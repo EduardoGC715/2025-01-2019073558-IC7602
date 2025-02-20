@@ -1,1 +1,1 @@
-Reppositorio grupal del curso de redes S1 2025
+Repositorio grupal del curso de redes S1 2025
