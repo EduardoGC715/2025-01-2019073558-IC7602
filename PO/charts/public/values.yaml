@@ -1,0 +1,8 @@
+config:
+  router:
+    replicas: 1
+    name: router
+    env1: "bla"
+    env2: "bla"
+    image: nereo08/router-ic76020125
+    port: 8080

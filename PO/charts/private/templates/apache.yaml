@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.config.apache.name }}
+  namespace: private
+  labels:
+    app: {{ .Values.config.apache.name }}
+spec:
+  replicas: {{ .Values.config.apache.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.config.apache.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.config.apache.name }}
+    spec:
+      containers:
+      - name: {{ .Values.config.apache.name }}
+        image: {{ .Values.config.apache.image }}
+        ports:
+          - containerPort: {{ .Values.config.apache.port }}
+        env:
+          - name: ENV1
+            value: "{{ .Values.config.apache.env1 }}"
+          - name: ENV2
+            value: {{ .Values.config.apache.env2 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.config.apache.name }}
+  namespace: private
+  labels:
+    app: {{ .Values.config.apache.name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.config.apache.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.config.apache.name }}

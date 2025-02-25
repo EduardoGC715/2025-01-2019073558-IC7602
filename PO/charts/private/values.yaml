@@ -1,0 +1,22 @@
+config:
+  app:
+    replicas: 2
+    name: api
+    env1: "bla"
+    env2: "bla"
+    image: nereo08/app-ic76020125
+    port: 5000
+  apache:
+    replicas: 2
+    name: apache
+    env1: "bla"
+    env2: "bla"
+    image: nereo08/apache-ic76020125
+    port: 80
+  asterisk:
+    replicas: 2
+    name: asterisk
+    env1: "bla"
+    env2: "bla"
+    image: nereo08/asterisk-ic76020125
+    port: 5601

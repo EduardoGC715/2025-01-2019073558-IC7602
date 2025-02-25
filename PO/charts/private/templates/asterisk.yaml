@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.config.asterisk.name }}
+  namespace: private
+  labels:
+    app: {{ .Values.config.asterisk.name }}
+spec:
+  replicas: {{ .Values.config.asterisk.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.config.asterisk.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.config.asterisk.name }}
+    spec:
+      containers:
+      - name: {{ .Values.config.asterisk.name }}
+        image: {{ .Values.config.asterisk.image }}
+        ports:
+          - containerPort: {{ .Values.config.asterisk.port }}
+        env:
+          - name: ENV1
+            value: "{{ .Values.config.asterisk.env1 }}"
+          - name: ENV2
+            value: {{ .Values.config.asterisk.env2 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.config.asterisk.name }}
+  namespace: private
+  labels:
+    app: {{ .Values.config.asterisk.name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.config.asterisk.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.config.asterisk.name }}

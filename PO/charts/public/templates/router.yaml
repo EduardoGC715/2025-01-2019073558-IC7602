@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.config.router.name }}
+  namespace: public
+  labels:
+    app: {{ .Values.config.router.name }}
+spec:
+  replicas: {{ .Values.config.router.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.config.router.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.config.router.name }}
+    spec:
+      containers:
+      - name: {{ .Values.config.router.name }}
+        securityContext:
+          privileged: true
+        image: {{ .Values.config.router.image }}
+        ports:
+          - containerPort: 8080
+          - containerPort: 8081
+          - containerPort: 5601
+        env:
+          - name: APACHE1URL
+            value: "apache1.private.svc.cluster.local"
+          - name: APACHE2URL
+            value: "apache1.private.svc.cluster.local"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.config.router.name }}
+  namespace: public
+  labels:
+    app: {{ .Values.config.router.name }}
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    protocol: TCP
+    name: apache1
+  - port: 8081
+    protocol: TCP
+    name: apache2
+  - port: 5601
+    protocol: TCP
+    name: asterisk
+  selector:
+    app: {{ .Values.config.router.name }}
