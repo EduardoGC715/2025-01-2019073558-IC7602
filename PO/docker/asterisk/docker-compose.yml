@@ -1,0 +1,11 @@
+services:
+  ubuntu_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ubuntu_app_container
+    # volumes:
+    #   - .:/app
+    tty: true # Keeps the container open for interaction
+    stdin_open: true # Keeps STDIN open, useful for interactive processes
+    command: ["tail", "-f", "/dev/null"] # Keeps the container running
