@@ -1,3 +1,4 @@
+{{- if .Values.config.asterisk.enabled}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,15 +17,10 @@ spec:
         app: {{ .Values.config.asterisk.name }}
     spec:
       containers:
-      - name: {{ .Values.config.asterisk.name }}
-        image: {{ .Values.config.asterisk.image }}
-        ports:
-          - containerPort: {{ .Values.config.asterisk.port }}
-        env:
-          - name: ENV1
-            value: "{{ .Values.config.asterisk.env1 }}"
-          - name: ENV2
-            value: {{ .Values.config.asterisk.env2 }}
+        - name: {{ .Values.config.asterisk.name }}
+          image: {{ .Values.config.asterisk.image }}
+          ports:
+            - containerPort: {{ .Values.config.asterisk.targetPort }}
 ---
 apiVersion: v1
 kind: Service
@@ -34,10 +30,11 @@ metadata:
   labels:
     app: {{ .Values.config.asterisk.name }}
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
-  - port: {{ .Values.config.asterisk.port }}
-    protocol: TCP
-    name: http
+    - port: {{ .Values.config.asterisk.port }}
+      targetPort: {{ .Values.config.asterisk.targetPort }}
+      protocol: UDP
   selector:
     app: {{ .Values.config.asterisk.name }}
+{{- end}}

@@ -1,43 +1,43 @@
+{{- if .Values.config.apache.enabled }}
+{{- range .Values.config.apache.instances }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.config.apache.name }}
+  name: {{ .name }}
   namespace: private
   labels:
-    app: {{ .Values.config.apache.name }}
+    app: {{ .name }}
 spec:
-  replicas: {{ .Values.config.apache.replicas }}
+  replicas: {{ $.Values.config.apache.replicas }}
   selector:
     matchLabels:
-      app: {{ .Values.config.apache.name }}
+      app: {{ .name }}
   template:
     metadata:
       labels:
-        app: {{ .Values.config.apache.name }}
+        app: {{ .name }}
     spec:
       containers:
-      - name: {{ .Values.config.apache.name }}
-        image: {{ .Values.config.apache.image }}
+      - name: {{ .name }}
+        image: {{ .image }}
         ports:
-          - containerPort: {{ .Values.config.apache.port }}
-        env:
-          - name: ENV1
-            value: "{{ .Values.config.apache.env1 }}"
-          - name: ENV2
-            value: {{ .Values.config.apache.env2 }}
+          - containerPort: {{ .port }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.config.apache.name }}
+  name: {{ .name }}
   namespace: private
   labels:
-    app: {{ .Values.config.apache.name }}
+    app: {{ .name }}
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
-  - port: {{ .Values.config.apache.port }}
+  - port: {{ .port }}
     protocol: TCP
     name: http
   selector:
-    app: {{ .Values.config.apache.name }}
+    app: {{ .name }}
+{{- end }}
+{{- end }}

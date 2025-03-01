@@ -1,7 +1,17 @@
 #!/bin/bash
-helm upgrade --install namespace namespace
+set -e  # Exit on error to prevent partial installs
+
+# Ensure script runs from the correct directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Running script from: $SCRIPT_DIR"
+
+# Install or upgrade the namespace chart
+helm upgrade --install namespace "$SCRIPT_DIR/namespace"
+sleep 10
+
+# Install or upgrade the private chart
+helm upgrade --install private "$SCRIPT_DIR/private"
 sleep 20
-cd ..
-helm upgrade --install private private
-sleep 60
-helm upgrade --install public public
+
+# Install or upgrade the public chart
+helm upgrade --install public "$SCRIPT_DIR/public"

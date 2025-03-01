@@ -44,4 +44,15 @@ RUN make && make install
 RUN make samples
 RUN make config
 
-CMD ["tail", "-f", "/dev/null"]
+WORKDIR /etc/asterisk
+RUN mv extensions.conf extensions.conf.bak
+RUN mv pjsip.conf pjsip.conf.bak
+RUN mv rtp.conf rtp.conf.bak
+COPY ./app/extensions.conf .
+COPY ./app/pjsip.conf .
+COPY ./app/rtp.conf .
+
+WORKDIR /app
+COPY ./app/script.sh .
+
+CMD ["sh", "script.sh"]

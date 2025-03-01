@@ -1,3 +1,4 @@
+{{- if .Values.config.router.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,19 +17,21 @@ spec:
         app: {{ .Values.config.router.name }}
     spec:
       containers:
-      - name: {{ .Values.config.router.name }}
-        securityContext:
-          privileged: true
-        image: {{ .Values.config.router.image }}
-        ports:
-          - containerPort: 8080
-          - containerPort: 8081
-          - containerPort: 5601
-        env:
-          - name: APACHE1URL
-            value: "apache1.private.svc.cluster.local"
-          - name: APACHE2URL
-            value: "apache1.private.svc.cluster.local"
+        - name: {{ .Values.config.router.name }}
+          securityContext:
+            privileged: true
+          image: {{ .Values.config.router.image }}
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+            - containerPort: 5601
+          env:
+            - name: APACHE1URL
+              value: "apache1.private.svc.cluster.local"
+            - name: APACHE2URL
+              value: "apache2.private.svc.cluster.local"
+            - name: ASTERISKURL
+              value: "asterisk.private.svc.cluster.local"
 ---
 apiVersion: v1
 kind: Service
@@ -40,14 +43,18 @@ metadata:
 spec:
   type: NodePort
   ports:
-  - port: 8080
-    protocol: TCP
-    name: apache1
-  - port: 8081
-    protocol: TCP
-    name: apache2
-  - port: 5601
-    protocol: TCP
-    name: asterisk
+    - port: 8080
+      protocol: TCP
+      name: apache1
+      nodePort: 30080
+    - port: 8081
+      protocol: TCP
+      name: apache2
+      nodePort: 30081
+    - port: 5601
+      protocol: UDP
+      name: asterisk
+      nodePort: 30601
   selector:
     app: {{ .Values.config.router.name }}
+{{- end }}

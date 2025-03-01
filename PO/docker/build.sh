@@ -1,13 +1,12 @@
 #!/bin/bash
 docker login
-cd flask
-docker build -t nereo08/app-ic76020125 .
-docker images
-docker push nereo08/app-ic76020125
+# cd flask
+# docker build -t nereo08/app-ic76020125 .
+# docker images
+# docker push nereo08/app-ic76020125
 cd ../router
-docker build -t nereo08/router-ic76020125 .
-docker images
-docker push nereo08/router-ic76020125
+docker-compose build
+make push
 cd ../asterisk
 docker build -t nereo08/asterisk-ic76020125 .
 docker images

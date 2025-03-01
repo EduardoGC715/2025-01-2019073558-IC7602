@@ -1,0 +1,10 @@
+services:
+  router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - router-po:latest
+        - router-po:1
+        - dandiego235/router-po:latest
+        - dandiego235/router-po:1
