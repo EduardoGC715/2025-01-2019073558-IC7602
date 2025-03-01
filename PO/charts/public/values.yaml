@@ -1,0 +1,7 @@
+config:
+  router:
+    enabled: true
+    replicas: 1
+    name: router
+    image: dandiego235/router-po:latest
+    port: 8080
