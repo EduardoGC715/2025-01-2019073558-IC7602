@@ -5,3 +5,9 @@ config:
     name: router
     image: dandiego235/router-po:latest
     port: 8080
+  ingress:
+    name: nginx-ingress
+nginx-ingress-controller:
+  namespaceOverride: public
+  fullnameOverride: nginx-ingress-controller
+  replicaCount: 1

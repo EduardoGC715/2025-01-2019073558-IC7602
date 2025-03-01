@@ -5,7 +5,7 @@ metadata:
   name: {{ .Values.config.router.name }}
   namespace: public
   labels:
-    app: {{ .Values.config.router.name }}
+    app: {{ .Values.config.router.name }} 
 spec:
   replicas: {{ .Values.config.router.replicas }}
   selector:

@@ -14,4 +14,6 @@ helm upgrade --install private "$SCRIPT_DIR/private"
 sleep 20
 
 # Install or upgrade the public chart
+#helm repo add bitnami https://charts.bitnami.com/bitnami
+#helm dependency update
 helm upgrade --install public "$SCRIPT_DIR/public"
