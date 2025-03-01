@@ -27,3 +27,7 @@ config:
     port: 5601
     targetPort: 5060
     protocol: UDP
+  ingress:
+    name: nginx-ingress
+    ingressClassName: nginx
+    host: localhost

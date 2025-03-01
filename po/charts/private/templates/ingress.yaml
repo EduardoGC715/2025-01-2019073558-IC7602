@@ -6,22 +6,17 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.config.ingress.ingressClassName }}
   rules:
-    - host: localhost
+    - host: {{ .Values.config.ingress.host }}
       http:
         paths:
-        - path: /apache1
+        {{- range .Values.config.apache.instances }}
+        - path: "/{{ .name }}"
           pathType: Prefix
           backend:
             service:
-              name: apache1
+              name: {{ .name }}
               port:
-                number: 80
-        - path: /apache2
-          pathType: Prefix
-          backend:
-            service:
-              name: apache2
-              port:
-                number: 80
+                number: {{ .port }}
+        {{- end }}
