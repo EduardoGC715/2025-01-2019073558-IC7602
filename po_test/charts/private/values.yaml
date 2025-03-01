@@ -1,0 +1,15 @@
+namespace:
+  name: private
+
+apache:
+  name1: apache1
+  name2: apache2
+  replicaCount: 1
+  internalPort: 80
+  apache1ExternalPort: 8080
+  apache2ExternalPort: 8081
+  image:
+    repository: httpd
+    tag: latest
+    pullPolicy: IfNotPresent
+  serviceType: ClusterIP

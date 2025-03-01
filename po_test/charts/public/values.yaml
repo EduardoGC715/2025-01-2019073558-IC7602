@@ -1,0 +1,20 @@
+namespace:
+  name: public
+
+router:
+  name: router
+  replicaCount: 1
+  image:
+    repository: ubuntu
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    externalPort: 8080 #todo
+    internalPort: 80 #todo
+ingress:
+  enabled: true
+  hosts:
+    - chart-example.local
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /

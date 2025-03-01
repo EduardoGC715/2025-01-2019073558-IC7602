@@ -1,0 +1,29 @@
+*filter
+# Allow loopback connections
+-A INPUT -i lo -j ACCEPT
+-A OUTPUT -o lo -j ACCEPT
+
+# Allow established and related connections
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A OUTPUT -m conntrack --ctstate ESTABLISHED -j ACCEPT
+
+# Allow SSH traffic
+-A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+-A OUTPUT -p tcp --sport 22 -m conntrack --ctstate ESTABLISHED -j ACCEPT
+
+# Allow HTTP traffic
+-A INPUT -p tcp --dport 80 -j ACCEPT
+
+# Allow access to Asterisk
+-A INPUT -p tcp --dport 5601 -j ACCEPT
+-A INPUT -p udp --dport 5601 -j ACCEPT
+
+# Allow access to Apaches
+-A INPUT -p tcp --dport 8080 -j ACCEPT
+-A INPUT -p tcp --dport 8081 -j ACCEPT
+
+# Drop all other incoming traffic
+-A INPUT -j DROP
+
+# End of rules
+COMMIT
