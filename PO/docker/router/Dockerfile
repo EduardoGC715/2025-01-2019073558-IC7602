@@ -8,18 +8,18 @@ FROM ubuntu:latest
 #RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf 
 #RUN yum install -y bind-utils -y
 
-RUN apt-get update
-RUN apt-get install build-essential -y
-RUN apt-get install curl -y
-RUN apt-get install dnsutils -y
-RUN apt-get install iptables -y
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    dnsutils \
+    iptables \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app 
 # entrar contenedor
 # crear un folder llamado /app
 # cd /app
- 
+
 COPY app/. . 
 
-CMD ["sh", "script.sh"]
-#CMD [ "tail", "-f", "/dev/null"]
+ENTRYPOINT ["/bin/bash", "/app/script.sh"]

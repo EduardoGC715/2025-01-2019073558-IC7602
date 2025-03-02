@@ -32,6 +32,8 @@ spec:
               value: "apache2.private.svc.cluster.local"
             - name: ASTERISKURL
               value: "asterisk.private.svc.cluster.local"
+            - name: INGRESSURL
+              value: "nginx-ingress-controller.public.svc.cluster.local"
 ---
 apiVersion: v1
 kind: Service
@@ -55,6 +57,10 @@ spec:
       protocol: UDP
       name: asterisk
       nodePort: 30601
+    - port: 80
+      protocol: TCP
+      name: ingress
+      nodePort: 30082
   selector:
     app: {{ .Values.config.router.name }}
 {{- end }}

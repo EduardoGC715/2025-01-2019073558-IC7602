@@ -6,5 +6,6 @@ services:
       tags:
         - router-po:latest
         - router-po:1
-        - dandiego235/router-po:latest
-        - dandiego235/router-po:1
+        - dado715/router-po:latest
+        - dado715/router-po:1
+    privileged: true
