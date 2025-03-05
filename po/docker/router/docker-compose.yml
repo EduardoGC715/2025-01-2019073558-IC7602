@@ -1,0 +1,11 @@
+services:
+  router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - router-po:latest
+        - router-po:1
+        - dado715/router-po:latest
+        - dado715/router-po:1
+    privileged: true

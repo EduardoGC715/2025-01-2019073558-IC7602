@@ -1,0 +1,33 @@
+config:
+  app:
+    enabled: false
+    replicas: 1
+    name: api
+    env1: "bla"
+    env2: "bla"
+    image: nereo08/app-ic76020125
+    port: 5000
+  apache:
+    enabled: true
+    replicas: 1
+    instances:
+      - name: apache1
+        image: dandiego235/apache-po:1.0
+        port: 80
+      - name: apache2
+        image: dandiego235/apache-po:2.0
+        port: 80
+  asterisk:
+    enabled: true
+    replicas: 1
+    name: asterisk
+    env1: "bla"
+    env2: "bla"
+    image: dandiego235/asterisk-po:latest
+    port: 5601
+    targetPort: 5060
+    protocol: UDP
+  ingress:
+    name: nginx-ingress
+    ingressClassName: nginx
+    host: localhost
