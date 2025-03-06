@@ -21,6 +21,9 @@ spec:
           image: {{ .Values.config.asterisk.image }}
           ports:
             - containerPort: {{ .Values.config.asterisk.targetPort }}
+            {{- range $port := untilStep 10000 10011 1 }}
+            - containerPort: {{ $port }}
+            {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -32,9 +35,16 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: {{ .Values.config.asterisk.port }}
+    - name: sip
+      port: {{ .Values.config.asterisk.port }}
       targetPort: {{ .Values.config.asterisk.targetPort }}
       protocol: UDP
+    {{- range $i, $port := untilStep 10000 10011 1 }}
+    - name: rtp-{{ $port }}  # Each port needs a unique name
+      port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: UDP
+    {{- end }}
   selector:
     app: {{ .Values.config.asterisk.name }}
 {{- end}}

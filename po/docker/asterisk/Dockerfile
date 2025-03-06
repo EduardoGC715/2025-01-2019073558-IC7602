@@ -6,6 +6,7 @@ RUN apt install -y \
   gcc \
   g++ \
   make \
+  nano \
   libjansson-dev \
   libsqlite3-dev \
   libxml2-dev \

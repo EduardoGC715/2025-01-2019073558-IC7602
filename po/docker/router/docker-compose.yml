@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
       tags:
         - router-po:latest
-        - router-po:1
-        - dado715/router-po:latest
-        - dado715/router-po:1
+        - router-po:2
+        - dandiego235/router-po:latest
+        - dandiego235/router-po:2
     privileged: true

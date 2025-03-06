@@ -5,16 +5,12 @@ services:
       dockerfile: Dockerfile
       tags:
         - asterisk-po:latest
-        - asterisk-po:1
+        - asterisk-po:2
         - dandiego235/asterisk-po:latest
-        - dandiego235/asterisk-po:1
+        - dandiego235/asterisk-po:2
     container_name: asterisk
-    network_mode: "host"
     # volumes:
     #   - .:/app
     ports:
       - "5060:5060/udp"
       - "10000-10010:10000-10010/udp" # RTP media ports
-    tty: true # Keeps the container open for interaction
-    stdin_open: true # Keeps STDIN open, useful for interactive processes
-    command: ["tail", "-f", "/dev/null"] # Keeps the container running
