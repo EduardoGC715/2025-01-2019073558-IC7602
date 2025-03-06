@@ -1,6 +1,6 @@
 push:
 	@echo "Pushing to DockerHub"
 ifdef version
-	docker push dado715/router-po:$(version)
+	docker push dandiego235/router-po:$(version)
 endif
-	docker push dado715/router-po:latest
+	docker push dandiego235/router-po:latest
