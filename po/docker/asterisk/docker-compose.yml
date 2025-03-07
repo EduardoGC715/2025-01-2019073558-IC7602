@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile
       tags:
         - asterisk-po:latest
-        - asterisk-po:2
+        - asterisk-po:2.1
         - dandiego235/asterisk-po:latest
-        - dandiego235/asterisk-po:2
+        - dandiego235/asterisk-po:2.1
     container_name: asterisk
     # volumes:
     #   - .:/app
