@@ -23,6 +23,8 @@ iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 80 -j ACCEPT
 # iptables -A FORWARD -p udp --dport 10000:10010 -j ACCEPT
 # iptables -A FORWARD -p udp --sport 10000:10010 -j ACCEPT
 
+iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 80 -j ACCEPT
+
 # Forward RTP packets to Asterisk
 iptables -t nat -A PREROUTING -i eth0 -p udp --dport 10000:10010 -j DNAT --to-destination $ASTERISK
 
