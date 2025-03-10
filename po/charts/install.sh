@@ -9,8 +9,9 @@ echo "Running script from: $SCRIPT_DIR"
 helm upgrade --install namespace "$SCRIPT_DIR/namespace"
 sleep 10
 
+export $(grep -v '^#' .env | xargs)  # Load .env variables
 # Install or upgrade the private chart
-helm upgrade --install private "$SCRIPT_DIR/private"
+helm upgrade --install private "$SCRIPT_DIR/private" --set config.asterisk.external_ip=$EXTERNAL_IP
 sleep 20
 
 # Install or upgrade the public chart

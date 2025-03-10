@@ -24,6 +24,9 @@ spec:
             {{- range $port := untilStep 10000 10011 1 }}
             - containerPort: {{ $port }}
             {{- end }}
+          env:
+            - name: EXTERNAL_IP
+              value: {{ .Values.config.asterisk.external_ip }}
 ---
 apiVersion: v1
 kind: Service

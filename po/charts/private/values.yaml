@@ -25,6 +25,7 @@ config:
     port: 5060
     targetPort: 5060
     protocol: UDP
+    external_ip: ${EXTERNAL_IP}
   ingress:
     name: nginx-ingress
     ingressClassName: nginx
