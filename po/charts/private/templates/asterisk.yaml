@@ -38,15 +38,23 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: sip
+    - name: sip-udp
       port: {{ .Values.config.asterisk.port }}
       targetPort: {{ .Values.config.asterisk.targetPort }}
       protocol: UDP
+    - name: sip-tcp
+      port: {{ .Values.config.asterisk.port }}
+      targetPort: {{ .Values.config.asterisk.targetPort }}
+      protocol: TCP
     {{- range $i, $port := untilStep 10000 10011 1 }}
-    - name: rtp-{{ $port }}  # Each port needs a unique name
+    - name: rtp-udp-{{ $port }}  # Each port needs a unique name
       port: {{ $port }}
       targetPort: {{ $port }}
       protocol: UDP
+    - name: rtp-tcp-{{ $port }}
+      port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: TCP
     {{- end }}
   selector:
     app: {{ .Values.config.asterisk.name }}

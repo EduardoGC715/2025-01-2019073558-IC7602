@@ -55,7 +55,11 @@ spec:
       nodePort: 30081
     - port: 5601
       protocol: UDP
-      name: asterisk
+      name: asterisk-udp
+      nodePort: 30601
+    - port: 5601
+      protocol: TCP
+      name: asterisk-tcp
       nodePort: 30601
     - port: 80
       protocol: TCP
