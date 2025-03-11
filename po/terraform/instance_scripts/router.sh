@@ -1,30 +1,21 @@
 #!/bin/bash
 
-# Execute the docker_installation.sh script
-${DOCKER_INSTALL_SCRIPT}
-
-# Check if the docker_installation.sh script executed successfully
-if [ $? -ne 0 ]; then
-  echo "Docker installation failed. Exiting."
-  exit 1
-fi
-
-# Pull the Docker image
-docker pull dandiego235/router-po:latest
-
-# Check if the Docker image was pulled successfully
-if [ $? -ne 0 ]; then
-  echo "Failed to pull Docker image. Exiting."
-  exit 1
-fi
-
 # Get the router instance's private IP from Terraform
 export APACHE1="${APACHE1URL_PLACEHOLDER}"
 export APACHE2="${APACHE2URL_PLACEHOLDER}"
+export ASTERISK="${ASTERISKURL_PLACEHOLDER}"
+export INGRESS="${INGRESSURL_PLACEHOLDER}"
 
 # Save the variable permanently
 echo "APACHE1=$APACHE1" >> /etc/environment
 echo "APACHE2=$APACHE2" >> /etc/environment
+echo "ASTERISK=$ASTERISK" >> /etc/environment
+echo "INGRESS=$INGRESS" >> /etc/environment
+
+sudo rm -f /etc/resolv.conf
+echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+
 
 # Enable IP forwarding in the kernel - CRITICAL FOR ROUTING
 echo 1 > /proc/sys/net/ipv4/ip_forward
@@ -33,8 +24,9 @@ echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sysctl -p
 
 # Allow all INPUT and OUTPUT traffic
-iptables -A INPUT -j ACCEPT
-iptables -A OUTPUT -j ACCEPT
+iptables -P INPUT -j ACCEPT
+iptables -P OUTPUT -j ACCEPT
+iptables -P FORWARD -j ACCEPT
 
 # Accept Forwarding Rules
 iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 8080 -j ACCEPT

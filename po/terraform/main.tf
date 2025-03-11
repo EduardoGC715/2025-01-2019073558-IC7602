@@ -106,6 +106,7 @@ resource "aws_route_table_association" "private_assoc" {
 
 # Security Group for Private Instances
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group
+# APACHES
 resource "aws_security_group" "apache_sg" {
   vpc_id = aws_vpc.po_vpc.id
   name   = "apache_sg"
@@ -117,7 +118,7 @@ resource "aws_security_group" "apache_sg" {
 
 resource "aws_vpc_security_group_ingress_rule" "allow_ssh_apache" {
   security_group_id = aws_security_group.apache_sg.id
-  cidr_ipv4         = aws_vpc.po_vpc.cidr_block
+  cidr_ipv4         = "0.0.0.0/0"
   from_port         = 22
   to_port           = 22
   ip_protocol       = "tcp"
@@ -173,6 +174,81 @@ resource "aws_instance" "apache2_instance" {
     DOCKER_INSTALL_SCRIPT = file("${path.module}/instance_scripts/docker_install.sh")
   })
 }
+
+# ASTERISK
+# Security Group for Asterisk Instances
+resource "aws_security_group" "asterisk_sg" {
+  vpc_id = aws_vpc.po_vpc.id
+  name   = "asterisk_sg"
+
+  tags = {
+    Name = "Asterisk Security Group"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_ssh_asterisk" {
+  security_group_id = aws_security_group.asterisk_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  to_port           = 22
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_udp_asterisk" {
+  security_group_id = aws_security_group.asterisk_sg.id
+  cidr_ipv4         = aws_subnet.public_subnet.cidr_block
+  from_port         = 5060
+  to_port           = 5060
+  ip_protocol       = "udp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_tcp_asterisk" {
+  security_group_id = aws_security_group.asterisk_sg.id
+  cidr_ipv4         = aws_subnet.public_subnet.cidr_block
+  from_port         = 5060
+  to_port           = 5060
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_rtp_udp_asterisk" {
+  security_group_id = aws_security_group.asterisk_sg.id
+  cidr_ipv4         = aws_subnet.public_subnet.cidr_block
+  from_port         = 10000
+  to_port           = 10010
+  ip_protocol       = "udp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_rtp_tcp_asterisk" {
+  security_group_id = aws_security_group.asterisk_sg.id
+  cidr_ipv4         = aws_subnet.public_subnet.cidr_block
+  from_port         = 10000
+  to_port           = 10010
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_asterisk" {
+  security_group_id = aws_security_group.asterisk_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
+
+resource "aws_instance" "asterisk_instance" {
+  ami             = var.aws_ami
+  instance_type   = "t2.micro"
+  subnet_id       = aws_subnet.private_subnet.id
+  security_groups = [aws_security_group.asterisk_sg.id]
+
+  tags = {
+    Name = "Asterisk Instance"
+  }
+
+  user_data = templatefile("${path.module}/instance_scripts/asterisk.sh", {
+    DOCKER_INSTALL_SCRIPT = file("${path.module}/instance_scripts/docker_install.sh")
+    EXTERNAL_IP_PLACEHOLDER = aws_eip.router_eip.public_ip
+    EXTERNAL_PORT_PLACEHOLDER = 5601
+  })
+}
+
 
 resource "aws_security_group" "router_sg" {
   vpc_id = aws_vpc.po_vpc.id
@@ -239,17 +315,75 @@ resource "aws_instance" "router_instance" {
     Name = "Router Instance"
   }
 
+  source_dest_check = false
+
   user_data = templatefile("${path.module}/instance_scripts/router.sh", {
-    DOCKER_INSTALL_SCRIPT  = file("${path.module}/instance_scripts/docker_install.sh")
     APACHE1URL_PLACEHOLDER = aws_instance.apache1_instance.private_ip
     APACHE2URL_PLACEHOLDER = aws_instance.apache2_instance.private_ip
+    ASTERISKURL_PLACEHOLDER = aws_instance.asterisk_instance.private_ip
+    INGRESSURL_PLACEHOLDER = aws_instance.ingress_instance.private_ip
   })
 }
 
 # Elastic IP for Router Instance
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip
 resource "aws_eip" "router_eip" {
-  instance = aws_instance.router_instance.id
+  
+}
+
+resource "aws_eip_association" "router_eip_assoc" {
+  instance_id   = aws_instance.router_instance.id
+  allocation_id = aws_eip.router_eip.id
+}
+
+# INGRESS
+resource "aws_security_group" "ingress_sg" {
+  vpc_id = aws_vpc.po_vpc.id
+  name   = "ingress_sg"
+
+  tags = {
+    Name = "Ingress Security Group"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_ssh_ingress" {
+  security_group_id = aws_security_group.ingress_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  to_port           = 22
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_http_ingress" {
+  security_group_id = aws_security_group.ingress_sg.id
+  cidr_ipv4         = aws_subnet.public_subnet.cidr_block
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_ingress" {
+  security_group_id = aws_security_group.ingress_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
+
+resource "aws_instance" "ingress_instance" {
+  ami             = var.aws_ami
+  instance_type   = "t2.micro"
+  subnet_id       = aws_subnet.public_subnet.id
+  security_groups = [aws_security_group.ingress_sg.id]
+
+  tags = {
+    Name = "Ingress Instance"
+  }
+
+  source_dest_check = false
+
+  user_data = templatefile("${path.module}/instance_scripts/ingress.sh", {
+    APACHE1URL_PLACEHOLDER = aws_instance.apache1_instance.private_ip
+    APACHE2URL_PLACEHOLDER = aws_instance.apache2_instance.private_ip
+  })
 }
 
 # Output

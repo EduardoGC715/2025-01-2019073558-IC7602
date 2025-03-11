@@ -1,12 +1,4 @@
 config:
-  app:
-    enabled: false
-    replicas: 1
-    name: api
-    env1: "bla"
-    env2: "bla"
-    image: nereo08/app-ic76020125
-    port: 5000
   apache:
     enabled: true
     replicas: 1
@@ -26,6 +18,7 @@ config:
     targetPort: 5060
     protocol: UDP
     external_ip: ${EXTERNAL_IP}
+    external_port: 5601
   ingress:
     name: nginx-ingress
     ingressClassName: nginx
