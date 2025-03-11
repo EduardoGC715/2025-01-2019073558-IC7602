@@ -25,6 +25,7 @@ spec:
             - containerPort: 8080
             - containerPort: 8081
             - containerPort: 5601
+            - containerPort: 80
           env:
             - name: APACHE1URL
               value: "apache1.private.svc.cluster.local"
