@@ -28,7 +28,7 @@ spec:
             - name: EXTERNAL_IP
               value: {{ .Values.config.asterisk.external_ip }}
             - name: EXTERNAL_PORT
-              value: {{ .Values.config.asterisk.external_port}}
+              value: "{{ .Values.config.asterisk.external_port}}"
 ---
 apiVersion: v1
 kind: Service
