@@ -26,3 +26,33 @@ http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" \
 
 sudo apt install nginx -y
 
+cat << 'EOF' | sudo tee /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    servername ;
+
+    # Route for Apache1
+    location /apache1 {
+        proxy_pass http://$apache1/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Route for Apache2
+    location /apache2 {
+        proxy_pass http://$apache2/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Default route
+    location / {
+        return 200 'Welcome to NGINX Router\n';
+        add_header Content-Type text/plain;
+    }
+}
+EOF
