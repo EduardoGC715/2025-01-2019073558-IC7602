@@ -50,7 +50,6 @@ resource "aws_subnet" "private_subnet" {
   vpc_id            = aws_vpc.po_vpc.id
   cidr_block        = "10.0.2.0/24"
   availability_zone = "us-east-1a"
-  map_public_ip_on_launch = true
   tags = {
     Name = "PrivateSubnet"
   }
@@ -64,6 +63,20 @@ resource "aws_internet_gateway" "igw" {
   tags = {
     Name = "PO Internet Gateway"
   }
+}
+
+# NAT Gateway
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/nat_gateway
+resource "aws_eip" "nat_gateway_eip" {}
+resource "aws_nat_gateway" "nat_gateway" {
+  allocation_id = aws_eip.nat_gateway_eip.id
+  subnet_id     = aws_subnet.public_subnet.id
+
+  tags = {
+    Name = "PO NAT Gateway"
+  }
+
+  depends_on = [aws_internet_gateway.igw]
 }
 
 # Route Table
@@ -91,9 +104,8 @@ resource "aws_route_table" "private_rt" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
+    nat_gateway_id = aws_nat_gateway.nat_gateway.id
   }
-
   tags = {
     Name = "PO Private Route Table"
   }
@@ -139,16 +151,16 @@ resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_apache" {
 }
 
 resource "aws_key_pair" "apache_key" {
-  key_name   = "apache-key"
-  public_key = file("${path.module}/apache_key.pub")
+  key_name = "apache_key"
+  public_key = file("${path.module}/ssh_keys/apache_key.pub")
 }
 
 resource "aws_instance" "apache1_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
   subnet_id       = aws_subnet.private_subnet.id
-  security_groups = [aws_security_group.apache_sg.id]
-  key_name        = aws_key_pair.apache_key.key_name
+  vpc_security_group_ids = [aws_security_group.apache_sg.id]
+  key_name = aws_key_pair.apache_key.key_name
 
   tags = {
     Name = "Apache 1 Instance"
@@ -163,9 +175,8 @@ resource "aws_instance" "apache2_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
   subnet_id       = aws_subnet.private_subnet.id
-  security_groups = [aws_security_group.apache_sg.id]
-  key_name        = aws_key_pair.apache_key.key_name
-
+  vpc_security_group_ids = [aws_security_group.apache_sg.id]
+  key_name = aws_key_pair.apache_key.key_name
   tags = {
     Name = "Apache 2 Instance"
   }
@@ -236,7 +247,8 @@ resource "aws_instance" "asterisk_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
   subnet_id       = aws_subnet.private_subnet.id
-  security_groups = [aws_security_group.asterisk_sg.id]
+  vpc_security_group_ids = [aws_security_group.asterisk_sg.id]
+  key_name = aws_key_pair.apache_key.key_name
 
   tags = {
     Name = "Asterisk Instance"
@@ -249,7 +261,7 @@ resource "aws_instance" "asterisk_instance" {
   })
 }
 
-
+# ROUTER
 resource "aws_security_group" "router_sg" {
   vpc_id = aws_vpc.po_vpc.id
   name   = "router_sg"
@@ -305,11 +317,17 @@ resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_router" {
   ip_protocol       = "-1"
 }
 
+resource "aws_key_pair" "router_key" {
+  key_name = "router_key"
+  public_key = file("${path.module}/ssh_keys/router_key.pub")
+}
+
 resource "aws_instance" "router_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
   subnet_id       = aws_subnet.public_subnet.id
-  security_groups = [aws_security_group.router_sg.id]
+  vpc_security_group_ids = [aws_security_group.router_sg.id]
+  key_name = aws_key_pair.router_key.key_name
 
   tags = {
     Name = "Router Instance"
@@ -372,7 +390,7 @@ resource "aws_instance" "ingress_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
   subnet_id       = aws_subnet.public_subnet.id
-  security_groups = [aws_security_group.ingress_sg.id]
+  vpc_security_group_ids = [aws_security_group.ingress_sg.id]
 
   tags = {
     Name = "Ingress Instance"
@@ -391,3 +409,61 @@ output "router_eip" {
   description = "The Elastic IP of the Router Instance"
   value       = aws_eip.router_eip.public_ip
 }
+
+
+# resource "aws_security_group" "bastion_sg" {
+#   vpc_id = aws_vpc.po_vpc.id
+#   name   = "bastion_sg"
+
+#   tags = {
+#     Name = "Bastion Host Security Group"
+#   }
+# }
+
+# resource "aws_vpc_security_group_ingress_rule" "allow_ssh_bastion" {
+#   security_group_id = aws_security_group.bastion_sg.id
+#   cidr_ipv4         = "0.0.0.0/0"
+#   from_port         = 22
+#   to_port           = 22
+#   ip_protocol       = "tcp"
+# }
+
+# resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_bastion" {
+#   security_group_id = aws_security_group.bastion_sg.id
+#   cidr_ipv4         = "0.0.0.0/0"
+#   ip_protocol       = "-1"
+# }
+
+# resource "aws_key_pair" "bastion_key" {
+#   key_name = "bastion_key"
+#   public_key = file("${path.module}/ssh_keys/bastion_key.pub")
+# }
+
+# resource "aws_instance" "bastion_host" {
+#   ami                         = var.aws_ami
+#   instance_type               = "t2.micro"
+#   subnet_id                   = aws_subnet.public_subnet.id
+#   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
+#   associate_public_ip_address = true
+#   key_name                    = aws_key_pair.bastion_key.key_name
+
+#   tags = {
+#     Name = "Bastion Host"
+#   }
+# }
+
+# output "bastion_public_ip" {
+#   value = aws_instance.bastion_host.public_ip
+# }
+
+# output "apache_private_ip" {
+#   value = aws_instance.apache1_instance.private_ip
+# }
+
+# resource "aws_vpc_security_group_ingress_rule" "allow_ssh_from_bastion" {
+#   security_group_id            = aws_security_group.apache_sg.id
+#   referenced_security_group_id = aws_security_group.bastion_sg.id
+#   from_port                    = 22
+#   to_port                      = 22
+#   ip_protocol                  = "tcp"
+# }

@@ -16,7 +16,6 @@ sudo rm -f /etc/resolv.conf
 echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
 
-
 # Enable IP forwarding in the kernel - CRITICAL FOR ROUTING
 echo 1 > /proc/sys/net/ipv4/ip_forward
 # Make IP forwarding persistent after reboot
@@ -66,5 +65,3 @@ iptables -t nat -A OUTPUT -p tcp --dport 80 -j DNAT --to-destination $INGRESS:80
 
 # Enable MASQUERADE for proper routing
 iptables -t nat -A POSTROUTING -j MASQUERADE
-
-

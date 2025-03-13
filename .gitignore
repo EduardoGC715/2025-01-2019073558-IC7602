@@ -1,2 +1,3 @@
 /PO/charts/.env
 /PO/terraform/.terraform
+/PO/terraform/ssh_keys
