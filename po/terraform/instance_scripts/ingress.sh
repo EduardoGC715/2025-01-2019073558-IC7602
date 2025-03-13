@@ -55,4 +55,9 @@ server {
         add_header Content-Type text/plain;
     }
 }
+
 EOF
+
+sudo rm -rf /etc/nginx/sites-enabled/default
+sudo systemctl restart nginx
+sudo systemctl enable nginx
