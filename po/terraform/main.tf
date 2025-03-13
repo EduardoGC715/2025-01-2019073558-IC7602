@@ -154,7 +154,7 @@ resource "aws_key_pair" "apache_key" {
   key_name = "apache_key"
   public_key = file("${path.module}/ssh_keys/apache_key.pub")
 }
-
+# APACHE 1
 resource "aws_instance" "apache1_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
@@ -169,8 +169,11 @@ resource "aws_instance" "apache1_instance" {
   user_data = templatefile("${path.module}/instance_scripts/apache1.sh", {
     DOCKER_INSTALL_SCRIPT = file("${path.module}/instance_scripts/docker_install.sh")
   })
+
+  depends_on = [ aws_nat_gateway.nat_gateway ]
 }
 
+# APACHE 2
 resource "aws_instance" "apache2_instance" {
   ami             = var.aws_ami
   instance_type   = "t2.micro"
@@ -184,6 +187,8 @@ resource "aws_instance" "apache2_instance" {
   user_data = templatefile("${path.module}/instance_scripts/apache2.sh", {
     DOCKER_INSTALL_SCRIPT = file("${path.module}/instance_scripts/docker_install.sh")
   })
+
+  depends_on = [ aws_nat_gateway.nat_gateway ]
 }
 
 # ASTERISK
@@ -259,6 +264,8 @@ resource "aws_instance" "asterisk_instance" {
     EXTERNAL_IP_PLACEHOLDER = aws_eip.router_eip.public_ip
     EXTERNAL_PORT_PLACEHOLDER = 5601
   })
+
+  depends_on = [ aws_nat_gateway.nat_gateway ]
 }
 
 # ROUTER
