@@ -1,5 +1,9 @@
 #!/bin/bash
 
+sudo rm -f /etc/resolv.conf
+echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+
 # Get the router instance's private IP from Terraform
 export EXTERNAL_IP="${EXTERNAL_IP_PLACEHOLDER}"
 export EXTERNAL_PORT="${EXTERNAL_PORT_PLACEHOLDER}"
