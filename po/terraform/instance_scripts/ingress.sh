@@ -26,27 +26,27 @@ http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" \
 
 sudo apt install nginx -y
 
-cat << 'EOF' | sudo tee /etc/nginx/conf.d/default.conf
+cat << EOF | sudo tee /etc/nginx/conf.d/reverse_proxy.conf
 server {
     listen 80;
-    servername ;
+    server_name _;
 
     # Route for Apache1
     location /apache1 {
-        proxy_pass http://$apache1/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://$APACHE1:80/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Route for Apache2
     location /apache2 {
-        proxy_pass http://$apache2/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://$APACHE2:80/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Default route
