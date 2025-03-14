@@ -1,5 +1,6 @@
 FROM ubuntu:latest
 
+# https://docs.asterisk.org/Getting-Started/Installing-Asterisk/Installing-Asterisk-From-Source/What-to-Download/
 RUN apt update && apt upgrade -y
 RUN apt install -y \
   build-essential \

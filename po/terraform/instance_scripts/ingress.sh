@@ -26,7 +26,9 @@ http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" \
 
 sudo apt install nginx -y
 
-cat << EOF | sudo tee /etc/nginx/conf.d/reverse_proxy.conf
+# https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/
+# https://www.digitalocean.com/community/tutorials/how-to-configure-nginx-as-a-reverse-proxy-on-ubuntu-22-04
+cat << EOF | sudo tee /etc/nginx/sites-enabled/reverse_proxy
 server {
     listen 80;
     server_name _;

@@ -28,10 +28,6 @@ iptables -P OUTPUT -j ACCEPT
 iptables -P FORWARD -j ACCEPT
 
 # Accept Forwarding Rules
-iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 8080 -j ACCEPT
-iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 8081 -j ACCEPT
-
-
 iptables -A FORWARD -i eth0 -o eth0 -p udp --dport 5060 -j ACCEPT
 iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 5060 -j ACCEPT
 
@@ -45,15 +41,15 @@ iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 80 -j ACCEPT
 iptables -t nat -A PREROUTING -i eth0 -p udp --dport 10000:10010 -j DNAT --to-destination $ASTERISK
 
 
-# Log and Apply DNAT (Destination NAT) for Apache1
+# Apply DNAT (Destination NAT) for Apache1
 iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 8080 -j DNAT --to-destination $APACHE1:80
 iptables -t nat -A OUTPUT -p tcp --dport 8080 -j DNAT --to-destination $APACHE1:80
 
-# Log and Apply DNAT for Apache2
+# Apply DNAT for Apache2
 iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 8081 -j DNAT --to-destination $APACHE2:80
 iptables -t nat -A OUTPUT -p tcp --dport 8081 -j DNAT --to-destination $APACHE2:80
 
-# Log and Apply DNAT for Asterisk (UDP and TCP)
+# Apply DNAT for Asterisk (UDP and TCP)
 iptables -t nat -A PREROUTING -i eth0 -p udp --dport 5601 -j DNAT --to-destination $ASTERISK:5060
 iptables -t nat -A OUTPUT -p udp --dport 5601 -j DNAT --to-destination $ASTERISK:5060
 iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 5601 -j DNAT --to-destination $ASTERISK:5060

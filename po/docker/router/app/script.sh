@@ -10,14 +10,8 @@ iptables -A INPUT -j ACCEPT
 iptables -A OUTPUT -j ACCEPT
 
 # Accept Forwarding Rules
-iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 8080 -j ACCEPT
-iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 8081 -j ACCEPT
-
-
 iptables -A FORWARD -i eth0 -o eth0 -p udp --dport 5060 -j ACCEPT
 iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 5060 -j ACCEPT
-
-iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 80 -j ACCEPT
 
 iptables -A FORWARD -i eth0 -o eth0 -p tcp --dport 80 -j ACCEPT
 

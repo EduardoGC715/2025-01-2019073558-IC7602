@@ -1,4 +1,7 @@
-# Basado en https://spacelift.io/blog/terraform-aws-vpc
+# Script de configuración de terraform para la creación de la infraestructura del PO de Redes
+# Basado en https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-build
+# https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-remote
+
 terraform {
   cloud {
     organization = "Proyectos-Redes"
@@ -22,6 +25,7 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Configuración de VPCs basado en https://spacelift.io/blog/terraform-aws-vpc
 # Virtual Private Cloud to host subnets
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc
 resource "aws_vpc" "po_vpc" {
@@ -65,6 +69,7 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
+# Configuración de NAT Gateway e instancias basado en https://rhuaridh.co.uk/blog/aws-private-subnet.html
 # NAT Gateway
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/nat_gateway
 resource "aws_eip" "nat_gateway_eip" {}
@@ -418,59 +423,59 @@ output "router_eip" {
 }
 
 
-# resource "aws_security_group" "bastion_sg" {
-#   vpc_id = aws_vpc.po_vpc.id
-#   name   = "bastion_sg"
+resource "aws_security_group" "bastion_sg" {
+  vpc_id = aws_vpc.po_vpc.id
+  name   = "bastion_sg"
 
-#   tags = {
-#     Name = "Bastion Host Security Group"
-#   }
-# }
+  tags = {
+    Name = "Bastion Host Security Group"
+  }
+}
 
-# resource "aws_vpc_security_group_ingress_rule" "allow_ssh_bastion" {
-#   security_group_id = aws_security_group.bastion_sg.id
-#   cidr_ipv4         = "0.0.0.0/0"
-#   from_port         = 22
-#   to_port           = 22
-#   ip_protocol       = "tcp"
-# }
+resource "aws_vpc_security_group_ingress_rule" "allow_ssh_bastion" {
+  security_group_id = aws_security_group.bastion_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  to_port           = 22
+  ip_protocol       = "tcp"
+}
 
-# resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_bastion" {
-#   security_group_id = aws_security_group.bastion_sg.id
-#   cidr_ipv4         = "0.0.0.0/0"
-#   ip_protocol       = "-1"
-# }
+resource "aws_vpc_security_group_egress_rule" "allow_outbound_traffic_bastion" {
+  security_group_id = aws_security_group.bastion_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
 
-# resource "aws_key_pair" "bastion_key" {
-#   key_name = "bastion_key"
-#   public_key = file("${path.module}/ssh_keys/bastion_key.pub")
-# }
+resource "aws_key_pair" "bastion_key" {
+  key_name = "bastion_key"
+  public_key = file("${path.module}/ssh_keys/bastion_key.pub")
+}
 
-# resource "aws_instance" "bastion_host" {
-#   ami                         = var.aws_ami
-#   instance_type               = "t2.micro"
-#   subnet_id                   = aws_subnet.public_subnet.id
-#   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
-#   associate_public_ip_address = true
-#   key_name                    = aws_key_pair.bastion_key.key_name
+resource "aws_instance" "bastion_host" {
+  ami                         = var.aws_ami
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.public_subnet.id
+  vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
+  associate_public_ip_address = true
+  key_name                    = aws_key_pair.bastion_key.key_name
 
-#   tags = {
-#     Name = "Bastion Host"
-#   }
-# }
+  tags = {
+    Name = "Bastion Host"
+  }
+}
 
-# output "bastion_public_ip" {
-#   value = aws_instance.bastion_host.public_ip
-# }
+output "bastion_public_ip" {
+  value = aws_instance.bastion_host.public_ip
+}
 
-# output "apache_private_ip" {
-#   value = aws_instance.apache1_instance.private_ip
-# }
+output "apache_private_ip" {
+  value = aws_instance.apache1_instance.private_ip
+}
 
-# resource "aws_vpc_security_group_ingress_rule" "allow_ssh_from_bastion" {
-#   security_group_id            = aws_security_group.apache_sg.id
-#   referenced_security_group_id = aws_security_group.bastion_sg.id
-#   from_port                    = 22
-#   to_port                      = 22
-#   ip_protocol                  = "tcp"
-# }
+resource "aws_vpc_security_group_ingress_rule" "allow_ssh_from_bastion" {
+  security_group_id            = aws_security_group.apache_sg.id
+  referenced_security_group_id = aws_security_group.bastion_sg.id
+  from_port                    = 22
+  to_port                      = 22
+  ip_protocol                  = "tcp"
+}
