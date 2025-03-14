@@ -6,6 +6,7 @@ config:
     image: dandiego235/router-po:latest
     port: 8080
 nginx-ingress-controller:
+  # Configuration for the Ingress obtained from https://kubernetes.io/docs/concepts/services-networking/ingress/
   namespaceOverride: public
   fullnameOverride: nginx-ingress-controller
   replicaCount: 1

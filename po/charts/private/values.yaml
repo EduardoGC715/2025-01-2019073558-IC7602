@@ -20,6 +20,7 @@ config:
     external_ip: ${EXTERNAL_IP}
     external_port: "30601"
   ingress:
+    # Configuration for the Ingress obtained from https://kubernetes.io/docs/concepts/services-networking/ingress/
     name: nginx-ingress
     ingressClassName: nginx
     host: localhost
