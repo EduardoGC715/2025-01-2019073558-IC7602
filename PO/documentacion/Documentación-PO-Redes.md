@@ -1,15 +1,14 @@
 	
 
-# Instituto Tecnológico de Costa Rica 
 
-# Campus Tecnológico Central Cartago 
+# Instituto Tecnológico de Costa Rica  
+## Campus Tecnológico Central Cartago  
+## Escuela de Ingeniería en Computación  
+# Proyecto Opcional Redes  
+### Redes - Grupo 2  
+### Prof. Gerardo Nereo Campos Araya  
 
-# Escuela de Ingeniería en Computación 
-
-# Proyecto Opcional Redes
-
-# Redes \- Grupo 2  
-# Prof. Gerardo Nereo Campos Araya
+### Fecha: Marzo 2025
 
 ### Daniel Granados Retana, carné 2022104692  
 ### Diego Manuel Granados Retana, carné 2022158363  
@@ -318,7 +317,7 @@ iptables -t nat -A OUTPUT -p tcp --dport 80 -j DNAT --to-destination $INGRESS:80
 
 Se configura **MASQUERADE** en la **POSTROUTING** chain dentro de la **NAT Table**, lo que permite que los paquetes salientes utilicen la dirección IP del router como su origen dinámico:
 
-`iptables -t nat -A POSTROUTING -j MASQUERADE`
+```iptables -t nat -A POSTROUTING -j MASQUERADE```
 
 **Flujo de paquetes en el router**  
 El siguiente diagrama ilustra cómo los paquetes son enviados por un cliente, ingresa el router en el cual se le aplican las reglas y filtros previamente definidos y son enrutados a los distintos servicios:  
