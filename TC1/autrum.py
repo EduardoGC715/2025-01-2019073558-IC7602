@@ -141,24 +141,6 @@ class Autrum:
         except Exception as e:
             print(f"Error saving file: {e}")
 
-    def listen_keyboard(self):
-        """Listen for key presses in the terminal"""
-        print(
-            "\nPress 's' to Start, 'p' to Pause, 'r' to Resume, 'x' to Stop, 'w' to Save"
-        )
-        while True:
-            key = keyboard.read_event().name
-            if key == "s":
-                self.start_recording()
-            elif key == "p":
-                self.pause_recording()
-            elif key == "r":
-                self.resume_recording()
-            elif key == "x":
-                self.stop_recording()
-            elif key == "w":
-                self.save_atm("recording.atm")
-
     def run_analyzer(self):
         """Run real-time analyzer"""
         ani = FuncAnimation(
@@ -169,7 +151,6 @@ class Autrum:
 
 if __name__ == "__main__":
     autrum = Autrum()
-    threading.Thread(target=autrum.listen_keyboard, daemon=True).start()
 
     # Run the analyzer in the main thread
     autrum.run_analyzer()

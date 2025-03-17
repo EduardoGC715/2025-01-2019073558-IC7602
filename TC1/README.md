@@ -22,29 +22,8 @@
 
 1. Ejecutar la aplicación:
 
-```bash
 python autrum.py
-```
 
-2. Comandos disponibles:
+2. Comandos de teclas para el uso
 
-- Para iniciar la grabación: `autrum.start_recording()`
-- Para pausar la grabación: `autrum.pause_recording()`
-- Para continuar la grabación: `autrum.resume_recording()`
-- Para detener la grabación: `autrum.stop_recording()`
-- Para guardar los datos: `autrum.save_atm('nombre_archivo.atm')`
-- Para procesar un archivo WAV: `autrum.process_wav('archivo.wav')`
-
-## Formato de Archivo .atm
-
-El archivo .atm es un formato binario que contiene:
-
-- Audio original
-- Tasa de muestreo
-- Datos de la transformada de Fourier
-
-## Notas
-
-- La aplicación utiliza PyAudio para la captura de audio
-- La visualización se realiza con Matplotlib
-- El análisis de frecuencia utiliza scipy.fft
+Press 's' to Start, 'p' to Pause, 'r' to Resume, 'x' to Stop, 'w' to Save"
