@@ -14,16 +14,14 @@
 ## Instalación
 
 1. Clonar repositorio
-2. Instalar las dependencias:
-3. python -m pip install --upgrade pip setuptools wheel
-   pip install -r requirements.txt
+2. Instalar las dependencias: pip install -r requirements.txt
 
 ## Uso
 
-1. Ejecutar la aplicación:
+Ejecutar la aplicación:
 
-python autrum.py
+1. python autrum.py
 
-2. Comandos de teclas para el uso
+Dentro del grafico uso de las siguientes teclas:
 
-Press 's' to Start, 'p' to Pause, 'r' to Resume, 'x' to Stop, 'w' to Save"
+2. Press 's' to Start, 'p' to Pause, 'r' to Resume, 'x' to Stop, 'w' to Save"
