@@ -2,3 +2,5 @@
 /PO/terraform/.terraform
 /PO/terraform/ssh_keys
 /PO/documentacion/images
+*__pycache__*
+*.tar.gz
