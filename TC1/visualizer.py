@@ -25,7 +25,7 @@ class AudioVisualizer:
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
 
     def on_key(self, event):
-        if event.key == "s":
+        if event.key == "a":
             self.recorder.start_recording()
         elif event.key == "p":
             self.recorder.pause_recording()
@@ -40,18 +40,20 @@ class AudioVisualizer:
         try:
             data = self.recorder.q.get_nowait()
 
-            x_time = np.arange(len(data)) / self.recorder.RATE
-            self.ax1.set_xlim(0, len(data) / self.recorder.RATE)
-            self.ax1.set_ylim(-1, 1)
-            self.line_time.set_data(x_time, data)
+            # Ensure data is in the correct format for plotting
+            if isinstance(data, np.ndarray):
+                x_time = np.arange(len(data)) / self.recorder.rate
+                self.ax1.set_xlim(0, len(data) / self.recorder.rate)
+                self.ax1.set_ylim(-1, 1)
+                self.line_time.set_data(x_time, data)
 
-            fft_data = fft(data)
-            freq = np.fft.fftfreq(len(data), 1 / self.recorder.RATE)
-            self.ax2.set_xlim(0, self.recorder.RATE / 2)
-            self.ax2.set_ylim(0, np.abs(fft_data).max())
-            self.line_freq.set_data(
-                freq[: len(freq) // 2], np.abs(fft_data)[: len(freq) // 2]
-            )
+                fft_data = fft(data)
+                freq = np.fft.fftfreq(len(data), 1 / self.recorder.rate)
+                self.ax2.set_xlim(0, self.recorder.rate / 2)
+                self.ax2.set_ylim(0, np.abs(fft_data).max())
+                self.line_freq.set_data(
+                    freq[: len(freq) // 2], np.abs(fft_data)[: len(freq) // 2]
+                )
 
         except queue.Empty:
             pass

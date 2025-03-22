@@ -20,8 +20,8 @@
 
 Ejecutar la aplicación:
 
-1. python autrum.py
+1. python main.py
 
 Dentro del grafico uso de las siguientes teclas:
 
-2. Press 's' to Start, 'p' to Pause, 'r' to Resume, 'x' to Stop, 'w' to Save"
+2. Press 'a' to Start, 'p' to Pause, 'r' to Resume, 'x' to Stop, 'w' to Save, 's' to Save Image"
