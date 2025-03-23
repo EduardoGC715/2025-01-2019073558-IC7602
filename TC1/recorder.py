@@ -19,31 +19,7 @@ class AudioRecorder:
         self.is_paused = False
         self.audio = pyaudio.PyAudio()
         self.stream = None
-        self.noise_frames = []
-        self.has_noise_profile = False
-        self.q = queue.Queue()
-
-    def collect_noise(self, seconds=3):
-        """Graba el ruido ambiente para crear un perfil"""
-        print(f"Grabando ruido ambiente por {seconds} segundos...")
-        self.noise_frames = []
-
-        stream = self.audio.open(
-            format=self.format,
-            channels=self.channels,
-            rate=self.rate,
-            input=True,
-            frames_per_buffer=self.chunk,
-        )
-
-        for i in range(0, int(self.rate / self.chunk * seconds)):
-            data = stream.read(self.chunk)
-            self.noise_frames.append(data)
-
-        stream.stop_stream()
-        stream.close()
-        self.has_noise_profile = True
-        print("Perfil de ruido creado correctamente")
+        self.queue = queue.Queue()
 
     def start_recording(self):
         """Inicia la grabación de audio"""
@@ -76,7 +52,7 @@ class AudioRecorder:
                     # Convert data to numpy array for processing
                     data_array = np.frombuffer(data, dtype=np.int16)
                     self.frames.append(data_array)  # Store as numpy array
-                    self.q.put_nowait(data_array)  # Put numpy array in queue
+                    self.queue.put_nowait(data_array)  # Put numpy array in queue
                 except Exception as e:
                     print(f"Error durante la grabación: {e}")
                     break
@@ -113,72 +89,14 @@ class AudioRecorder:
         """Convierte el array numpy a frames de bytes"""
         return array.astype(np.int16).tobytes()
 
-    def apply_noise_reduction(self, signal_array, noise_array, reduction_factor=0.7):
-        """Aplica reducción de ruido espectral"""
-        # Convertimos bytes a datos numéricos
-        if noise_array.size == 0:
-            return signal_array
-
-        # Calculamos la FFT del ruido
-        noise_fft = np.fft.rfft(noise_array)
-        noise_power = np.abs(noise_fft) ** 2
-
-        # Calculamos la FFT de la señal
-        signal_fft = np.fft.rfft(signal_array)
-        signal_power = np.abs(signal_fft) ** 2
-
-        # Calculamos una máscara de supresión espectral
-        mask = (
-            1 - np.sqrt(noise_power) / (np.sqrt(signal_power) + 1e-6) * reduction_factor
-        )
-        mask = np.clip(mask, 0.1, 1.0)  # Limitamos entre 0.1 y 1.0
-
-        # Aplicamos la máscara
-        signal_fft *= mask
-
-        # Volvemos al dominio del tiempo
-        return np.fft.irfft(signal_fft).astype(np.int16)
-
-    def enhance_voice(self, audio_array):
-        """Mejora las frecuencias de voz humana"""
-        # Aplicamos un filtro pasa banda para frecuencias de voz (300-3400 Hz)
-        nyquist = self.rate / 2
-        low = 300 / nyquist
-        high = 3400 / nyquist
-        b, a = signal.butter(4, [low, high], btype="band")
-        return signal.lfilter(b, a, audio_array)
-
-    def save_recording(self, filename="grabacion_mejorada.wav", apply_filters=True):
+    def save_recording(self):
         """Guarda la grabación como archivo WAV con procesamiento opcional"""
         if not self.frames:
             print("No hay audio para guardar")
             return False
 
         processed_frames = self.frames
-
-        if apply_filters:
-            print("Aplicando filtros y mejoras al audio...")
-
-            # Convertimos los frames para procesamiento
-            audio_array = self._convert_frames_to_array(self.frames)
-
-            # Reducción de ruido si tenemos un perfil de ruido
-            if self.has_noise_profile:
-                noise_array = self._convert_frames_to_array(self.noise_frames)
-                audio_array = self.apply_noise_reduction(audio_array, noise_array)
-
-            # Mejora de voz
-            audio_array = self.enhance_voice(audio_array)
-
-            # Normalización del volumen (evita saturación)
-            max_val = np.max(np.abs(audio_array))
-            if max_val > 0:
-                scale_factor = min(32000 / max_val, 5.0)  # Limitamos la ganancia
-                audio_array = audio_array * scale_factor
-
-            # Convertimos de vuelta a bytes
-            processed_frames = [self._convert_array_to_frames(audio_array)]
-
+        filename = f"recording-{time.strftime('%Y%m%d-%H%M%S')}.wav"
         # Guardamos el archivo WAV
         wf = wave.open(filename, "wb")
         wf.setnchannels(self.channels)
