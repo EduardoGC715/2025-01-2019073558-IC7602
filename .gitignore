@@ -4,3 +4,4 @@
 /PO/documentacion/images
 *__pycache__*
 *.tar.gz
+*.venv*
