@@ -6,6 +6,7 @@ import time
 import os
 from scipy import signal
 import queue
+import pickle
 
 
 class AudioRecorder:
@@ -51,7 +52,7 @@ class AudioRecorder:
                     data = self.stream.read(self.chunk)
                     # Convert data to numpy array for processing
                     data_array = np.frombuffer(data, dtype=np.int16)
-                    self.frames.append(data_array)  # Store as numpy array
+                    # self.frames.append(data_array)  # Store as numpy array
                     self.queue.put_nowait(data_array)  # Put numpy array in queue
                 except Exception as e:
                     print(f"Error durante la grabación: {e}")
@@ -63,6 +64,36 @@ class AudioRecorder:
             self.stream.stop_stream()
             self.stream.close()
             self.stream = None
+
+    def load_audio_file(self, filename):
+        """Lee un archivo de audio WAV"""
+        if not os.path.exists(filename):
+            print("El archivo no existe")
+            return False
+
+        threading.Thread(target=self._process_audio_file, args=(filename,)).start()
+
+    def _process_audio_file(self, filename):
+        """Procesa un archivo de audio WAV"""
+        self.is_recording = True
+        wf = wave.open(filename, "rb")
+        self.channels = wf.getnchannels()
+        self.rate = wf.getframerate()
+        self.format = self.audio.get_format_from_width(wf.getsampwidth())
+        self.frames = []
+        data_array = np.frombuffer(wf.readframes(self.chunk), dtype=np.int16)
+        print("Cargando audio...")
+        count = 0
+        while len(data_array) > 0:
+            # self.frames.append(np.frombuffer(data_array, dtype=np.int16))
+            # data_array = wf.readframes(self.chunk)
+            self.queue.put_nowait(data_array)  # Put numpy array in queue
+            data_array = np.frombuffer(wf.readframes(self.chunk), dtype=np.int16)
+            count += 1
+            print(count)
+        wf.close()
+        print(f"Audio cargado de {filename}")
+        self.is_recording = False
 
     def pause_recording(self):
         """Pausa la grabación en curso"""
@@ -107,6 +138,21 @@ class AudioRecorder:
 
         print(f"Audio guardado como {filename}")
         return True
+
+    def export_autrum(self, filename=None):
+        if not filename:
+            filename = f"autrum-{time.strftime('%Y%m%d-%H%M%S')}.atm"
+        data = {
+            "rate": self.rate,  # Sample rate
+            "channels": self.channels,  # Number of audio channels
+            "frames": self.frames,  # List of numpy arrays containing audio data
+            "fft_data": getattr(self, "fft_data", {}),  # FFT info, if available
+            "sample_width": self.audio.get_sample_size(self.format),  # Sample width
+        }
+        # Write the data to file using pickle.
+        with open(filename, "wb") as f:
+            pickle.dump(data, f)
+        print(f"Autrum file saved as {filename}")
 
     def close(self):
         """Libera recursos"""

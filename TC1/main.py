@@ -1,7 +1,7 @@
 from recorder import AudioRecorder
-from visualizer import AudioVisualizer
+from analyzer import AudioAnalyzer
+from interface import Interface
 
 if __name__ == "__main__":
-    recorder = AudioRecorder()
-    visualizer = AudioVisualizer(recorder)
-    visualizer.run()
+    interface = Interface()
+    interface.run()
