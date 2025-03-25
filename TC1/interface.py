@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from analyzer import AudioAnalyzer
 from recorder import AudioRecorder
-
+from player import AudioPlayer
 
 class Interface:
     def __init__(self):
@@ -64,7 +64,17 @@ class Interface:
         AudioAnalyzer(recorder, streaming, filename).run()
 
     def open_reproductor(self):
-        messagebox.showinfo("Reproductor", "Pendiente.")
+        file_path = filedialog.askopenfilename(
+            title="Seleccione el archivo WAV",
+            filetypes=[("ATM Files", "*.atm")],
+        )
+        if file_path:
+            AudioPlayer(file_path).run()
+        else:
+            messagebox.showinfo(
+                "Selección de archivo", "No hay un archivo seleccionado."
+            )
+        
 
     def open_comparador(self):
         messagebox.showinfo("Comparador", "Pendiente.")
