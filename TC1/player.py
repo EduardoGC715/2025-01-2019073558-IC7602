@@ -45,7 +45,7 @@ class AudioPlayer:
         # --- Crear figura y ejes ---
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
         plt.subplots_adjust(bottom=0.3, hspace=0.4)
-        self.fig.canvas.set_window_title("Autrum - Reproductor de Audio")
+        self.fig.canvas.manager.set_window_title("Autrum - Reproductor de Audio")
 
         # Eje de tiempo
         self.ax_time.set_title("Audio Player (Time Domain)")

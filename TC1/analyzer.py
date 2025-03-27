@@ -17,7 +17,7 @@ class AudioAnalyzer:
 
         # Create a figure with adjusted bottom for button space.
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
-        self.fig.canvas.set_window_title("Autrum - Analizador")
+        self.fig.canvas.manager.set_window_title("Autrum - Analizador")
 
         plt.subplots_adjust(bottom=0.3, hspace=0.4)
 
