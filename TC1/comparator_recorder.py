@@ -14,6 +14,7 @@ class AudioComparatorRecorder:
         self.MAX_SECONDS = 2
         self.recorder = recorder
         self.filename = filename
+        self.streaming = True
 
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
         self.fig.canvas.manager.set_window_title("Autrum - Analizador")
@@ -64,6 +65,7 @@ class AudioComparatorRecorder:
 
     def pause_recording(self, event):
         self.recorder.pause_recording()
+        self.streaming = True
         self.btn_pause.label.set_text("Paused")
         self.fig.canvas.draw_idle()
 
@@ -74,8 +76,9 @@ class AudioComparatorRecorder:
 
     def stop_recording(self, event):
         self.recorder.stop_recording()
+        self.streaming = False
         plt.close(self.fig)
-        visualizer = AudioComparatorVisualizer(self.recorder)
+        visualizer = AudioComparatorVisualizer(self.filename, self.recorder)
         visualizer.run()
 
     def update_plot(self):
@@ -98,7 +101,6 @@ class AudioComparatorRecorder:
             #         if self.streaming:
             #             self.btn_pause.label.set_text("Paused")
             #         self.fig.canvas.draw_idle()
-            print("No chunks to process.")
             return
 
         self.recorder.frames.extend(new_chunks)
@@ -151,13 +153,20 @@ class AudioComparatorRecorder:
 
     def on_xlim_changed(self, ax):
         """Callback that updates the frequency plot when time-domain zoom changes."""
-        print(self.is_zooming)
-        if self.recorder.is_paused or not self.recorder.is_recording:
-            print("HERE")
+        if (self.recorder.is_paused or not self.recorder.is_recording) and hasattr(self.recorder, 'frames'):
             try:
+                # Verificar que haya frames para concatenar
+                if not self.recorder.frames:
+                    return
+                    
                 # Concatenate full audio data.
                 full_audio_array = np.concatenate(self.recorder.frames)
                 total_samples = len(full_audio_array)
+                
+                if total_samples == 0:
+                    print("Array de audio vacío después de concatenar")
+                    return
+                    
                 total_duration = total_samples / self.recorder.rate
 
                 # Create a time vector for the full audio.
@@ -166,15 +175,30 @@ class AudioComparatorRecorder:
                 # Get the current x-axis limits (in seconds) from the time plot.
                 t_min, t_max = self.ax_time.get_xlim()
 
+                # Verificar que los límites sean válidos
+                if t_min >= total_duration or t_max <= 0:
+                    print("Límites de tiempo fuera del rango de audio")
+                    return
+
+                # Ajustar los límites para que estén dentro del rango válido
+                t_min = max(0, t_min)
+                t_max = min(total_duration, t_max)
+
                 # Find the indices in the full time array corresponding to the limits.
-                idx_min = np.searchsorted(times_full, t_min)
-                idx_max = np.searchsorted(times_full, t_max)
+                idx_min = max(0, np.searchsorted(times_full, t_min))
+                idx_max = min(total_samples, np.searchsorted(times_full, t_max))
+
+                # Verificar que el rango sea válido
+                if idx_min >= idx_max:
+                    print("Rango de índices inválido:", idx_min, idx_max)
+                    return
 
                 # Extract the zoomed portion of the audio.
                 zoom_audio = full_audio_array[idx_min:idx_max]
                 if len(zoom_audio) == 0:
+                    print("Array de zoom vacío")
                     return
-                print("HERE 2.5")
+
                 # Compute FFT for the zoomed portion.
                 num_frames = len(zoom_audio)
                 y_frequency = np.abs(rfft(zoom_audio))
@@ -184,18 +208,23 @@ class AudioComparatorRecorder:
                 mask = x_frequency <= self.MAX_FREQUENCY
                 x_frequency = x_frequency[mask]
                 y_frequency = y_frequency[mask]
-                print("HERE 3")
+
                 # Update the frequency domain plot.
                 self.line_freq.set_data(x_frequency, y_frequency)
+                
                 # You might want to update the limits accordingly.
-                self.ax_freq.set_xlim(0, self.recorder.rate / 2)
-                self.ax_freq.set_ylim(
-                    0, np.max(y_frequency) * 1.1 if np.max(y_frequency) > 0 else 1
-                )
-                print("HERE 4")
+                self.ax_freq.set_xlim(0, min(self.MAX_FREQUENCY, self.recorder.rate / 2))
+                
+                if len(y_frequency) > 0 and np.max(y_frequency) > 0:
+                    self.ax_freq.set_ylim(0, np.max(y_frequency) * 1.1)
+                else:
+                    self.ax_freq.set_ylim(0, 1)
+
                 self.fig.canvas.draw_idle()
             except Exception as e:
                 print("Error updating frequency plot on zoom:", e)
+                import traceback
+                traceback.print_exc()
 
     def on_close(self, event):
         self.timer.stop()

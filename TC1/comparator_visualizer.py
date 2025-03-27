@@ -93,17 +93,31 @@ class AudioComparatorVisualizer:
         self.p = pyaudio.PyAudio()
 
     def start_playback(self, event):
-        """Inicia la reproducción de audio en un hilo separado."""
+        """Inicia la reproducción de audio en un hilo separado desde la mejor posición encontrada."""
         if self.is_playing:
             print("Ya está reproduciendo.")
             return
         if self.audio_array.size == 0:
             print("No hay audio para reproducir.")
             return
-
+            
+        # Comparar audio y encontrar posición
+        print("Comparando audio con grabación...")
+        results = self.compare_audio()
+        
+        # Si obtuvimos resultados con buena coincidencia, iniciar desde esa posición
+        start_pos = 0  # Posición predeterminada
+        
+        if results:  
+            # Iniciar desde la posición donde se encontró el audio grabado
+            start_pos = results["offset"]
+            print(f"Iniciando reproducción desde la posición {results['offset_seconds']:.2f}s donde se encontró la mejor coincidencia")
+        else:
+            print("No se encontró una coincidencia confiable. Iniciando reproducción desde el principio.")
+        
         self.is_playing = True
         self.is_paused = False
-        self.current_pos = 0
+        self.current_pos = start_pos  # Usar la posición calculada directamente
         self.timer.start()
         self.play_thread = threading.Thread(target=self._playback_thread, daemon=True)
         self.play_thread.start()
@@ -234,3 +248,114 @@ class AudioComparatorVisualizer:
     def run(self):
         """Inicia el loop de Matplotlib."""
         plt.show()
+
+    def compare_audio(self, event=None):
+        """
+        Compara el audio grabado con el audio de referencia.
+        Busca donde aparece la grabación dentro del audio de referencia.
+        Analiza similitud por armónicos y potencia espectral.
+        
+        Args:
+            event: Parámetro opcional para poder usar como callback en botones
+        
+        Returns:
+            dict: Resultados de la comparación con métricas y posición encontrada
+        """
+        # Obtener el audio del reproductor (referencia)
+        reference_audio = self.audio_array
+        
+        # Obtener el audio ya grabado del recorder
+        recorded_frames = self.recorder.frames
+        if not recorded_frames:
+            print("No hay audio grabado para comparar. Debe grabar audio primero.")
+            return None
+        
+        recorded_audio = np.concatenate(recorded_frames) if recorded_frames else np.array([], dtype=np.int16)
+        
+        if len(reference_audio) == 0 or len(recorded_audio) == 0:
+            print("Una o ambas señales están vacías")
+            return None
+        
+        print(f"Comparando audio - Referencia: {len(reference_audio)} muestras, Grabado: {len(recorded_audio)} muestras")
+        
+        # Buscar la mejor posición de coincidencia
+        step_size = self.rate // 10  # Buscar cada 0.1 segundos para mayor eficiencia
+
+        if len(reference_audio) > len(recorded_audio):
+            print("Buscando dónde aparece el audio grabado dentro de la referencia...")
+            best_offset = 0
+            best_score = 0
+            
+            for offset in range(0, len(reference_audio), step_size):
+                # Extraer segmento de la referencia de igual longitud que la grabación
+                ref_segment = reference_audio[offset:offset+len(recorded_audio)]
+
+                if len(ref_segment) < len(recorded_audio):
+                    print("No se encontró una coincidencia confiable. La referencia es más corta que la grabación.")
+                    break
+
+                # Calcular FFT para ambas señales
+                ref_fft = np.abs(rfft(ref_segment))
+                rec_fft = np.abs(rfft(recorded_audio))
+
+                frequencies = rfftfreq(len(recorded_audio), d=1.0/self.rate)
+                
+                n_peaks = 10  # Armónicos principales a considerar
+        
+                # Encontrar índices de los picos más altos en ambas señales (solo en frecuencias significativas)
+                ref_peaks_idx = np.argsort(ref_fft)[-n_peaks:]
+                rec_peaks_idx = np.argsort(rec_fft)[-n_peaks:]
+
+                # Obtener frecuencias correspondientes a estos picos
+                ref_peak_freqs = frequencies[ref_peaks_idx]
+                rec_peak_freqs = frequencies[rec_peaks_idx]
+
+                # Calcular similitud de armónicos con tolerancia
+                frequency_tolerance = 20  # Hz
+                harmonic_matches = 0
+                matched_harmonics = []
+                
+                for rec_freq in rec_peak_freqs:
+                    for ref_freq in ref_peak_freqs:
+                        if abs(rec_freq - ref_freq) <= frequency_tolerance:
+                            harmonic_matches += 1
+                            matched_harmonics.append((rec_freq, ref_freq))
+                            break
+                
+                harmonic_similarity = (harmonic_matches / min(len(rec_peak_freqs), n_peaks)) * 100
+
+                # Calcular similitud de potencia espectral
+                ref_fft_norm = ref_fft / np.sum(ref_fft) if np.sum(ref_fft) > 0 else ref_fft
+                rec_fft_norm = rec_fft / np.sum(rec_fft) if np.sum(rec_fft) > 0 else rec_fft
+                
+                power_correlation = np.corrcoef(rec_fft_norm, ref_fft_norm)[0, 1] * 100
+                if np.isnan(power_correlation):
+                    power_correlation = 0
+                
+                # Calcular puntuación final
+                total_score = 0.7 * harmonic_similarity + 0.3 * power_correlation
+                if total_score > best_score:
+                    best_score = total_score
+                    best_offset = offset
+            # Reportar resultados
+            print(f"\n--- RESULTADOS DE COMPARACIÓN DE AUDIO ---")
+            print(f"Audio grabado encontrado en la posición: {best_offset} muestras ({best_offset/self.rate:.2f} segundos) del audio de referencia")
+            print(f"Similitud de armónicos: {harmonic_similarity:.1f}%")
+            for i, (rec, ref) in enumerate(matched_harmonics[:5]):  # Mostrar primeros 5 para no saturar
+                print(f"  Armónico {i+1}: Grabado {rec:.1f}Hz - Ref {ref:.1f}Hz")
+                print(f"Correlación de potencia espectral: {power_correlation:.1f}%")
+                print(f"Puntuación total de similitud: {total_score:.1f}%\n")
+                
+            results = {
+                "offset": best_offset,
+                "offset_seconds": best_offset/self.rate,
+                "harmonic_similarity": harmonic_similarity,
+                "power_correlation": power_correlation,
+                "total_score": total_score,
+                "matched_harmonics": matched_harmonics
+            }
+                
+            return results
+        else:
+            print("La referencia es más corta que la grabación.")
+            return None
