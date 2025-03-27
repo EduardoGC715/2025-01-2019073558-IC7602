@@ -8,12 +8,14 @@ import time
 from scipy.fft import rfft, rfftfreq
 
 
-class AudioPlayer:
-    def __init__(self, atm_file):
+class AudioComparatorVisualizer:
+    def __init__(self, atm_file, recorder):
         """
         Carga datos desde un archivo .atm y configura la interfaz para reproducir audio
         y visualizar su forma de onda y espectro de frecuencia.
         """
+        self.recorder = recorder
+
         # --- Load .atm data ---
         with open(atm_file, "rb") as f:
             data = pickle.load(f)

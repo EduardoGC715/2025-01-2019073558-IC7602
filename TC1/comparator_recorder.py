@@ -5,17 +5,16 @@ from matplotlib.widgets import Button
 from scipy.fft import rfft, rfftfreq
 import queue
 from tkinter import filedialog, messagebox
+from comparator_visualizer import AudioComparatorVisualizer
 
 
-class AudioAnalyzer:
-    def __init__(self, recorder, streaming, filename=None):
+class AudioComparatorRecorder:
+    def __init__(self, recorder, filename=None):
         self.MAX_FREQUENCY = 4000
         self.MAX_SECONDS = 2
         self.recorder = recorder
-        self.streaming = streaming
         self.filename = filename
 
-        # Create a figure with adjusted bottom for button space.
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
         self.fig.canvas.set_window_title("Autrum - Analizador")
 
@@ -33,40 +32,27 @@ class AudioAnalyzer:
         self.ax_freq.set_ylabel("Magnitude")
         (self.line_freq,) = self.ax_freq.plot([], [])
 
-        if streaming:
-            ax_start = plt.axes([0.05, 0.1, 0.10, 0.075])
-            ax_pause = plt.axes([0.2, 0.1, 0.10, 0.075])
-            ax_resume = plt.axes([0.35, 0.1, 0.10, 0.075])
-            ax_stop = plt.axes([0.5, 0.1, 0.10, 0.075])
-            ax_save = plt.axes([0.65, 0.1, 0.1, 0.075])
+        ax_start = plt.axes([0.05, 0.1, 0.10, 0.075])
+        ax_pause = plt.axes([0.2, 0.1, 0.10, 0.075])
+        ax_resume = plt.axes([0.35, 0.1, 0.10, 0.075])
+        ax_stop = plt.axes([0.5, 0.1, 0.10, 0.075])
 
-            self.btn_start = Button(ax_start, "Iniciar")
-            self.btn_pause = Button(ax_pause, "Pausar")
-            self.btn_resume = Button(ax_resume, "Reanudar")
-            self.btn_stop = Button(ax_stop, "Detener")
-            self.btn_save = Button(ax_save, "Guardar")
-            # Connect buttons to callback functions.
-            self.btn_start.on_clicked(self.start_recording)
-            self.btn_pause.on_clicked(self.pause_recording)
-            self.btn_resume.on_clicked(self.resume_recording)
-            self.btn_stop.on_clicked(self.stop_recording)
-            self.btn_save.on_clicked(self.save_recording)
-        else:
-            self.recorder.load_audio_file(filename)
+        self.btn_start = Button(ax_start, "Iniciar")
+        self.btn_pause = Button(ax_pause, "Pausar")
+        self.btn_resume = Button(ax_resume, "Reanudar")
+        self.btn_stop = Button(ax_stop, "Detener y continuar")
 
-        ax_export = plt.axes([0.8, 0.1, 0.1, 0.075])
-        self.btn_export = Button(ax_export, "Exportar")
-        self.btn_export.on_clicked(self.export_data)
+        self.btn_start.on_clicked(self.start_recording)
+        self.btn_pause.on_clicked(self.pause_recording)
+        self.btn_resume.on_clicked(self.resume_recording)
+        self.btn_stop.on_clicked(self.stop_recording)
 
-        # Use a Matplotlib timer to update the plot regularly.
         self.timer = self.fig.canvas.new_timer(interval=100)
         self.timer.add_callback(self.update_plot)
         self.timer.start()
 
-        # Connect the time domain plot to the frequency domain plot.
         self.ax_time.callbacks.connect("xlim_changed", self.on_xlim_changed)
 
-        # Ensure we close resources when the figure is closed.
         self.fig.canvas.mpl_connect("close_event", self.on_close)
 
         self.is_zooming = False
@@ -88,32 +74,9 @@ class AudioAnalyzer:
 
     def stop_recording(self, event):
         self.recorder.stop_recording()
-        self.btn_start.label.set_text("Start")
-        self.fig.canvas.draw_idle()
-
-    def save_recording(self, event):
-        if self.recorder.frames:
-            self.recorder.save_recording()
-        else:
-            messagebox.showerror("Guardar grabación", "No hay datos para guardar.")
-
-    def export_data(self, event):
-        if (
-            not self.recorder.is_recording
-            and len(self.recorder.frames) > 0
-            and len(self.recorder.fft_data) > 0
-        ):
-            filename = filedialog.asksaveasfilename(
-                title="Exportar datos de Autrum",
-                defaultextension=".atm",
-                filetypes=[("Autrum Files", "*.atm")],
-            )
-            self.recorder.export_autrum(filename)
-        else:
-            messagebox.showerror(
-                "Exportar datos de Autrum",
-                "No hay datos para exportar. Por favor, detenga la grabación y espere a que se procese.",
-            )
+        plt.close(self.fig)
+        visualizer = AudioComparatorVisualizer(self.recorder)
+        visualizer.run()
 
     def update_plot(self):
         new_chunks = []
