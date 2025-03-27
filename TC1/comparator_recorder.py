@@ -75,7 +75,7 @@ class AudioComparatorRecorder:
     def stop_recording(self, event):
         self.recorder.stop_recording()
         plt.close(self.fig)
-        visualizer = AudioComparatorVisualizer(self.recorder)
+        visualizer = AudioComparatorVisualizer(self.filename, self.recorder)
         visualizer.run()
 
     def update_plot(self):
@@ -117,9 +117,7 @@ class AudioComparatorRecorder:
 
             # Limit to last N samples (e.g., last 2 seconds) for plotting.
             max_samples = int(self.recorder.rate * self.MAX_SECONDS)
-            if (
-                self.streaming and len(full_audio_array) > max_samples
-            ):  # If recording audio in real-time
+            if len(full_audio_array) > max_samples:  # If recording audio in real-time
                 audio_array = full_audio_array[-max_samples:]
             else:
                 audio_array = full_audio_array
