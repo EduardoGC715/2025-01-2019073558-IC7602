@@ -8,32 +8,39 @@ from tkinter import filedialog, messagebox
 
 
 class AudioAnalyzer:
+    """Clase para analizar audio en tiempo real o desde un archivo .atm.
+    Permite visualizar la señal en el dominio del tiempo y la frecuencia."""
+
     def __init__(self, recorder, streaming, filename=None):
+        """Constructor que recibe un objeto AudioRecorder para grabar audio,
+        una bandera de si va a grabar en tiempo real (streaming) o no (batch),
+        y el nombre del archivo que se va a cargar si es de tipo batch."""
         self.MAX_FREQUENCY = 4000
         self.MAX_SECONDS = 2
         self.recorder = recorder
         self.streaming = streaming
         self.filename = filename
 
-        # Create a figure with adjusted bottom for button space.
+        # Figura para los gráfics de dominio de tiempo y frecuencia
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
         self.fig.canvas.manager.set_window_title("Autrum - Analizador")
 
         plt.subplots_adjust(bottom=0.3, hspace=0.4)
 
-        # Time domain plot
+        # Dominio de tiempo
         self.ax_time.set_title("Real-time Audio Signal (Time Domain)")
         self.ax_time.set_xlabel("Time (s)")
         self.ax_time.set_ylabel("Amplitude")
         (self.line_time,) = self.ax_time.plot([], [])
 
-        # Frequency domain plot
+        # Dominio de frecuencia
         self.ax_freq.set_title("Real-time Audio Signal (Frequency Domain)")
         self.ax_freq.set_xlabel("Frequency (Hz)")
         self.ax_freq.set_ylabel("Magnitude")
         (self.line_freq,) = self.ax_freq.plot([], [])
 
         if streaming:
+            # Agregar botones para iniciar, pausar, reanudar y detener la grabación
             ax_start = plt.axes([0.05, 0.1, 0.10, 0.075])
             ax_pause = plt.axes([0.2, 0.1, 0.10, 0.075])
             ax_resume = plt.axes([0.35, 0.1, 0.10, 0.075])
@@ -45,7 +52,8 @@ class AudioAnalyzer:
             self.btn_resume = Button(ax_resume, "Reanudar")
             self.btn_stop = Button(ax_stop, "Detener")
             self.btn_save = Button(ax_save, "Guardar")
-            # Connect buttons to callback functions.
+
+            # Enlazar botones a funciones
             self.btn_start.on_clicked(self.start_recording)
             self.btn_pause.on_clicked(self.pause_recording)
             self.btn_resume.on_clicked(self.resume_recording)
@@ -54,50 +62,58 @@ class AudioAnalyzer:
         else:
             self.recorder.load_audio_file(filename)
 
+        # Agregar botón para exportar a Autrum
         ax_export = plt.axes([0.8, 0.1, 0.1, 0.075])
         self.btn_export = Button(ax_export, "Exportar")
         self.btn_export.on_clicked(self.export_data)
 
-        # Use a Matplotlib timer to update the plot regularly.
+        # Actualizar el gráfico cada 100 ms para mostrar la señal en tiempo real
         self.timer = self.fig.canvas.new_timer(interval=100)
         self.timer.add_callback(self.update_plot)
         self.timer.start()
 
-        # Connect the time domain plot to the frequency domain plot.
+        # Agregar callback para detectar zoom/pan en el eje de tiempo
         self.ax_time.callbacks.connect("xlim_changed", self.on_xlim_changed)
 
-        # Ensure we close resources when the figure is closed.
+        # Cerrar recursos
         self.fig.canvas.mpl_connect("close_event", self.on_close)
 
         self.is_zooming = False
 
     def start_recording(self, event):
+        """Inicia la grabación de audio."""
         self.recorder.start_recording()
         self.btn_start.label.set_text("Recording...")
         self.fig.canvas.draw_idle()
 
     def pause_recording(self, event):
+        """Pausa la grabación de audio."""
         self.recorder.pause_recording()
         self.btn_pause.label.set_text("Paused")
         self.fig.canvas.draw_idle()
 
     def resume_recording(self, event):
+        """Reanuda la grabación de audio."""
         self.recorder.resume_recording()
         self.btn_pause.label.set_text("Pause")
         self.fig.canvas.draw_idle()
 
     def stop_recording(self, event):
+        """Detiene la grabación de audio."""
         self.recorder.stop_recording()
         self.btn_start.label.set_text("Start")
         self.fig.canvas.draw_idle()
 
     def save_recording(self, event):
+        """Guarda la grabación de audio en un archivo WAV."""
         if self.recorder.frames:
             self.recorder.save_recording()
         else:
             messagebox.showerror("Guardar grabación", "No hay datos para guardar.")
 
     def export_data(self, event):
+        """Exporta los datos de audio a un archivo Autrum.
+        Solicita el nombre del archivo y ejecuta la función del objeto AudioRecorder"""
         if (
             not self.recorder.is_recording
             and len(self.recorder.frames) > 0
@@ -116,6 +132,7 @@ class AudioAnalyzer:
             )
 
     def update_plot(self):
+        """Actualiza el gráfico de audio en tiempo real."""
         new_chunks = []
 
         while not self.recorder.queue.empty():
@@ -125,25 +142,16 @@ class AudioAnalyzer:
                 break
 
         if len(new_chunks) == 0:
-            # Only update the axes limits if the user is not zooming or panning.
-            # toolbar = self.fig.canvas.manager.toolbar
-            # if toolbar is not None and toolbar.mode != "":
-            #     # If zoom/pan is active, pause the recording if not already paused.
-            #     self.is_zooming = True
-            #     if not self.recorder.is_paused:
-            #         self.recorder.pause_recording()
-            #         if self.streaming:
-            #             self.btn_pause.label.set_text("Paused")
-            #         self.fig.canvas.draw_idle()
+            # Si no hay nuevos chunks de datos para procesar en la cola, no actualiza el gráfico.
             print("No chunks to process.")
             return
 
         self.recorder.frames.extend(new_chunks)
         try:
-            # Concatenate all frames into one full array.
+            # Concatenar todas las tramas en un solo array.
             full_audio_array = np.concatenate(self.recorder.frames)
 
-            # Compute FFT for the full audio data and save it.
+            # Calcular FFT para los datos de audio completos y guardarlos.
             full_num_frames = len(full_audio_array)
             y_frequency_full = np.abs(rfft(full_audio_array))
             x_frequency_full = rfftfreq(full_num_frames, d=1.0 / self.recorder.rate)
@@ -152,16 +160,16 @@ class AudioAnalyzer:
                 "y_frequency": y_frequency_full.tolist(),
             }
 
-            # Limit to last N samples (e.g., last 2 seconds) for plotting.
+            # Se limita a los últimos N samples para agilizar el rendimiento del gráfico.
             max_samples = int(self.recorder.rate * self.MAX_SECONDS)
             if (
                 self.streaming and len(full_audio_array) > max_samples
-            ):  # If recording audio in real-time
+            ):  # Si está grabando audio en tiempo real
                 audio_array = full_audio_array[-max_samples:]
             else:
                 audio_array = full_audio_array
 
-            # Compute FFT for the plotting window (last 2 seconds)
+            # Calcular la transformada de Fourier para la ventana de trazado (últimos 2 segundos)
             num_frames = len(audio_array)
             y_frequency = np.abs(rfft(audio_array))
             x_frequency = rfftfreq(num_frames, d=1.0 / self.recorder.rate)
@@ -170,6 +178,8 @@ class AudioAnalyzer:
             audio_array = np.array([])
 
         if audio_array.size > 0:
+            # Actualizar los datos de la señal de audio en el dominio del tiempo y la frecuencia
+            # y actualizar los límites de los ejes.
             duration = len(audio_array) / self.recorder.rate
             times = np.linspace(0, duration, len(audio_array))
             self.line_time.set_data(times, audio_array)
@@ -187,49 +197,48 @@ class AudioAnalyzer:
             self.fig.canvas.draw_idle()
 
     def on_xlim_changed(self, ax):
-        """Callback that updates the frequency plot when time-domain zoom changes."""
-        print(self.is_zooming)
+        """Callback que actualiza el gráfico de frecuencia cuando cambia el zoom en el dominio del tiempo.
+        Esto es para que si se hace zoom en el gráfico de tiempo, se haga zoom en el gráfico de frecuencia también.
+        """
         if self.recorder.is_paused or not self.recorder.is_recording:
-            print("HERE")
             try:
-                # Concatenate full audio data.
+                # Concatenar el audio.
                 full_audio_array = np.concatenate(self.recorder.frames)
                 total_samples = len(full_audio_array)
                 total_duration = total_samples / self.recorder.rate
 
-                # Create a time vector for the full audio.
+                # Crear un array de tiempo completo.
+                # Se usa para calcular el tiempo en segundos para cada muestra.
                 times_full = np.linspace(0, total_duration, total_samples)
 
-                # Get the current x-axis limits (in seconds) from the time plot.
+                # Obtener los límites del eje x del gráfico de tiempo.
                 t_min, t_max = self.ax_time.get_xlim()
 
-                # Find the indices in the full time array corresponding to the limits.
+                # Encontrar los índices de los límites en el array de tiempo completo.
+                # Esto es para que se pueda hacer zoom en el gráfico de frecuencia también.
                 idx_min = np.searchsorted(times_full, t_min)
                 idx_max = np.searchsorted(times_full, t_max)
 
-                # Extract the zoomed portion of the audio.
+                # Extraer la porción de audio magnificada
                 zoom_audio = full_audio_array[idx_min:idx_max]
                 if len(zoom_audio) == 0:
                     return
-                print("HERE 2.5")
-                # Compute FFT for the zoomed portion.
+                # Calcular la FFT para la porción de audio magnificada.
                 num_frames = len(zoom_audio)
                 y_frequency = np.abs(rfft(zoom_audio))
                 x_frequency = rfftfreq(num_frames, d=1.0 / self.recorder.rate)
 
-                # Truncate frequencies to self.MAX_FREQUENCY
+                # Mantener las frecuencias dentro del rango permitido.
                 mask = x_frequency <= self.MAX_FREQUENCY
                 x_frequency = x_frequency[mask]
                 y_frequency = y_frequency[mask]
-                print("HERE 3")
-                # Update the frequency domain plot.
+
+                # Actualizar datos
                 self.line_freq.set_data(x_frequency, y_frequency)
-                # You might want to update the limits accordingly.
                 self.ax_freq.set_xlim(0, self.recorder.rate / 2)
                 self.ax_freq.set_ylim(
                     0, np.max(y_frequency) * 1.1 if np.max(y_frequency) > 0 else 1
                 )
-                print("HERE 4")
                 self.fig.canvas.draw_idle()
             except Exception as e:
                 print("Error updating frequency plot on zoom:", e)
