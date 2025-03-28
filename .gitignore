@@ -5,3 +5,4 @@
 *__pycache__*
 *.tar.gz
 *.venv*
+/TC1/audio

@@ -41,7 +41,7 @@ class AudioComparatorRecorder:
         self.btn_start = Button(ax_start, "Iniciar")
         self.btn_pause = Button(ax_pause, "Pausar")
         self.btn_resume = Button(ax_resume, "Reanudar")
-        self.btn_stop = Button(ax_stop, "Detener y continuar")
+        self.btn_stop = Button(ax_stop, "Detener y\n continuar")
 
         self.btn_start.on_clicked(self.start_recording)
         self.btn_pause.on_clicked(self.pause_recording)
