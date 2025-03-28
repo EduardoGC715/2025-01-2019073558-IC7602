@@ -16,7 +16,7 @@ class AudioComparatorVisualizer:
         """
         self.recorder = recorder
 
-        # --- Load .atm data ---
+        # Cargar archivo Autrum
         with open(atm_file, "rb") as f:
             data = pickle.load(f)
 
@@ -24,7 +24,7 @@ class AudioComparatorVisualizer:
         self.rate = data["rate"]
         self.channels = data["channels"]
         self.sample_width = data["sample_width"]
-        self.frames = data["frames"]  # list of NumPy arrays
+        self.frames = data["frames"]
         # Concatenar en un solo array para la reproducción
         self.audio_array = (
             np.concatenate(self.frames) if self.frames else np.array([], dtype=np.int16)
@@ -32,6 +32,9 @@ class AudioComparatorVisualizer:
 
         # FFT data guardada
         self.fft_data = data.get("fft_data", {})
+        if self.fft_data:
+            self.fft_data["x_frequency"] = np.array(self.fft_data["x_frequency"])
+            self.fft_data["y_frequency"] = np.array(self.fft_data["y_frequency"])
 
         # Parámetros para reproducción
         self.is_playing = False
@@ -44,12 +47,13 @@ class AudioComparatorVisualizer:
         self.MAX_FREQUENCY = 4000  # Límite de frecuencia a mostrar
         self.MAX_SECONDS = 2  # Mostrar últimos 2 segundos en el gráfico
 
+        # Comparar audio y encontrar posición
         self.results = self.compare_audio()
 
-        # --- Crear figura y ejes ---
+        # Crear figura y ejes de Matplotlib
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
         plt.subplots_adjust(bottom=0.3, hspace=0.4)
-        self.fig.canvas.manager.set_window_title("Autrum - Reproductor de Audio")
+        self.fig.canvas.manager.set_window_title("Autrum - Comparador")
 
         # Dominio de tiempo
         self.ax_time.set_title("Audio en tiempo real (Dominio del Tiempo)")
@@ -63,7 +67,7 @@ class AudioComparatorVisualizer:
         self.ax_freq.set_ylabel("Magnitud")
         (self.line_freq,) = self.ax_freq.plot([], [])
 
-        # --- Botones ---
+        # Botones
         ax_play = plt.axes([0.05, 0.1, 0.1, 0.075])
         ax_pause = plt.axes([0.2, 0.1, 0.1, 0.075])
         ax_resume = plt.axes([0.35, 0.1, 0.1, 0.075])
@@ -84,10 +88,6 @@ class AudioComparatorVisualizer:
         self.timer.add_callback(self.update_plot)
         self.timer.start()
 
-        # Detectar zoom/pan en el eje de tiempo
-        self.ax_time.callbacks.connect("xlim_changed", self.on_xlim_changed)
-        self.is_zooming = False
-
         # Cerrar la figura limpia el audio
         self.fig.canvas.mpl_connect("close_event", self.on_close)
 
@@ -103,14 +103,11 @@ class AudioComparatorVisualizer:
             print("No hay audio para reproducir.")
             return
 
-        # Comparar audio y encontrar posición
-        print("Comparando audio con grabación...")
-
         # Si obtuvimos resultados con buena coincidencia, iniciar desde esa posición
         start_pos = 0  # Posición predeterminada
 
         if self.results:
-            # self.visualize_match(results)
+            self.visualize_match(self.results)
             # Iniciar desde la posición donde se encontró el audio grabado
             start_pos = self.results["offset"]
             print(
@@ -127,6 +124,10 @@ class AudioComparatorVisualizer:
         self.timer.start()
         self.play_thread = threading.Thread(target=self._playback_thread, daemon=True)
         self.play_thread.start()
+
+        # Detectar zoom/pan en el eje de tiempo
+        self.ax_time.callbacks.connect("xlim_changed", self.on_xlim_changed)
+        self.is_zooming = False
         print("Reproducción iniciada.")
 
     def _playback_thread(self):
@@ -153,9 +154,7 @@ class AudioComparatorVisualizer:
             stream.write(block.tobytes())
 
             self.current_pos = end_pos
-            # Podrías dormir, pero stream.write() generalmente bloquea el tiempo suficiente
 
-        # Si llegamos al final o se detuvo la reproducción
         stream.stop_stream()
         stream.close()
 
@@ -173,6 +172,9 @@ class AudioComparatorVisualizer:
         """Reanuda la reproducción."""
         if self.is_playing and self.is_paused:
             self.is_paused = False
+            toolbar = self.fig.canvas.manager.toolbar
+            if toolbar is not None:
+                toolbar.mode = ""
             self.timer.start()
             print("Reproducción reanudada.")
 
@@ -184,49 +186,45 @@ class AudioComparatorVisualizer:
             print("Reproducción detenida.")
 
     def update_plot(self):
-        # If there's no audio, do nothing.
-        if self.audio_array.size == 0:
+        """Actualiza los gráficos de tiempo y frecuencia."""
+        if self.audio_array.size == 0 and self.is_paused:
             return
 
-        # Stop updating if playback is finished.
+        # No actualizar si ya terminó
         if not self.is_playing and self.current_pos >= len(self.audio_array):
             self.timer.stop()
             return
 
-        # Determine how many samples have been played.
+        # Determinar posición actual
         current_pos = self.current_pos
 
-        # Choose the window to display: from the beginning until the current position.
+        # Fragmento del audio que se despliega
         audio_segment = self.audio_array[:current_pos]
 
-        # Avoid FFT on an empty segment.
         if audio_segment.size == 0:
             self.fig.canvas.draw_idle()
             return
 
-        # Total duration of the segment.
         duration = len(audio_segment) / self.rate
         times = np.linspace(0, duration, len(audio_segment))
 
-        # Update time-domain plot.
         self.line_time.set_data(times, audio_segment)
 
-        # Auto-adjust axes if not zooming.
+        # Ajustar límites del eje de tiempo si está en modo zoom
         toolbar = self.fig.canvas.manager.toolbar
         if toolbar is not None and toolbar.mode != "":
-            self.is_zooming = True
+            self.is_paused = True
         else:
-            self.is_zooming = False
             self.ax_time.set_xlim(0, max(duration, 0.01))
             self.ax_time.set_ylim(
                 np.min(audio_segment) - 500, np.max(audio_segment) + 500
             )
 
-        # Compute FFT for the current window.
+        # Calcular fft para el segmento de audio
         yf = np.abs(rfft(audio_segment))
         xf = rfftfreq(len(audio_segment), d=1.0 / self.rate)
 
-        # Truncate to self.MAX_FREQUENCY.
+        # Truncar hasta MAX_FREQUENCY.
         mask = xf <= self.MAX_FREQUENCY
         xf = xf[mask]
         yf = yf[mask]
@@ -238,11 +236,40 @@ class AudioComparatorVisualizer:
         self.fig.canvas.draw_idle()
 
     def on_xlim_changed(self, ax):
-        """Callback al hacer zoom/pan en el dominio del tiempo."""
-        # Si quieres recalcular la FFT en la porción visible, puedes hacerlo aquí.
-        if self.is_zooming:
-            # Implementa la lógica de re-FFT si deseas
-            pass
+        """Callback que actualiza el gráfico de frecuencia cuando cambia el zoom en el dominio del tiempo.
+        Esto es para que si se hace zoom en el gráfico de tiempo, se haga zoom en el gráfico de frecuencia también.
+        """
+        if self.is_paused or not self.is_playing:
+            # Límites de tiempo actuales
+            t_min, t_max = self.ax_time.get_xlim()
+
+            total_samples = len(self.audio_array)
+            total_duration = total_samples / self.rate
+
+            times_full = np.linspace(0, total_duration, total_samples)
+
+            idx_min = np.searchsorted(times_full, t_min)
+            idx_max = np.searchsorted(times_full, t_max)
+
+            zoom_audio = self.audio_array[idx_min:idx_max]
+            if zoom_audio.size == 0:
+                return
+
+            num_frames = len(zoom_audio)
+            y_frequency = np.abs(rfft(zoom_audio))
+            x_frequency = rfftfreq(num_frames, d=1.0 / self.rate)
+            # Truncar hasta MAX_FREQUENCY.
+            mask = x_frequency <= self.MAX_FREQUENCY
+            x_frequency = x_frequency[mask]
+            y_frequency = y_frequency[mask]
+
+            self.line_freq.set_data(x_frequency, y_frequency)
+            self.ax_freq.set_xlim(0, self.MAX_FREQUENCY)
+            self.ax_freq.set_ylim(
+                0, np.max(y_frequency) * 1.1 if np.max(y_frequency) > 0 else 1
+            )
+
+            self.fig.canvas.draw_idle()
 
     def on_close(self, event):
         """Al cerrar la ventana, asegurarse de liberar recursos."""
@@ -267,6 +294,7 @@ class AudioComparatorVisualizer:
         Returns:
             dict: Resultados de la comparación con métricas y posición encontrada
         """
+        print("Comparando audio con grabación...")
         # Obtener el audio del reproductor (referencia)
         reference_audio = self.audio_array
 

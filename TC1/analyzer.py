@@ -244,8 +244,10 @@ class AudioAnalyzer:
                 print("Error updating frequency plot on zoom:", e)
 
     def on_close(self, event):
+        """Cierra la ventana y detiene el AudioRecorder"""
         self.timer.stop()
         self.recorder.close()
 
     def run(self):
+        """Despliega la ventana de análisis de audio."""
         plt.show()

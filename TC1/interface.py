@@ -7,14 +7,16 @@ from comparator_recorder import AudioComparatorRecorder
 
 
 class Interface:
+    """Clase que crea la interfaz gráfica de usuario (GUI) para el programa."""
 
     def __init__(self):
+        """Inicializa la ventana principal y los botones."""
         self.root = tk.Tk()
         self.root.title("Autrum")
         self.root.geometry("600x400")
         self.button_font = ("Helvetica", 16)
 
-        # Create three main buttons.
+        # Crear los botones para las funcionalidades principales.
         btn_analizador = tk.Button(
             self.root,
             text="Analizador",
@@ -49,7 +51,7 @@ class Interface:
         btn_comparador.pack(padx=20, pady=10)
 
     def open_analizador(self):
-        # Create a new window for the Analizador options.
+        """Crea una ventana para escoger el modo del analizador"""
         analizador_window = tk.Toplevel(self.root)
         analizador_window.title("Analizador")
         analizador_window.geometry("400x300")
@@ -79,7 +81,7 @@ class Interface:
         btn_batch.pack(padx=20, pady=10)
 
     def open_file_audio_visualizer(self):
-        # Open a file explorer to select a file.
+        """Abre el analizador en modo Batch"""
         file_path = filedialog.askopenfilename(
             title="Seleccione el archivo WAV",
             filetypes=[("WAV Files", "*.wav")],
@@ -92,10 +94,12 @@ class Interface:
             )
 
     def open_streaming_audio_visualizer(self, streaming, filename):
+        """Abre el Analizador"""
         recorder = AudioRecorder()
         AudioAnalyzer(recorder, streaming, filename).run()
 
     def open_reproductor(self):
+        """Abre el reproductor de audio"""
         file_path = filedialog.askopenfilename(
             title="Seleccione el archivo WAV",
             filetypes=[("ATM Files", "*.atm")],
@@ -108,7 +112,7 @@ class Interface:
             )
 
     def open_comparador(self):
-        # Open a file explorer to select a file.
+        """Abre el comparador de audio"""
         file_path = filedialog.askopenfilename(
             title="Seleccione el archivo WAV que se usa para comparar",
             filetypes=[("Autrum Files", "*.atm")],
@@ -123,4 +127,5 @@ class Interface:
             )
 
     def run(self):
+        """Ejecuta la interfaz gráfica de usuario (GUI)"""
         self.root.mainloop()
