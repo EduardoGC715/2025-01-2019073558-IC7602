@@ -285,30 +285,41 @@ class AudioComparatorVisualizer:
             print("Buscando dónde aparece el audio grabado dentro de la referencia...")
             best_offset = 0
             best_score = 0
+
+            rec_fft = np.abs(rfft(recorded_audio))
+            frequencies = rfftfreq(len(recorded_audio), d=1.0/self.rate)
+            n_peaks = 10  # Armónicos principales a considerar
+
+            rec_peaks_idx = np.argsort(rec_fft)[-n_peaks:]
+            
+            rec_peak_freqs = frequencies[rec_peaks_idx]
+
+            rec_fft_norm = rec_fft / np.sum(rec_fft) if np.sum(rec_fft) > 0 else rec_fft
             
             for offset in range(0, len(reference_audio), step_size):
                 # Extraer segmento de la referencia de igual longitud que la grabación
                 ref_segment = reference_audio[offset:offset+len(recorded_audio)]
 
                 if len(ref_segment) < len(recorded_audio):
-                    print("No se encontró una coincidencia confiable. La referencia es más corta que la grabación.")
-                    break
+                    # skip, ya lo que queda es el final del file
+                    continue    
 
-                # Calcular FFT para ambas señales
-                ref_fft = np.abs(rfft(ref_segment))
-                rec_fft = np.abs(rfft(recorded_audio))
-
-                frequencies = rfftfreq(len(recorded_audio), d=1.0/self.rate)
-                
-                n_peaks = 10  # Armónicos principales a considerar
+                # Usar FFT pre-calculada si esta disponible
+                segment_key = f"{offset}_{len(ref_segment)}"
+                if segment_key in self.fft_data:
+                    ref_fft = self.fft_data[segment_key]
+                    print(f"Using cached FFT data for offset {offset}")
+                else:
+                    # Calculate FFT if not available in cache
+                    ref_fft = np.abs(rfft(ref_segment))
+                    # Optionally store for future use
+                    self.fft_data[segment_key] = ref_fft
         
                 # Encontrar índices de los picos más altos en ambas señales (solo en frecuencias significativas)
                 ref_peaks_idx = np.argsort(ref_fft)[-n_peaks:]
-                rec_peaks_idx = np.argsort(rec_fft)[-n_peaks:]
 
                 # Obtener frecuencias correspondientes a estos picos
                 ref_peak_freqs = frequencies[ref_peaks_idx]
-                rec_peak_freqs = frequencies[rec_peaks_idx]
 
                 # Calcular similitud de armónicos con tolerancia
                 frequency_tolerance = 20  # Hz
@@ -324,9 +335,9 @@ class AudioComparatorVisualizer:
                 
                 harmonic_similarity = (harmonic_matches / min(len(rec_peak_freqs), n_peaks)) * 100
 
-                # Calcular similitud de potencia espectral
+                # Calcular similitud de potencia espectral 
+                # amplitud de onda TODO
                 ref_fft_norm = ref_fft / np.sum(ref_fft) if np.sum(ref_fft) > 0 else ref_fft
-                rec_fft_norm = rec_fft / np.sum(rec_fft) if np.sum(rec_fft) > 0 else rec_fft
                 
                 power_correlation = np.corrcoef(rec_fft_norm, ref_fft_norm)[0, 1] * 100
                 if np.isnan(power_correlation):
