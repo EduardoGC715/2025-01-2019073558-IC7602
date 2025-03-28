@@ -10,7 +10,10 @@ import pickle
 
 
 class AudioRecorder:
+    """Clase para grabar audio con el micrófono y procesar archivos WAV."""
+
     def __init__(self):
+        """Inicializa los parámetros de grabación y la cola."""
         self.format = pyaudio.paInt16
         self.channels = 1
         self.rate = 44100
@@ -50,10 +53,9 @@ class AudioRecorder:
             if not self.is_paused:
                 try:
                     data = self.stream.read(self.chunk)
-                    # Convert data to numpy array for processing
+                    # Convertir los datos de bytes a un array numpy
                     data_array = np.frombuffer(data, dtype=np.int16)
-                    # self.frames.append(data_array)  # Store as numpy array
-                    self.queue.put_nowait(data_array)  # Put numpy array in queue
+                    self.queue.put_nowait(data_array)  # Encolar frame
                 except Exception as e:
                     print(f"Error durante la grabación: {e}")
                     break
@@ -85,9 +87,7 @@ class AudioRecorder:
         print("Cargando audio...")
         count = 0
         while len(data_array) > 0:
-            # self.frames.append(np.frombuffer(data_array, dtype=np.int16))
-            # data_array = wf.readframes(self.chunk)
-            self.queue.put_nowait(data_array)  # Put numpy array in queue
+            self.queue.put_nowait(data_array)  # Encolar frame
             data_array = np.frombuffer(wf.readframes(self.chunk), dtype=np.int16)
             count += 1
             print(count)
@@ -112,14 +112,6 @@ class AudioRecorder:
         self.is_recording = False
         print("Grabación detenida")
 
-    def _convert_frames_to_array(self, frames):
-        """Convierte los frames de bytes a array numpy para procesamiento"""
-        return np.frombuffer(b"".join(frames), dtype=np.int16)
-
-    def _convert_array_to_frames(self, array):
-        """Convierte el array numpy a frames de bytes"""
-        return array.astype(np.int16).tobytes()
-
     def save_recording(self):
         """Guarda la grabación como archivo WAV con procesamiento opcional"""
         if not self.frames:
@@ -140,16 +132,21 @@ class AudioRecorder:
         return True
 
     def export_autrum(self, filename=None):
+        """Exporta la grabación com un archivo Autrum (.atm)
+        El archivo Autrum almacena los parámetros de grabación, los frames de audio y la información
+        de la transformada de Fourier"""
         if not filename:
             filename = f"autrum-{time.strftime('%Y%m%d-%H%M%S')}.atm"
         data = {
-            "rate": self.rate,  # Sample rate
-            "channels": self.channels,  # Number of audio channels
-            "frames": self.frames,  # List of numpy arrays containing audio data
-            "fft_data": getattr(self, "fft_data", {}),  # FFT info, if available
-            "sample_width": self.audio.get_sample_size(self.format),  # Sample width
+            "rate": self.rate,
+            "channels": self.channels,
+            "frames": self.frames,
+            "fft_data": getattr(self, "fft_data", {}),
+            "sample_width": self.audio.get_sample_size(self.format),
+            "format": self.format,
+            "chunk": self.chunk,
         }
-        # Write the data to file using pickle.
+
         with open(filename, "wb") as f:
             pickle.dump(data, f)
         print(f"Autrum file saved as {filename}")
