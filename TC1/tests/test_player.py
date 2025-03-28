@@ -1,49 +1,104 @@
+import sys
+import os
 import unittest
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import MagicMock, patch
 import numpy as np
-import pickle
-from player import AudioPlayer  # Assuming AudioPlayer is imported from player.py
+import matplotlib
+import sounddevice as sd
+
+
+matplotlib.use("Agg")
+import time
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from player import AudioPlayer  # Assuming this is the file name
+
+
+class MockAudioPlayer:
+    def __init__(self):
+        self.rate = 8000
+        self.channels = 2
+        self.sample_width = 2
+        self.frames = [np.random.randn(self.rate)]
+        self.audio_array = np.zeros(44100, dtype=np.int16)
+        self.is_playing = False
+        self.is_paused = False
+        self.current_pos = 0
+        self.chunk = 1024
+        self.play_thread = None
+        self.timer = MagicMock()
+
+    def start_playback(self, event=None):
+        if self.is_playing:
+            return
+        self.is_playing = True
+        try:
+            sd.play(self.audio_array, samplerate=44100)
+        except Exception:
+            pass
+
+    def _playback_thread(self):
+        while self.is_playing and self.current_pos < len(self.audio_array):
+            if self.is_paused:
+                time.sleep(0.1)
+                continue
+
+            self.current_pos += self.chunk
+
+        self.is_playing = False
+
+    def pause_playback(self, event):
+        self.is_paused = True
+
+    def resume_playback(self, event):
+        self.is_paused = False
+
+    def stop_playback(self, event):
+        self.is_playing = False
 
 
 class TestAudioPlayer(unittest.TestCase):
-
     def setUp(self):
-        # Sample data to mock the .atm file loading
-        self.sample_data = {
-            "rate": 44100,
-            "channels": 1,
-            "sample_width": 2,
-            "frames": [np.zeros(1024, dtype=np.int16)],
-            "fft_data": {},
-        }
+        self.patcher_sd = patch("sounddevice.play", MagicMock())
+        self.patcher_sd.start()
 
-        self.patcher_open = patch("builtins.open", mock_open(read_data=b"mock data"))
-        self.patcher_pickle = patch("pickle.load", return_value=self.sample_data)
-        self.mock_open = self.patcher_open.start()
-        self.mock_pickle = self.patcher_pickle.start()
-
-        self.patcher_plt = patch(
-            "matplotlib.pyplot.subplots", return_value=(Mock(), (Mock(), Mock()))
-        )
-        self.mock_plt = self.patcher_plt.start()
-
-        # Initialize the AudioPlayer
-        self.player = AudioPlayer("test.atm")
+        self.mock_player = AudioPlayer("test.atm")
+        self.mock_player.audio_array = np.zeros(44100, dtype=np.int16)
 
     def tearDown(self):
-        # Stop patching after each test
-        self.patcher_open.stop()
-        self.patcher_pickle.stop()
-        self.patcher_plt.stop()
+        self.patcher_sd.stop()
 
-    def test_initialization(self):
-        """Test initialization of the AudioPlayer"""
-        self.assertEqual(self.player.rate, 44100)
-        self.assertEqual(self.player.channels, 1)
-        self.assertEqual(self.player.sample_width, 2)
-        self.assertFalse(self.player.is_playing)
-        self.assertFalse(self.player.is_paused)
-        self.assertEqual(self.player.current_pos, 0)
+    def test_start_playback(self):
+        print(f"Antes de iniciar: is_playing = {self.mock_player.is_playing}")
+        self.mock_player.start_playback(event=None)
+        print(f"Después de iniciar: is_playing = {self.mock_player.is_playing}")
+        self.assertTrue(
+            self.mock_player.is_playing, "El reproductor debe comenzar a reproducir."
+        )
+
+    def test_pause_playback(self):
+        self.mock_player.start_playback(event=None)
+        self.mock_player.pause_playback(event=None)
+        self.assertTrue(
+            self.mock_player.is_paused, "El reproductor debe estar pausado."
+        )
+
+    def test_resume_playback(self):
+        self.mock_player.start_playback(event=None)
+        self.mock_player.is_paused = True
+        self.mock_player.resume_playback(event=None)
+        self.assertFalse(
+            self.mock_player.is_paused, "El reproductor debe reanudar la reproducción."
+        )
+
+    def test_stop_playback(self):
+        self.mock_player.start_playback(event=None)
+        self.mock_player.stop_playback(event=None)
+        self.assertFalse(
+            self.mock_player.is_playing,
+            "El reproductor debe haber detenido la reproducción.",
+        )
 
 
 if __name__ == "__main__":
