@@ -83,25 +83,25 @@ class AudioAnalyzer:
     def start_recording(self, event):
         """Inicia la grabación de audio."""
         self.recorder.start_recording()
-        self.btn_start.label.set_text("Recording...")
+        self.btn_start.label.set_text("Grabando...")
         self.fig.canvas.draw_idle()
 
     def pause_recording(self, event):
         """Pausa la grabación de audio."""
         self.recorder.pause_recording()
-        self.btn_pause.label.set_text("Paused")
+        self.btn_pause.label.set_text("Pausado")
         self.fig.canvas.draw_idle()
 
     def resume_recording(self, event):
         """Reanuda la grabación de audio."""
         self.recorder.resume_recording()
-        self.btn_pause.label.set_text("Pause")
+        self.btn_pause.label.set_text("Pausar")
         self.fig.canvas.draw_idle()
 
     def stop_recording(self, event):
         """Detiene la grabación de audio."""
         self.recorder.stop_recording()
-        self.btn_start.label.set_text("Start")
+        self.btn_start.label.set_text("Iniciar")
         self.fig.canvas.draw_idle()
 
     def save_recording(self, event):
