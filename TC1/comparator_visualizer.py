@@ -109,6 +109,7 @@ class AudioComparatorVisualizer:
         start_pos = 0  # Posición predeterminada
         
         if results:  
+            #self.visualize_match(results)
             # Iniciar desde la posición donde se encontró el audio grabado
             start_pos = results["offset"]
             print(f"Iniciando reproducción desde la posición {results['offset_seconds']:.2f}s donde se encontró la mejor coincidencia")
@@ -279,7 +280,7 @@ class AudioComparatorVisualizer:
         print(f"Comparando audio - Referencia: {len(reference_audio)} muestras, Grabado: {len(recorded_audio)} muestras")
         
         # Buscar la mejor posición de coincidencia
-        step_size = self.rate // 10  # Buscar cada 0.1 segundos para mayor eficiencia
+        step_size = self.rate // 100
 
         if len(reference_audio) > len(recorded_audio):
             print("Buscando dónde aparece el audio grabado dentro de la referencia...")
@@ -295,6 +296,7 @@ class AudioComparatorVisualizer:
             rec_peak_freqs = frequencies[rec_peaks_idx]
 
             rec_fft_norm = rec_fft / np.sum(rec_fft) if np.sum(rec_fft) > 0 else rec_fft
+            recorded_norm = recorded_audio / np.max(np.abs(recorded_audio)) if np.max(np.abs(recorded_audio)) > 0 else recorded_audio
             
             for offset in range(0, len(reference_audio), step_size):
                 # Extraer segmento de la referencia de igual longitud que la grabación
@@ -322,7 +324,7 @@ class AudioComparatorVisualizer:
                 ref_peak_freqs = frequencies[ref_peaks_idx]
 
                 # Calcular similitud de armónicos con tolerancia
-                frequency_tolerance = 20  # Hz
+                frequency_tolerance = 10  # Hz
                 harmonic_matches = 0
                 matched_harmonics = []
                 
@@ -333,18 +335,27 @@ class AudioComparatorVisualizer:
                             matched_harmonics.append((rec_freq, ref_freq))
                             break
                 
-                harmonic_similarity = (harmonic_matches / min(len(rec_peak_freqs), n_peaks)) * 100
+                harmonic_similarity = self._cosine_similarity(rec_peak_freqs, ref_peak_freqs) * 100
 
                 # Calcular similitud de potencia espectral 
-                # amplitud de onda TODO
                 ref_fft_norm = ref_fft / np.sum(ref_fft) if np.sum(ref_fft) > 0 else ref_fft
                 
-                power_correlation = np.corrcoef(rec_fft_norm, ref_fft_norm)[0, 1] * 100
+                """power_correlation = np.corrcoef(rec_fft_norm, ref_fft_norm)[0, 1] * 100
                 if np.isnan(power_correlation):
-                    power_correlation = 0
+                    power_correlation = 0"""
+
+                # Calcular similitud de potencia espectral (RMS)
+                power_correlation = self._power_similarity(recorded_audio, ref_segment)
+
+                # Calcular similitud de amplitud de onda (dominio del tiempo)
+                ref_segment_norm = ref_segment / np.max(np.abs(ref_segment)) if np.max(np.abs(ref_segment)) > 0 else ref_segment
+                                
+                amplitude_correlation = np.corrcoef(recorded_norm, ref_segment_norm)[0, 1] * 100
+                if np.isnan(amplitude_correlation):
+                    amplitude_correlation = 0
                 
                 # Calcular puntuación final
-                total_score = 0.7 * harmonic_similarity + 0.3 * power_correlation
+                total_score = harmonic_similarity + amplitude_correlation + power_correlation
                 if total_score > best_score:
                     best_score = total_score
                     best_offset = offset
@@ -352,16 +363,19 @@ class AudioComparatorVisualizer:
             print(f"\n--- RESULTADOS DE COMPARACIÓN DE AUDIO ---")
             print(f"Audio grabado encontrado en la posición: {best_offset} muestras ({best_offset/self.rate:.2f} segundos) del audio de referencia")
             print(f"Similitud de armónicos: {harmonic_similarity:.1f}%")
-            for i, (rec, ref) in enumerate(matched_harmonics[:5]):  # Mostrar primeros 5 para no saturar
-                print(f"  Armónico {i+1}: Grabado {rec:.1f}Hz - Ref {ref:.1f}Hz")
-                print(f"Correlación de potencia espectral: {power_correlation:.1f}%")
-                print(f"Puntuación total de similitud: {total_score:.1f}%\n")
-                
+            print(f"Correlación de amplitud de onda: {amplitude_correlation:.1f}%")
+            print(f"Correlación de potencia espectral: {power_correlation:.1f}%")
+            print(f"Puntuación total: {total_score:.1f}")
+            print(f"Armónicos coincidentes: {matched_harmonics}")
+
+
+
             results = {
                 "offset": best_offset,
                 "offset_seconds": best_offset/self.rate,
                 "harmonic_similarity": harmonic_similarity,
                 "power_correlation": power_correlation,
+                "amplitude_correlation": amplitude_correlation,
                 "total_score": total_score,
                 "matched_harmonics": matched_harmonics
             }
@@ -370,3 +384,110 @@ class AudioComparatorVisualizer:
         else:
             print("La referencia es más corta que la grabación.")
             return None
+        
+    def _cosine_similarity(self, a, b):
+        """Calcula la similitud de coseno entre dos vectores."""
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
+        if norm_a == 0 or norm_b == 0:
+            return 0
+        return np.dot(a, b) / (norm_a * norm_b)
+
+    def _power_similarity(self, segment, template):
+        """
+        Calcula la similitud basada en la potencia (RMS) entre el segmento y el template.
+        Se utiliza una fórmula que compara la diferencia relativa de RMS.
+        """
+        rms_template = np.sqrt(np.mean(template.astype(np.float32)**2))
+        rms_segment = np.sqrt(np.mean(segment.astype(np.float32)**2))
+        # Evitar división por cero
+        if rms_template == 0:
+            return 100 if rms_segment == 0 else 0
+        diff = abs(rms_segment - rms_template) / rms_template
+        similarity = max(0, 1 - diff)
+        return similarity * 100
+    
+    def visualize_match(self, results):
+        """
+        Visualiza el mejor offset encontrado en el audio de referencia.
+        
+        Args:
+            results: Diccionario con los resultados de la comparación
+        """
+        if not results:
+            print("No hay resultados para visualizar")
+            return
+        
+        # Crear una nueva figura para esta visualización
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+        fig.suptitle("Visualización de coincidencia de audio", fontsize=16)
+        
+        # Audio de referencia completo
+        reference_audio = self.audio_array
+        duration = len(reference_audio) / self.rate
+        times = np.linspace(0, duration, len(reference_audio))
+        
+        # Graficar el audio completo (posiblemente con un submuestreo para mejor rendimiento)
+        step = max(1, len(reference_audio) // 10000)  # Limitar a ~10k puntos para rendimiento
+        ax1.plot(times[::step], reference_audio[::step], 'b-', alpha=0.5, label='Audio de referencia')
+        
+        # Marcar el mejor offset
+        best_offset = results["offset"]
+        best_offset_seconds = results["offset_seconds"]
+        
+        # Obtener la grabación
+        recorded_frames = self.recorder.frames
+        if recorded_frames:
+            recorded_audio = np.concatenate(recorded_frames)
+            recorded_duration = len(recorded_audio) / self.rate
+            
+            # Destacar la región donde se encontró la coincidencia - cambiado a rojo
+            ax1.axvspan(best_offset_seconds, 
+                    best_offset_seconds + recorded_duration, 
+                    color='red', alpha=0.3, label='Mejor coincidencia')
+            
+            # También marcamos el inicio con una línea vertical - mantenemos azul
+            ax1.axvline(x=best_offset_seconds, color='blue', linestyle='--', 
+                    label=f'Mejor offset: {best_offset_seconds:.2f}s')
+            
+            # Configurar límites de visualización para centrarse en la región de interés
+            margin = 3  # segundos antes y después para contexto
+            ax1.set_xlim(max(0, best_offset_seconds - margin), 
+                        min(duration, best_offset_seconds + recorded_duration + margin))
+        
+        ax1.set_title("Audio de referencia con mejor coincidencia marcada")
+        ax1.set_xlabel("Tiempo (s)")
+        ax1.set_ylabel("Amplitud")
+        ax1.legend()
+        
+        # Gráfico de zoom a la coincidencia
+        if best_offset + len(recorded_audio) <= len(reference_audio):
+            matched_segment = reference_audio[best_offset:best_offset+len(recorded_audio)]
+            matched_times = np.linspace(best_offset_seconds, 
+                                    best_offset_seconds + recorded_duration, 
+                                    len(matched_segment))
+            
+            # Graficar el segmento coincidente - cambiado a azul
+            ax2.plot(matched_times, matched_segment, 'b-', label='Segmento coincidente')
+            
+            # Graficar la grabación superpuesta - cambiado a rojo sólido
+            recorded_times = np.linspace(best_offset_seconds, 
+                                        best_offset_seconds + recorded_duration, 
+                                        len(recorded_audio))
+            ax2.plot(recorded_times, recorded_audio, 'r-', alpha=0.7, label='Audio grabado')
+            
+            ax2.set_title("Comparación del segmento coincidente con el audio grabado")
+            ax2.set_xlabel("Tiempo (s)")
+            ax2.set_ylabel("Amplitud")
+            ax2.legend()
+        
+        # Añadir información sobre la puntuación
+        fig.text(0.02, 0.02, 
+                f"Similitud de armónicos: {results['harmonic_similarity']:.1f}%\n"
+                f"Correlación de potencia: {results['power_correlation']:.1f}%\n"
+                f"Correlación de amplitud: {results['amplitude_correlation']:.1f}%\n"
+                f"Puntuación total: {results['total_score']:.1f}",
+                fontsize=12)
+        
+        plt.tight_layout()
+        plt.show(block=False)
