@@ -44,21 +44,23 @@ class AudioComparatorVisualizer:
         self.MAX_FREQUENCY = 4000  # Límite de frecuencia a mostrar
         self.MAX_SECONDS = 2  # Mostrar últimos 2 segundos en el gráfico
 
+        self.results = self.compare_audio()
+
         # --- Crear figura y ejes ---
         self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(10, 8))
         plt.subplots_adjust(bottom=0.3, hspace=0.4)
         self.fig.canvas.manager.set_window_title("Autrum - Reproductor de Audio")
 
-        # Eje de tiempo
-        self.ax_time.set_title("Audio Player (Time Domain)")
-        self.ax_time.set_xlabel("Time (s)")
-        self.ax_time.set_ylabel("Amplitude")
+        # Dominio de tiempo
+        self.ax_time.set_title("Audio en tiempo real (Dominio del Tiempo)")
+        self.ax_time.set_xlabel("Tiempo (s)")
+        self.ax_time.set_ylabel("Amplitud")
         (self.line_time,) = self.ax_time.plot([], [])
 
-        # Eje de frecuencia
-        self.ax_freq.set_title("Audio Player (Frequency Domain)")
-        self.ax_freq.set_xlabel("Frequency (Hz)")
-        self.ax_freq.set_ylabel("Magnitude")
+        # Dominio de frecuencia
+        self.ax_freq.set_title("Audio en tiempo real (Dominio de Frecuencia)")
+        self.ax_freq.set_xlabel("Frecuencia (Hz)")
+        self.ax_freq.set_ylabel("Magnitud")
         (self.line_freq,) = self.ax_freq.plot([], [])
 
         # --- Botones ---
@@ -100,22 +102,25 @@ class AudioComparatorVisualizer:
         if self.audio_array.size == 0:
             print("No hay audio para reproducir.")
             return
-            
+
         # Comparar audio y encontrar posición
         print("Comparando audio con grabación...")
-        results = self.compare_audio()
-        
+
         # Si obtuvimos resultados con buena coincidencia, iniciar desde esa posición
         start_pos = 0  # Posición predeterminada
-        
-        if results:  
-            #self.visualize_match(results)
+
+        if self.results:
+            # self.visualize_match(results)
             # Iniciar desde la posición donde se encontró el audio grabado
-            start_pos = results["offset"]
-            print(f"Iniciando reproducción desde la posición {results['offset_seconds']:.2f}s donde se encontró la mejor coincidencia")
+            start_pos = self.results["offset"]
+            print(
+                f"Iniciando reproducción desde la posición {self.results['offset_seconds']:.2f}s donde se encontró la mejor coincidencia"
+            )
         else:
-            print("No se encontró una coincidencia confiable. Iniciando reproducción desde el principio.")
-        
+            print(
+                "No se encontró una coincidencia confiable. Iniciando reproducción desde el principio."
+            )
+
         self.is_playing = True
         self.is_paused = False
         self.current_pos = start_pos  # Usar la posición calculada directamente
@@ -255,30 +260,36 @@ class AudioComparatorVisualizer:
         Compara el audio grabado con el audio de referencia.
         Busca donde aparece la grabación dentro del audio de referencia.
         Analiza similitud por armónicos y potencia espectral.
-        
+
         Args:
             event: Parámetro opcional para poder usar como callback en botones
-        
+
         Returns:
             dict: Resultados de la comparación con métricas y posición encontrada
         """
         # Obtener el audio del reproductor (referencia)
         reference_audio = self.audio_array
-        
+
         # Obtener el audio ya grabado del recorder
         recorded_frames = self.recorder.frames
         if not recorded_frames:
             print("No hay audio grabado para comparar. Debe grabar audio primero.")
             return None
-        
-        recorded_audio = np.concatenate(recorded_frames) if recorded_frames else np.array([], dtype=np.int16)
-        
+
+        recorded_audio = (
+            np.concatenate(recorded_frames)
+            if recorded_frames
+            else np.array([], dtype=np.int16)
+        )
+
         if len(reference_audio) == 0 or len(recorded_audio) == 0:
             print("Una o ambas señales están vacías")
             return None
-        
-        print(f"Comparando audio - Referencia: {len(reference_audio)} muestras, Grabado: {len(recorded_audio)} muestras")
-        
+
+        print(
+            f"Comparando audio - Referencia: {len(reference_audio)} muestras, Grabado: {len(recorded_audio)} muestras"
+        )
+
         # Buscar la mejor posición de coincidencia
         step_size = self.rate // 100
 
@@ -288,23 +299,27 @@ class AudioComparatorVisualizer:
             best_score = 0
 
             rec_fft = np.abs(rfft(recorded_audio))
-            frequencies = rfftfreq(len(recorded_audio), d=1.0/self.rate)
+            frequencies = rfftfreq(len(recorded_audio), d=1.0 / self.rate)
             n_peaks = 10  # Armónicos principales a considerar
 
             rec_peaks_idx = np.argsort(rec_fft)[-n_peaks:]
-            
+
             rec_peak_freqs = frequencies[rec_peaks_idx]
 
             rec_fft_norm = rec_fft / np.sum(rec_fft) if np.sum(rec_fft) > 0 else rec_fft
-            recorded_norm = recorded_audio / np.max(np.abs(recorded_audio)) if np.max(np.abs(recorded_audio)) > 0 else recorded_audio
-            
+            recorded_norm = (
+                recorded_audio / np.max(np.abs(recorded_audio))
+                if np.max(np.abs(recorded_audio)) > 0
+                else recorded_audio
+            )
+
             for offset in range(0, len(reference_audio), step_size):
                 # Extraer segmento de la referencia de igual longitud que la grabación
-                ref_segment = reference_audio[offset:offset+len(recorded_audio)]
+                ref_segment = reference_audio[offset : offset + len(recorded_audio)]
 
                 if len(ref_segment) < len(recorded_audio):
                     # skip, ya lo que queda es el final del file
-                    continue    
+                    continue
 
                 # Usar FFT pre-calculada si esta disponible
                 segment_key = f"{offset}_{len(ref_segment)}"
@@ -316,7 +331,7 @@ class AudioComparatorVisualizer:
                     ref_fft = np.abs(rfft(ref_segment))
                     # Optionally store for future use
                     self.fft_data[segment_key] = ref_fft
-        
+
                 # Encontrar índices de los picos más altos en ambas señales (solo en frecuencias significativas)
                 ref_peaks_idx = np.argsort(ref_fft)[-n_peaks:]
 
@@ -327,19 +342,23 @@ class AudioComparatorVisualizer:
                 frequency_tolerance = 10  # Hz
                 harmonic_matches = 0
                 matched_harmonics = []
-                
+
                 for rec_freq in rec_peak_freqs:
                     for ref_freq in ref_peak_freqs:
                         if abs(rec_freq - ref_freq) <= frequency_tolerance:
                             harmonic_matches += 1
                             matched_harmonics.append((rec_freq, ref_freq))
                             break
-                
-                harmonic_similarity = self._cosine_similarity(rec_peak_freqs, ref_peak_freqs) * 100
 
-                # Calcular similitud de potencia espectral 
-                ref_fft_norm = ref_fft / np.sum(ref_fft) if np.sum(ref_fft) > 0 else ref_fft
-                
+                harmonic_similarity = (
+                    self._cosine_similarity(rec_peak_freqs, ref_peak_freqs) * 100
+                )
+
+                # Calcular similitud de potencia espectral
+                ref_fft_norm = (
+                    ref_fft / np.sum(ref_fft) if np.sum(ref_fft) > 0 else ref_fft
+                )
+
                 """power_correlation = np.corrcoef(rec_fft_norm, ref_fft_norm)[0, 1] * 100
                 if np.isnan(power_correlation):
                     power_correlation = 0"""
@@ -348,43 +367,51 @@ class AudioComparatorVisualizer:
                 power_correlation = self._power_similarity(recorded_audio, ref_segment)
 
                 # Calcular similitud de amplitud de onda (dominio del tiempo)
-                ref_segment_norm = ref_segment / np.max(np.abs(ref_segment)) if np.max(np.abs(ref_segment)) > 0 else ref_segment
-                                
-                amplitude_correlation = np.corrcoef(recorded_norm, ref_segment_norm)[0, 1] * 100
+                ref_segment_norm = (
+                    ref_segment / np.max(np.abs(ref_segment))
+                    if np.max(np.abs(ref_segment)) > 0
+                    else ref_segment
+                )
+
+                amplitude_correlation = (
+                    np.corrcoef(recorded_norm, ref_segment_norm)[0, 1] * 100
+                )
                 if np.isnan(amplitude_correlation):
                     amplitude_correlation = 0
-                
+
                 # Calcular puntuación final
-                total_score = harmonic_similarity + amplitude_correlation + power_correlation
+                total_score = (
+                    harmonic_similarity + amplitude_correlation + power_correlation
+                )
                 if total_score > best_score:
                     best_score = total_score
                     best_offset = offset
             # Reportar resultados
             print(f"\n--- RESULTADOS DE COMPARACIÓN DE AUDIO ---")
-            print(f"Audio grabado encontrado en la posición: {best_offset} muestras ({best_offset/self.rate:.2f} segundos) del audio de referencia")
+            print(
+                f"Audio grabado encontrado en la posición: {best_offset} muestras ({best_offset/self.rate:.2f} segundos) del audio de referencia"
+            )
             print(f"Similitud de armónicos: {harmonic_similarity:.1f}%")
             print(f"Correlación de amplitud de onda: {amplitude_correlation:.1f}%")
             print(f"Correlación de potencia espectral: {power_correlation:.1f}%")
             print(f"Puntuación total: {total_score:.1f}")
             print(f"Armónicos coincidentes: {matched_harmonics}")
 
-
-
             results = {
                 "offset": best_offset,
-                "offset_seconds": best_offset/self.rate,
+                "offset_seconds": best_offset / self.rate,
                 "harmonic_similarity": harmonic_similarity,
                 "power_correlation": power_correlation,
                 "amplitude_correlation": amplitude_correlation,
                 "total_score": total_score,
-                "matched_harmonics": matched_harmonics
+                "matched_harmonics": matched_harmonics,
             }
-                
+
             return results
         else:
             print("La referencia es más corta que la grabación.")
             return None
-        
+
     def _cosine_similarity(self, a, b):
         """Calcula la similitud de coseno entre dos vectores."""
         norm_a = np.linalg.norm(a)
@@ -398,96 +425,125 @@ class AudioComparatorVisualizer:
         Calcula la similitud basada en la potencia (RMS) entre el segmento y el template.
         Se utiliza una fórmula que compara la diferencia relativa de RMS.
         """
-        rms_template = np.sqrt(np.mean(template.astype(np.float32)**2))
-        rms_segment = np.sqrt(np.mean(segment.astype(np.float32)**2))
+        rms_template = np.sqrt(np.mean(template.astype(np.float32) ** 2))
+        rms_segment = np.sqrt(np.mean(segment.astype(np.float32) ** 2))
         # Evitar división por cero
         if rms_template == 0:
             return 100 if rms_segment == 0 else 0
         diff = abs(rms_segment - rms_template) / rms_template
         similarity = max(0, 1 - diff)
         return similarity * 100
-    
+
     def visualize_match(self, results):
         """
         Visualiza el mejor offset encontrado en el audio de referencia.
-        
+
         Args:
             results: Diccionario con los resultados de la comparación
         """
         if not results:
             print("No hay resultados para visualizar")
             return
-        
+
         # Crear una nueva figura para esta visualización
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
         fig.suptitle("Visualización de coincidencia de audio", fontsize=16)
-        
+
         # Audio de referencia completo
         reference_audio = self.audio_array
         duration = len(reference_audio) / self.rate
         times = np.linspace(0, duration, len(reference_audio))
-        
+
         # Graficar el audio completo (posiblemente con un submuestreo para mejor rendimiento)
-        step = max(1, len(reference_audio) // 10000)  # Limitar a ~10k puntos para rendimiento
-        ax1.plot(times[::step], reference_audio[::step], 'b-', alpha=0.5, label='Audio de referencia')
-        
+        step = max(
+            1, len(reference_audio) // 10000
+        )  # Limitar a ~10k puntos para rendimiento
+        ax1.plot(
+            times[::step],
+            reference_audio[::step],
+            "b-",
+            alpha=0.5,
+            label="Audio de referencia",
+        )
+
         # Marcar el mejor offset
         best_offset = results["offset"]
         best_offset_seconds = results["offset_seconds"]
-        
+
         # Obtener la grabación
         recorded_frames = self.recorder.frames
         if recorded_frames:
             recorded_audio = np.concatenate(recorded_frames)
             recorded_duration = len(recorded_audio) / self.rate
-            
+
             # Destacar la región donde se encontró la coincidencia - cambiado a rojo
-            ax1.axvspan(best_offset_seconds, 
-                    best_offset_seconds + recorded_duration, 
-                    color='red', alpha=0.3, label='Mejor coincidencia')
-            
+            ax1.axvspan(
+                best_offset_seconds,
+                best_offset_seconds + recorded_duration,
+                color="red",
+                alpha=0.3,
+                label="Mejor coincidencia",
+            )
+
             # También marcamos el inicio con una línea vertical - mantenemos azul
-            ax1.axvline(x=best_offset_seconds, color='blue', linestyle='--', 
-                    label=f'Mejor offset: {best_offset_seconds:.2f}s')
-            
+            ax1.axvline(
+                x=best_offset_seconds,
+                color="blue",
+                linestyle="--",
+                label=f"Mejor offset: {best_offset_seconds:.2f}s",
+            )
+
             # Configurar límites de visualización para centrarse en la región de interés
             margin = 3  # segundos antes y después para contexto
-            ax1.set_xlim(max(0, best_offset_seconds - margin), 
-                        min(duration, best_offset_seconds + recorded_duration + margin))
-        
+            ax1.set_xlim(
+                max(0, best_offset_seconds - margin),
+                min(duration, best_offset_seconds + recorded_duration + margin),
+            )
+
         ax1.set_title("Audio de referencia con mejor coincidencia marcada")
         ax1.set_xlabel("Tiempo (s)")
         ax1.set_ylabel("Amplitud")
         ax1.legend()
-        
+
         # Gráfico de zoom a la coincidencia
         if best_offset + len(recorded_audio) <= len(reference_audio):
-            matched_segment = reference_audio[best_offset:best_offset+len(recorded_audio)]
-            matched_times = np.linspace(best_offset_seconds, 
-                                    best_offset_seconds + recorded_duration, 
-                                    len(matched_segment))
-            
+            matched_segment = reference_audio[
+                best_offset : best_offset + len(recorded_audio)
+            ]
+            matched_times = np.linspace(
+                best_offset_seconds,
+                best_offset_seconds + recorded_duration,
+                len(matched_segment),
+            )
+
             # Graficar el segmento coincidente - cambiado a azul
-            ax2.plot(matched_times, matched_segment, 'b-', label='Segmento coincidente')
-            
+            ax2.plot(matched_times, matched_segment, "b-", label="Segmento coincidente")
+
             # Graficar la grabación superpuesta - cambiado a rojo sólido
-            recorded_times = np.linspace(best_offset_seconds, 
-                                        best_offset_seconds + recorded_duration, 
-                                        len(recorded_audio))
-            ax2.plot(recorded_times, recorded_audio, 'r-', alpha=0.7, label='Audio grabado')
-            
+            recorded_times = np.linspace(
+                best_offset_seconds,
+                best_offset_seconds + recorded_duration,
+                len(recorded_audio),
+            )
+            ax2.plot(
+                recorded_times, recorded_audio, "r-", alpha=0.7, label="Audio grabado"
+            )
+
             ax2.set_title("Comparación del segmento coincidente con el audio grabado")
             ax2.set_xlabel("Tiempo (s)")
             ax2.set_ylabel("Amplitud")
             ax2.legend()
-        
+
         # Añadir información sobre la puntuación
-        fig.text(0.02, 0.02, 
-                f"Similitud de armónicos: {results['harmonic_similarity']:.1f}%\n"
-                f"Correlación de potencia: {results['power_correlation']:.1f}%\n"
-                f"Correlación de amplitud: {results['amplitude_correlation']:.1f}%\n"
-                f"Puntuación total: {results['total_score']:.1f}",
-                fontsize=12)
-        
+        fig.text(
+            0.02,
+            0.02,
+            f"Similitud de armónicos: {results['harmonic_similarity']:.1f}%\n"
+            f"Correlación de potencia: {results['power_correlation']:.1f}%\n"
+            f"Correlación de amplitud: {results['amplitude_correlation']:.1f}%\n"
+            f"Puntuación total: {results['total_score']:.1f}",
+            fontsize=12,
+        )
+
         plt.tight_layout()
         plt.show(block=False)

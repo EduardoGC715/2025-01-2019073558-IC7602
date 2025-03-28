@@ -28,15 +28,15 @@ class AudioAnalyzer:
         plt.subplots_adjust(bottom=0.3, hspace=0.4)
 
         # Dominio de tiempo
-        self.ax_time.set_title("Real-time Audio Signal (Time Domain)")
-        self.ax_time.set_xlabel("Time (s)")
-        self.ax_time.set_ylabel("Amplitude")
+        self.ax_time.set_title("Audio en tiempo real (Dominio del Tiempo)")
+        self.ax_time.set_xlabel("Tiempo (s)")
+        self.ax_time.set_ylabel("Amplitud")
         (self.line_time,) = self.ax_time.plot([], [])
 
         # Dominio de frecuencia
-        self.ax_freq.set_title("Real-time Audio Signal (Frequency Domain)")
-        self.ax_freq.set_xlabel("Frequency (Hz)")
-        self.ax_freq.set_ylabel("Magnitude")
+        self.ax_freq.set_title("Audio en tiempo real (Dominio de Frecuencia)")
+        self.ax_freq.set_xlabel("Frecuencia (Hz)")
+        self.ax_freq.set_ylabel("Magnitud")
         (self.line_freq,) = self.ax_freq.plot([], [])
 
         if streaming:

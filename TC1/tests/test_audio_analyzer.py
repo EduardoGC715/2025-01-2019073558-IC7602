@@ -21,12 +21,9 @@ class MockRecorder:
         self.frames = []
         self.fft_data = {}
         self.queue = queue.Queue()
-        self.rate = 8000  # Sample rate
+        self.rate = 8000
         self.is_recording = False
         self.is_paused = False
-        self.saved = False
-        self.exported = None
-        self.closed = False
 
     def start_recording(self):
         self.is_recording = True
