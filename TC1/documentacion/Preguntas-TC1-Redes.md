@@ -1,42 +1,26 @@
-# Instituto Tecnológico de Costa Rica
+# Instituto Tecnológico de Costa Rica  
+## Escuela de Ingeniería en Computación – Campus Central Cartago  
 
-## Campus Tecnológico Central Cartago
+# Preguntas - Tarea de Computación 1 
+### Redes - Grupo 2  
+**Profesor:** Gerardo Nereo Campos Araya  
+**Fecha:** 28 de marzo, 2025 – IS 2025  
 
-## Escuela de Ingeniería en Computación
-
-# Preguntas - Tarea de Computación 1
-
-### Redes - Grupo 2
-
-### Prof. Gerardo Nereo Campos Araya
-
-### Fecha: Marzo 2025
-
-### Daniel Granados Retana, carné 2022104692
-
-### Diego Manuel Granados Retana, carné 2022158363
-
-### David Fernández Salas, carné 2022045079
-
-### Diego Mora Montes, carné 2022104866
-
-### Eduardo Gutierrez Conejo, carné 2019073558
-
-### 28 de Marzo del 2024
-
-### IS 2025
+**Integrantes:**  
+- Daniel Granados Retana – 2022104692  
+- Diego Manuel Granados Retana – 2022158363  
+- David Fernández Salas – 2022045079  
+- Diego Mora Montes – 2022104866  
+- Eduardo Gutiérrez Conejo – 2019073558
 
 ## 1. ¿Por qué las voces de los integrantes son diferentes?
 
-### Diferencias anatómicas y de frecuencia
-Empezando desde el origen de todo, lo cual sería nuestra estructura anatómica mediante la cual somos capaces de producir sonidos y por ende nuestra voz, va a ir directamente ligada a la forma en la que esta suena, debido a las diferencias que tenemos las personas en cuanto el tamaño, forma, configuración u otro aspecto en los cuales los distintos órganos involucrados en producir nuestra voz como lo son el diafragma, laringe, cuerdas vocales, garganta, cavidad oral y fosas nasales, se varían levemente entre todas las personas, causa que cada quien genere sonidos de distinta manera. Estas variaciones afectan como suena nuestra voz, ya que provocan que se produzca mayor potencia en ciertos rangos de frecuencia y menor en otros, utilizando distintos armónicos para producir el sonido que escuchamos como voz. 
-
 ### Resultados obtenidos
-A continuación se realizará un análisis de resultados obtenidos mediante nuestra aplicación Autrum. Esta sé probo por tres integrantes del grupo, quienes grabaron la frase "hola esta es la tarea de redes" utilizando el analizador para generar los archivos .atm, mediante el uso de estos en el reproductor, se mostraron los gráficos del dominio de tiempo y dominio de frecuencia, con los cuales se muestra de manera visual las diferencias que tienen nuestras voces, mediante el siguiente análisis de cada gráfica demostraremos porque es que estas son distintas unas de otras:
+A continuación se analiza el resultado obtenido con la aplicación Autrum, donde tres integrantes grabaron la frase "hola esta es la tarea de redes". Usando el analizador y reproductor, se generaron gráficos en el dominio del tiempo y frecuencia que permiten visualizar y explicar las diferencias entre sus voces.
 
 **1. Daniel Granados**  
 
-<img src="imagenes/Daniel.png" width="400" height="250"/>
+<img src="imagenes/Daniel.png" width="350" height="200"/>
 
 Dominio del tiempo
 - Se muestra una señal continua y estable, con ondas bien definidas y pocos silencios cortantes.
@@ -51,7 +35,7 @@ Dominio de la frecuencia
 
 **2. Diego Granados**
 
-<img src="imagenes/DiegoG.png" width="400" height="250"/>
+<img src="imagenes/DiegoG.png" width="350" height="200"/>
 
 Dominio del tiempo 
 - Se muestra una señal más densa, con actividad más constante a lo largo del tiempo con pocas pausas entre palabras.
@@ -66,7 +50,7 @@ Dominio de la frecuencia
 
 **3. Diego Mora**
 
-<img src="imagenes/DiegoM.png" width="400" height="250"/>
+<img src="imagenes/DiegoM.png" width="350" height="200"/>
 
 Dominio del tiempo 
 - Se muestra una señal con múltiples segmentos de silencio, interrumpidos por picos bruscos de amplitud.
@@ -87,29 +71,22 @@ De igual forma, la señal compuesta se ve afectada por las limitaciones del cana
 ---
 
 ## 2. ¿Por qué la comparación de voces es tan poco exacta mediante armónicos?
-Aunque mediante el uso de la Transformada de Fourier es posible identificar los armónicos de una señal y utilizarlos como base para comparar grabaciones de audio, esta técnica resulta limitada y más propensa a errores en comparación con el método de análisis por potencia. A continuación, se presentan las principales razones por las cuales la comparación basada en armónicos resulta poco precisa:
 
-### La voz no es una sinusoide perfecta
-Según el Teorema de Fourier nuestras voces están compuestas por señales complejas formadas por la superposición de múltiples sinusoides, más en realidad estos no son tonos puros. Mientras una persona habla genera un patrón único de armónicos dependiendo de su configuración anatómica, intensidad del habla, postura y otros factores. Estos factores hace que las voces no se repitan de manera exacta entre grabaciones, incluso cuando decimos la misma palabra.
-
-### Los armónicos no representan nuestra identidad de voz
-Aunque los armónicos representan una parte importante del timbre y la forma en la que nuestra voz se diferencia una de otra, no van a ser suficientes para identificar una voz de manera precisa. Dos voces pueden compartir una misma estructura armónica parecida, pero tener una diferencia notable en la amplitud, fase, contenido inarmónico y ruido. Por lo que los armónicos no se pueden llegar a considerar una huella digital confiable a la hora de realizar las comparaciones. 
+Para responder esta pregunta se analiza el resultado obtenido con el comparador de la aplicación Autrum, utilizando el mismo archivo .atm de la frase "hola esta es la tarea de redes", comparado con la grabación de la palabra "tarea". A continuación, se presentan los resultados junto con su análisis.
 
 
-### Pequeñas variaciones cambian la forma de onda
-Como se menciona en el artículo "sinusoides y sonidos compuestos: armónicos y parciales en audio", pequeños cambios en como se excita una fuente sonora (ya sea hablar con un mayor tono o cambiar la posición del micrófono que utilizamos) alteran la energía que reciben ciertos armónicos. Esto cambia la forma de la onda final, aunque la frase que se dice sea la misma. Por lo que dos grabaciones aunque sean de la misma persona pueden producir espectros de frecuencia diferentes.
+<img src="imagenes/Comparacion.png" width="400" height="250"/>
 
-### Presencia de ruido y componentes inarmónicas
-Múltiples de las grabaciones realizadas no solo contienen la voz del hablante, sino que también ruido de fondo que afecta la estructura de las ondas capturadas. Por más pequeñas que estas ondas de ruido sean, estos elementos introducen componentes que no pertenecen a la serie armónica del hablante, lo que interfiere con el análisis y la descomposición de las señales compuestas por sus armónicos. Esto dificulta una comparación precisa, ya que el ruido es un factor impredecible que altera la forma de la onda original.
+### Análisis de resultados  
+En la gráfica superior se observa que el sistema logra identificar de forma aproximada la ubicación de la palabra "tarea" dentro de la señal original. El fragmento rosado marca la región detectada como coincidencia, aunque no corresponde exactamente al mismo punto de pronunciación, lo que indica una coincidencia parcial.
 
----
+### Similitudes entre las señales  
+Aunque ambas se ven visualmente alineadas, los desfases de milisegundos y pequeñas diferencias en la articulación afectan la forma exacta de la onda. En el análisis de Fourier, estas pequeñas diferencias implican una reorganización completa de los armónicos, debido a que el contenido de la frecuencia depende de la estructura periódica exacta de la señal.
 
-## Referencias
+### Dominio de la frecuencia  
+En el espectro se ve una alta densidad de armónicos en frecuencias más bajas, desde 100 a 800 Hz, pero se atenúan rápidamente a partir de los 1000 Hz, debido al límite de ancho de banda definido a los 4000 Hz; por ende, muchos armónicos superiores no se conservan, reduciendo la capacidad del sistema de comparar patrones que caractericen la voz humana.
 
-- Tanenbaum, A. (2002). *Computer Networks* (4ta ed.). Chapter 2: The Physical Layer.
+### Por qué los armónicos no son suficientes para la comparación  
+Los armónicos son múltiplos de la frecuencia fundamental, y por esto, cualquier pequeño cambio en la entonación, ritmo o articulación puede alterar completamente su posición. De igual forma, los canales físicos nos limitan el paso de frecuencias altas, eliminando armónicos con información importante, reduciendo la fidelidad de la comparación. En los resultados obtenidos con Autrum, aunque se tiene una buena similitud de armónicos del 75.8 %, la correlación de potencia y de amplitud son sumamente bajas, indicando que las señales son distintas en relación a la energía, a pesar de compartir frecuencias. En conclusión, los armónicos no van a ser una buena métrica de comparación de voces, al ser sumamente sensibles e inestables ante cambios en la voz y no considerar aspectos como el tiempo ni la estructura completa de la señal.
 
-- Apuntes del curso de Redes.
 
-- [Fernández-Cid, P. (2017). *Sinusoides y sonidos compuestos: armónicos y parciales en audio*. Hispasonic.](https://www.hispasonic.com/tutoriales/sinusoides-sonidos-compuestos-armonicos-parciales-audio/43309)
-
-- [The Voice Foundation. *Anatomy & Physiology of Voice Production*.](https://voicefoundation.org/health-science/voice-disorders/anatomy-physiology-of-voice-production/)
