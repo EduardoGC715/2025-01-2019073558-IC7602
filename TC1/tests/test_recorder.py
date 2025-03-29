@@ -134,6 +134,7 @@ class TestAudioRecorder(unittest.TestCase):
             exported_data = mock_pickle.call_args[0][0]
             self.assertIn("rate", exported_data)
             self.assertIn("channels", exported_data)
+
             self.assertIn("frames", exported_data)
             self.assertIn("fft_data", exported_data)
             self.assertIn("sample_width", exported_data)
