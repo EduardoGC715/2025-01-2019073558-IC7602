@@ -21,7 +21,7 @@ A continuación se analiza el resultado obtenido con la aplicación Autrum, dond
 
 Dominio del tiempo
 - Se muestra una señal continua y estable, con ondas bien definidas y pocos silencios cortantes.
-- Hay una gran variación en la amplitud con valores mayores a 6000, lo cual indica una señal altamente energética.
+- Hay una gran variación en la amplitud con valores mayores a 6000, indicando una señal altamente energética.
 - Lo anterior sugiere que la relación señal/ruido es alta, por lo que el contenido obtenido de la voz domina sobre el ruido térmico de fondo. 
 
 Dominio de la frecuencia
@@ -37,7 +37,7 @@ Dominio de la frecuencia
 Dominio del tiempo 
 - Se muestra una señal más densa, con actividad más constante a lo largo del tiempo con pocas pausas entre palabras.
 - Se tiene una menor amplitud alrededor de los 4000, aunque más sostenidas, lo que indica una señal menos intensa que la de Daniel, pero más estable.
-- La articulación parece ser más suave, con transiciones que indican una frecuencia fundamental bastante constante.
+- La articulación parece ser más suave, con transiciones que indican una frecuencia fundamental constante.
 
 
 Dominio de la frecuencia
@@ -57,13 +57,14 @@ Dominio del tiempo
 Dominio de la frecuencia
 - El pico fundamental igual aparece alrededor de los 500 Hz, pero el número de armónicos presentes es significativamente menor. 
 - Los armónicos caen rápidamente a partir de los 600 Hz y se pierden casi por completo antes de los 1000 Hz.
-- Sugiere que es una señal que por su irregularidad y menor energía en promedio, no conserva suficiente armónicos para reconstruirse de manera fácil.
+- Sugiere que es una señal que por su irregularidad y menor energía en promedio, no conserva suficiente armónicos para reconstruirse facilmente.
 
 
 ### Interpretación de resultados
 
 Basándose en la información obtenida de los gráficos generados por los integrantes del grupo y sus distintas características, se concluye que las diferencias en las voces se deben a que cada una tiene una composición armónica única, determinada por su frecuencia fundamental, la forma en la que cada persona articula las palabras y la energía con la cual emite su voz. 
-De igual forma, la señal compuesta se ve afectada por las limitaciones del canal, como lo son la atenuación de las frecuencias altas y el ruido térmico del sistema. Las voces que tienen una emisión más estable y una mayor abundancia de armónicos, como lo es la de Diego Granados, van a ser las que se van a poder reconstruir digitalmente con una mayor fidelidad y ser más cercanas a su voz original, por otro lado las señales más irregulares o fragmentadas, como la de Diego Mora, pierden armónicos importantes, por lo que tiene un resultado más distorsionada y difícil de interpretar.
+Adicionalmente, otro factor importante que puede influir en los resultados obtenidos es la diferencia entre los micrófonos utilizados durante la grabación. Debido a que cada quien grabo con su propio dispositivos, la sensibilidad, el rango de frecuencias captadas y el nivel de ruido térmico varían entre ellos, lo que puede afectar la forma en la que las señales de audio son registradas. Esto provoca variaciones en la amplitud e incluso la pérdida de ciertos armónicos que sí están presentes en la voz original, pero que no son captados adecuadamente por el dispositivo utilizado.
+De igual forma, la señal compuesta se ve afectada por las limitaciones del canal, como lo son la atenuación de las frecuencias altas y el ruido térmico del sistema. Las voces que tienen una emisión más estable y una mayor abundancia de armónicos, como lo es la de Diego Granados, van a ser las que se van a poder reconstruir digitalmente con una mayor fidelidad y ser más cercanas a su voz original, por otro lado las señales más irregulares o fragmentadas, como la de Diego Mora, pierden armónicos importantes, por lo que tiene un resultado más distorsionado y difícil de interpretar.
 
 ---
 
@@ -75,7 +76,7 @@ Para responder esta pregunta se analiza el resultado obtenido con el comparador 
 <img src="imagenes/Comparacion.png" width="400" height="250"/>
 
 ### Análisis de resultados  
-En la gráfica superior se observa que el sistema logra identificar de forma aproximada la ubicación de la palabra "tarea" dentro de la señal original. El fragmento rosado marca la región detectada como coincidencia, aunque no corresponde exactamente al mismo punto de pronunciación, lo que indica una coincidencia parcial.
+En la gráfica superior se observa que el sistema logra identificar de forma aproximada la ubicación de la palabra "tarea" dentro de la señal original. El fragmento rosado marca la región en que coinciden, aunque no corresponde exactamente al mismo punto de pronunciación, lo que indica una coincidencia parcial.
 
 ### Similitudes entre las señales  
 Aunque ambas se ven visualmente alineadas, los desfases de milisegundos y pequeñas diferencias en la articulación afectan la forma exacta de la onda. En el análisis de Fourier, estas pequeñas diferencias implican una reorganización completa de los armónicos, debido a que el contenido de la frecuencia depende de la estructura periódica exacta de la señal.
