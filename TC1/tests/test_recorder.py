@@ -7,7 +7,6 @@ from recorder import AudioRecorder
 
 class TestAudioRecorder(unittest.TestCase):
     def setUp(self):
-        # Mock PyAudio completamente
         self.mock_pyaudio = patch("pyaudio.PyAudio").start()
         self.recorder = AudioRecorder()
 
@@ -37,23 +36,17 @@ class TestAudioRecorder(unittest.TestCase):
         mock_stream = Mock()
         self.mock_pyaudio.return_value.open.return_value = mock_stream
 
-        # Simula datos de audio
         test_data = np.zeros(1024, dtype=np.int16).tobytes()
         mock_stream.read.return_value = test_data
 
-        # Ajuste del mock para evitar errores de formato
         self.mock_pyaudio.paInt16 = pyaudio.paInt16
 
-        # Inicia grabación
         self.recorder.start_recording()
 
-        # Asegura que se detenga tras una iteración
         self.recorder.is_recording = False
 
-        # Ejecuta _record
         self.recorder._record()
 
-        # Verifica que el stream se configuró correctamente
         self.mock_pyaudio.return_value.open.assert_called_with(
             format=pyaudio.paInt16,
             channels=1,
@@ -64,26 +57,23 @@ class TestAudioRecorder(unittest.TestCase):
 
     def test_pause_resume_recording(self):
         """Prueba pausar y reanudar la grabación"""
-        # Configura estado inicial
         self.recorder.is_recording = True
         self.recorder.is_paused = False
 
-        # Prueba pausar
+        # pausar
         self.recorder.pause_recording()
         self.assertTrue(self.recorder.is_paused)
         self.assertTrue(self.recorder.is_recording)
 
-        # Prueba reanudar
+        # reanudar
         self.recorder.resume_recording()
         self.assertFalse(self.recorder.is_paused)
         self.assertTrue(self.recorder.is_recording)
 
     def stop_recording(self):
-        print(f"self.stream: {self.stream}")  # Debug
         if self.is_recording:
             self.is_recording = False
             if self.stream:
-                print("Calling stop_stream()")  # Debug
                 self.stream.stop_stream()
                 self.stream.close()
 
@@ -91,21 +81,17 @@ class TestAudioRecorder(unittest.TestCase):
     @patch("os.path.exists")
     def test_load_audio_file_success(self, mock_exists, mock_wave):
         """Prueba cargar un archivo de audio exitosamente"""
-        # Configura los mocks
         mock_exists.return_value = True
         mock_wave_obj = mock_wave.return_value
         mock_wave_obj.getnchannels.return_value = 1
         mock_wave_obj.getframerate.return_value = 44100
         mock_wave_obj.getsampwidth.return_value = 2
 
-        # Simula datos de audio
         test_data = np.zeros(1024, dtype=np.int16).tobytes()
         mock_wave_obj.readframes.side_effect = [test_data, b""]
 
-        # Ejecuta la carga
         self.recorder.load_audio_file("test.wav")
 
-        # Verifica las llamadas
         mock_exists.assert_called_once_with("test.wav")
         mock_wave.assert_called_once_with("test.wav", "rb")
 
@@ -126,11 +112,9 @@ class TestAudioRecorder(unittest.TestCase):
         ) as mock_pickle:
             self.recorder.export_autrum("test.atm")
 
-            # Verifica que se llamó a pickle.dump con los datos correctos
             mock_file.assert_called_once_with("test.atm", "wb")
             self.assertEqual(mock_pickle.call_count, 1)
 
-            # Verifica la estructura de los datos exportados
             exported_data = mock_pickle.call_args[0][0]
             self.assertIn("rate", exported_data)
             self.assertIn("channels", exported_data)
