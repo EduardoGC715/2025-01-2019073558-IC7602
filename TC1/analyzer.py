@@ -107,7 +107,12 @@ class AudioAnalyzer:
     def save_recording(self, event):
         """Guarda la grabación de audio en un archivo WAV."""
         if self.recorder.frames:
-            self.recorder.save_recording()
+            filename = filedialog.asksaveasfilename(
+                title="Guardar grabación",
+                defaultextension=".wav",
+                filetypes=[("WAV Files", "*.wav")],
+            )
+            self.recorder.save_recording(filename)
         else:
             messagebox.showerror("Guardar grabación", "No hay datos para guardar.")
 
@@ -232,10 +237,10 @@ class AudioAnalyzer:
                 mask = x_frequency <= self.MAX_FREQUENCY
                 x_frequency = x_frequency[mask]
                 y_frequency = y_frequency[mask]
-
+                print(self.MAX_FREQUENCY)
                 # Actualizar datos
                 self.line_freq.set_data(x_frequency, y_frequency)
-                self.ax_freq.set_xlim(0, self.recorder.rate / 2)
+                self.ax_freq.set_xlim(0, self.MAX_FREQUENCY)
                 self.ax_freq.set_ylim(
                     0, np.max(y_frequency) * 1.1 if np.max(y_frequency) > 0 else 1
                 )

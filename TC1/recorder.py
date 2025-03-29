@@ -112,14 +112,15 @@ class AudioRecorder:
         self.is_recording = False
         print("Grabación detenida")
 
-    def save_recording(self):
+    def save_recording(self, filename=None):
         """Guarda la grabación como archivo WAV con procesamiento opcional"""
         if not self.frames:
             print("No hay audio para guardar")
             return False
 
         processed_frames = self.frames
-        filename = f"recording-{time.strftime('%Y%m%d-%H%M%S')}.wav"
+        if not filename:
+            filename = f"recording-{time.strftime('%Y%m%d-%H%M%S')}.wav"
         # Guardamos el archivo WAV
         wf = wave.open(filename, "wb")
         wf.setnchannels(self.channels)

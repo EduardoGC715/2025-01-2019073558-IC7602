@@ -201,7 +201,7 @@ class AudioComparatorRecorder:
 
                 # Actualizar datos
                 self.line_freq.set_data(x_frequency, y_frequency)
-                self.ax_freq.set_xlim(0, self.recorder.rate / 2)
+                self.ax_freq.set_xlim(0, self.MAX_FREQUENCY)
                 self.ax_freq.set_ylim(
                     0, np.max(y_frequency) * 1.1 if np.max(y_frequency) > 0 else 1
                 )
