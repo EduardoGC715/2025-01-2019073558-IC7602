@@ -4,11 +4,12 @@ import numpy as np
 import threading
 import time
 import os
-from scipy import signal
 import queue
 import pickle
 
 
+# Basado en https://youtu.be/3oA_griyboI?si=ALFq8jUjOZ46jE-s
+# https://people.csail.mit.edu/hubert/pyaudio/docs/
 class AudioRecorder:
     """Clase para grabar audio con el micrófono y procesar archivos WAV."""
 

@@ -1,3 +1,35 @@
+# Instituto Tecnológico de Costa Rica
+
+## Campus Tecnológico Central Cartago
+
+## Escuela de Ingeniería en Computación
+
+# Preguntas - Tarea de Computación 1
+
+### Redes - Grupo 2
+
+### Prof. Gerardo Nereo Campos Araya
+
+### Fecha: Marzo 2025
+
+### Daniel Granados Retana, carné 2022104692
+
+### Diego Manuel Granados Retana, carné 2022158363
+
+### David Fernández Salas, carné 2022045079
+
+### Diego Mora Montes, carné 2022104866
+
+### Eduardo Gutierrez Conejo, carné 2019073558
+
+### 28 de Marzo del 2024
+
+### IS 2025
+
+## Video de Demostración
+
+https://youtu.be/8XeOOJAPuhY
+
 ## Características
 
 - Captura de audio en tiempo real desde el micrófono.
@@ -16,7 +48,7 @@
 
 1. Clonar repositorio
 2. Asegurarse de tener la versión más reciente de pip.
-3. Instalar las dependencias: pip install -r requirements.txt.
+3. Instalar las dependencias: `pip install -r requirements.txt`.
 
 ## Uso
 
