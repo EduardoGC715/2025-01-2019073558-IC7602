@@ -7,11 +7,8 @@
 **Fecha:** 28 de marzo, 2025 – IS 2025  
 
 **Integrantes:**  
-- Daniel Granados Retana – 2022104692  
-- Diego Manuel Granados Retana – 2022158363  
-- David Fernández Salas – 2022045079  
-- Diego Mora Montes – 2022104866  
-- Eduardo Gutiérrez Conejo – 2019073558
+Daniel Granados Retana – 2022104692; Diego Manuel Granados Retana – 2022158363; David Fernández Salas – 2022045079; Diego Mora Montes – 2022104866; Eduardo Gutiérrez Conejo – 2019073558
+
 
 ## 1. ¿Por qué las voces de los integrantes son diferentes?
 
