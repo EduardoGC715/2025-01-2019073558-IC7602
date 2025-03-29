@@ -19,7 +19,7 @@ class MockRecorder:
 
 @pytest.fixture
 def mock_atm_file(tmp_path):
-    """Create a temporary ATM file with test data"""
+    """Crear un ATM temporal con datos"""
     test_data = {
         "rate": 44100,
         "channels": 1,
@@ -37,7 +37,7 @@ def mock_atm_file(tmp_path):
 
 @pytest.fixture
 def mock_pyaudio():
-    """Mock PyAudio functionality"""
+    """Mock la funcionalidad de PyAudio"""
     with patch("pyaudio.PyAudio") as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
@@ -49,7 +49,7 @@ def mock_pyaudio():
 
 @pytest.fixture
 def visualizer(mock_atm_file, mock_pyaudio):
-    """Create AudioComparatorVisualizer instance with mocked components"""
+    """Crear el AudioComparatorVisualizer con los componentes mocked"""
     with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.figure"), patch(
         "matplotlib.pyplot.subplots"
     ) as mock_subplots:
@@ -77,7 +77,7 @@ def visualizer(mock_atm_file, mock_pyaudio):
 
 
 def test_initialization(visualizer):
-    """Test if visualizer initializes correctly"""
+    """Probar si el visualizador inicio correctamente"""
     assert visualizer.rate == 44100
     assert visualizer.channels == 1
     assert visualizer.sample_width == 2
@@ -87,7 +87,6 @@ def test_initialization(visualizer):
 
 
 def test_trim_silence():
-    """Test silence trimming functionality"""
     visualizer = AudioComparatorVisualizer.__new__(AudioComparatorVisualizer)
 
     audio = np.array([0, 0, 1000, 2000, 0, 0], dtype=np.int16)
@@ -107,22 +106,21 @@ def test_trim_silence():
 
 
 def test_cosine_similarity():
-    """Test cosine similarity calculation"""
     visualizer = AudioComparatorVisualizer.__new__(AudioComparatorVisualizer)
 
-    # Similar vectors
+    # Vectores similares
     a = np.array([1, 0, 1])
     b = np.array([1, 0, 1])
     similarity = visualizer._cosine_similarity(a, b)
     assert np.isclose(similarity, 1.0)
 
-    # Orthogonal vectors
+    # Vectores normales
     a = np.array([1, 0])
     b = np.array([0, 1])
     similarity = visualizer._cosine_similarity(a, b)
     assert np.isclose(similarity, 0.0)
 
-    # Zero vector
+    # Cero vector
     a = np.array([0, 0])
     b = np.array([1, 1])
     similarity = visualizer._cosine_similarity(a, b)
@@ -130,21 +128,21 @@ def test_cosine_similarity():
 
 
 def test_power_similarity():
-    """Test power similarity calculation"""
+    """Probar la similitud de poder"""
     visualizer = AudioComparatorVisualizer.__new__(AudioComparatorVisualizer)
 
-    # Identical signals
+    # Señales identicas
     signal = np.array([1000, -1000, 1000], dtype=np.int16)
     similarity = visualizer._power_similarity(signal, signal)
     assert np.isclose(similarity, 100.0)
 
-    # Different amplitude signals
+    # Señales con diferente amplitud
     signal1 = np.array([1000, -1000, 1000], dtype=np.int16)
     signal2 = np.array([500, -500, 500], dtype=np.int16)
     similarity = visualizer._power_similarity(signal1, signal2)
     assert 0 <= similarity <= 100
 
-    # Zero signal
+    # Cero señal
     signal1 = np.array([0, 0, 0], dtype=np.int16)
     signal2 = np.array([0, 0, 0], dtype=np.int16)
     similarity = visualizer._power_similarity(signal1, signal2)
