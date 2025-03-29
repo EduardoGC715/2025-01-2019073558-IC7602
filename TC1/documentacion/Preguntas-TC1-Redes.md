@@ -89,4 +89,8 @@ En el espectro se ve una alta densidad de armónicos en frecuencias más bajas, 
 ### Por qué los armónicos no son suficientes para la comparación  
 Los armónicos son múltiplos de la frecuencia fundamental, y por esto, cualquier pequeño cambio en la entonación, ritmo o articulación puede alterar completamente su posición. De igual forma, los canales físicos nos limitan el paso de frecuencias altas, eliminando armónicos con información importante, reduciendo la fidelidad de la comparación. En los resultados obtenidos con Autrum, aunque se tiene una buena similitud de armónicos del 75.8 %, la correlación de potencia y de amplitud son sumamente bajas, indicando que las señales son distintas en relación a la energía, a pesar de compartir frecuencias. En conclusión, los armónicos no van a ser una buena métrica de comparación de voces, al ser sumamente sensibles e inestables ante cambios en la voz y no considerar aspectos como el tiempo ni la estructura completa de la señal.
 
+## Referencias
 
+- Tanenbaum, A. (2002). *Computer Networks* (4ta ed.). Chapter 2: The Physical Layer.
+
+- Apuntes del curso de Redes.
