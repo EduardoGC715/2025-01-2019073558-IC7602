@@ -4,11 +4,12 @@ import numpy as np
 import threading
 import time
 import os
-from scipy import signal
 import queue
 import pickle
 
 
+# Basado en https://youtu.be/3oA_griyboI?si=ALFq8jUjOZ46jE-s
+# https://people.csail.mit.edu/hubert/pyaudio/docs/
 class AudioRecorder:
     """Clase para grabar audio con el micrófono y procesar archivos WAV."""
 
@@ -112,14 +113,15 @@ class AudioRecorder:
         self.is_recording = False
         print("Grabación detenida")
 
-    def save_recording(self):
+    def save_recording(self, filename=None):
         """Guarda la grabación como archivo WAV con procesamiento opcional"""
         if not self.frames:
             print("No hay audio para guardar")
             return False
 
         processed_frames = self.frames
-        filename = f"recording-{time.strftime('%Y%m%d-%H%M%S')}.wav"
+        if not filename:
+            filename = f"recording-{time.strftime('%Y%m%d-%H%M%S')}.wav"
         # Guardamos el archivo WAV
         wf = wave.open(filename, "wb")
         wf.setnchannels(self.channels)

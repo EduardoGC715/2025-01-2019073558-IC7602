@@ -83,31 +83,36 @@ class AudioAnalyzer:
     def start_recording(self, event):
         """Inicia la grabación de audio."""
         self.recorder.start_recording()
-        self.btn_start.label.set_text("Recording...")
+        self.btn_start.label.set_text("Grabando...")
         self.fig.canvas.draw_idle()
 
     def pause_recording(self, event):
         """Pausa la grabación de audio."""
         self.recorder.pause_recording()
-        self.btn_pause.label.set_text("Paused")
+        self.btn_pause.label.set_text("Pausado")
         self.fig.canvas.draw_idle()
 
     def resume_recording(self, event):
         """Reanuda la grabación de audio."""
         self.recorder.resume_recording()
-        self.btn_pause.label.set_text("Pause")
+        self.btn_pause.label.set_text("Pausar")
         self.fig.canvas.draw_idle()
 
     def stop_recording(self, event):
         """Detiene la grabación de audio."""
         self.recorder.stop_recording()
-        self.btn_start.label.set_text("Start")
+        self.btn_start.label.set_text("Iniciar")
         self.fig.canvas.draw_idle()
 
     def save_recording(self, event):
         """Guarda la grabación de audio en un archivo WAV."""
         if self.recorder.frames:
-            self.recorder.save_recording()
+            filename = filedialog.asksaveasfilename(
+                title="Guardar grabación",
+                defaultextension=".wav",
+                filetypes=[("WAV Files", "*.wav")],
+            )
+            self.recorder.save_recording(filename)
         else:
             messagebox.showerror("Guardar grabación", "No hay datos para guardar.")
 
@@ -232,10 +237,10 @@ class AudioAnalyzer:
                 mask = x_frequency <= self.MAX_FREQUENCY
                 x_frequency = x_frequency[mask]
                 y_frequency = y_frequency[mask]
-
+                print(self.MAX_FREQUENCY)
                 # Actualizar datos
                 self.line_freq.set_data(x_frequency, y_frequency)
-                self.ax_freq.set_xlim(0, self.recorder.rate / 2)
+                self.ax_freq.set_xlim(0, self.MAX_FREQUENCY)
                 self.ax_freq.set_ylim(
                     0, np.max(y_frequency) * 1.1 if np.max(y_frequency) > 0 else 1
                 )

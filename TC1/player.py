@@ -22,7 +22,7 @@ class AudioPlayer:
         self.rate = data["rate"]
         self.channels = data["channels"]
         self.sample_width = data["sample_width"]
-        self.frames = data["frames"]  # list of NumPy arrays
+        self.frames = data["frames"]
         # Concatenar en un solo array para la reproducción
         self.audio_array = (
             np.concatenate(self.frames) if self.frames else np.array([], dtype=np.int16)

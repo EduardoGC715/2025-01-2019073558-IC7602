@@ -12,7 +12,7 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from player import AudioPlayer  # Assuming this is the file name
+from player import AudioPlayer
 
 
 class MockAudioPlayer:
