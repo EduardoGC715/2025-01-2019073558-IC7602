@@ -1,0 +1,21 @@
+services:
+  dns:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - dandiego235/dns-interceptor:1.0
+        - dandiego235/dns-interceptor:latest
+    ports:
+      - "6000:53/udp"
+  dns-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: dns_dev
+    volumes:
+      - ./:/app # Bind mount: current directory to /app
+    working_dir: /app
+    tty: true # Keep container open for interactive shell
+    ports:
+      - "6000:53/udp"
