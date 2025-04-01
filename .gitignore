@@ -6,3 +6,4 @@
 *.tar.gz
 *.venv*
 /TC1/audio
+*.vscode
