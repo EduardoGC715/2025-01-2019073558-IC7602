@@ -1,0 +1,113 @@
+{
+        "com": {
+            "google": {
+                "www": {
+                    "routing_policy": "single",
+                    "ip": {
+                        "address": "142.250.217.164",
+                        "health": true
+                    }
+                } 
+            },
+            "amazon": {
+                "www": {
+                    "routing_policy": "multi",
+                    "ips": [
+                        {
+                            "address": "23.35.214.20",
+                            "health": true
+                        },
+                        {
+                            "address": "23.35.214.30",
+                            "health": true
+                        },
+                        {
+                            "address": "23.35.214.40",
+                            "health": true
+                        },
+                        {
+                            "address": "23.35.214.50",
+                            "health": true
+                        },
+                        {
+                            "address": "23.35.214.60",
+                            "health": true
+                        }
+                    ],
+                    "counter": 0
+                } 
+            },
+            "guitarcenter": {
+                "www": {
+                    "routing_policy": "weight",
+                    "ips": [
+                        {
+                            "address": "184.31.180.112",
+                            "health": true,
+                            "weight": 0.8
+                        },
+                        {
+                            "address": "184.31.180.200",
+                            "health": true,
+                            "weight": 0.2
+                        }
+                    ]
+                } 
+            },
+            "microsoft": {
+                "www": {
+                    "routing_policy": "geo",
+                    "ips": {
+                        "CR": {
+                            "address": "104.91.161.240",
+                            "health": true
+                        },
+                        "US": {
+                            "address": "104.91.161.20",
+                            "health": true
+                        },
+                        "MX": {
+                            "address": "104.91.161.80",
+                            "health": true
+                        },
+                        "GB": {
+                            "address": "104.91.161.10",
+                            "health": true
+                        },
+                        "ES": {
+                            "address": "104.91.161.150",
+                            "health": true
+                        }
+                    }
+                } 
+            },
+            "apple": {
+                "www": {
+                    "routing_policy": "round-trip",
+                    "ip": {
+                        "address": "184.26.53.53",
+                        "health": true
+                    }
+                } 
+            }
+        },
+        "net": {
+            "minecraft": {
+                "www": {
+                    "routing_policy": "multi",
+                    "ips": [
+                        {
+                            "address": "186.176.5.18",
+                            "health": true
+                        },
+                        {
+                            "address": "186.176.5.42",
+                            "health": true
+                        }
+                    ],
+                    "counter": 0
+                } 
+            }
+        }
+    
+}
