@@ -123,9 +123,8 @@ char * parse_qname(const char *request, int *offset) {
 // Para base64 encoding y decoding, se usa la biblioteca libb64
 // Basado en:
 // https://github.com/libb64/libb64/blob/master/examples/c-example1.c
-char * encode(const char * data, int length) {
-    int encoded_length = 4 * ((length + 2) / 3);
-    char * encoded_data = (char*) malloc(encoded_length + 1);
+char * encode(const char * data, int encoded_length) {
+    char * encoded_data = (char*) malloc(encoded_length);
     char * encoded_ptr = encoded_data;
 
     if (!encoded_data) {
@@ -135,7 +134,7 @@ char * encode(const char * data, int length) {
 
     base64_encodestate state;
     base64_init_encodestate(&state);
-    int count = base64_encode_block(data, length, encoded_ptr, &state);
+    int count = base64_encode_block(data, encoded_length, encoded_ptr, &state);
     encoded_ptr += count;
     count = base64_encode_blockend(encoded_ptr, &state);
     encoded_ptr += count;
@@ -160,29 +159,78 @@ char * decode(const char * data, int length) {
     return decoded_data;
 }
 
+// Almacenar la respuesta de la request HTTPS en memoria.
+// Basado en:
+// https://curl.se/libcurl/c/getinmemory.html
+typedef struct {
+    char *memory;
+    size_t size;
+} memory_struct;
+
+static size_t write_callback(void * contents, size_t size, size_t nmemb, void * userp) {
+    size_t realsize = size * nmemb;
+    memory_struct *mem = (memory_struct *)userp;
+
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if(ptr == NULL) {
+        printf("Not enough memory (realloc returned NULL)\n");
+        return 0; // Out of memory
+    }
+
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = '\0'; // Null terminate the string
+
+    return realsize;
+}
+
 // Enviar la solicitud HTTPS al DNS API
 // Basado en:
 // https://curl.se/libcurl/c/http-post.html
 // https://curl.se/libcurl/c/https.html
-int send_https_request(const char *url, const char * data, bool encoded_data) {
+memory_struct * send_https_request(const char *url, const char * data, int length) {
     CURL *curl;
     CURLcode res;
 
     curl = curl_easy_init();
     if(curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        memory_struct * resp_mem = malloc(sizeof(memory_struct));
+        if (!resp_mem) {
+            perror("malloc failed");
+            return NULL;
+        }
+
+        resp_mem->memory = malloc(1); // Initial memory allocation
+        resp_mem->size = 0; // No data at this point
+
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: text/plain");
+        
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, length);
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)resp_mem);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        
         res = curl_easy_perform(curl);
-        if(res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        }
+        
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
+        if(res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            free(resp_mem->memory);
+            free(resp_mem);
+            return NULL;
+        }
+
+        return resp_mem;
     }
+    perror("curl_easy_init failed");
+    return NULL;
 }
 
 dns_request * parse_dns_request(const char *request, const int size) {
@@ -264,6 +312,19 @@ void * process_dns_request(void * arg) {
     if (!req) {
         // Query no estándar, codificar en base 64 y enviar al dns_api/dns_resolver
         printf("Failed to parse DNS request\n");
+        int encoded_length = 4 * ((request_size + 2) / 3) + 1;
+        char *encoded_data = encode(request, encoded_length);
+        if (!encoded_data) {
+            printf("Failed to encode DNS request\n");
+            free(request);
+            free(args);
+            return NULL;
+        }
+        memory_struct * response = send_https_request("https://dns_api/dns_resolver", encoded_data, encoded_length);
+        if (response) {
+            printf("Failed to send HTTPS request\n");
+        }
+        free(encoded_data);
         free(request);
         free(args);
         return NULL;
