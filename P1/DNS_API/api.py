@@ -17,8 +17,10 @@ import time
 import json
 import random
 import requests
+import ipaddress
 
-domainRef = db.reference('/domains')
+domain_ref = db.reference('/domains')
+ip_to_country_ref = db.reference('/ip_to_country')
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ def retry_with_backoff(fn, backoff_in_seconds = 1):
             if x < 8:
                 x += 1
 
+def ip_to_int(ip):
+    return int(ipaddress.ip_address(ip))
 
 @app.route("/")
 def home():
@@ -133,14 +137,161 @@ def exists():
         # Flip the domain: google.com -> com/google
         flipped_path = "/".join(reversed(domain.strip().split(".")))
         print(flipped_path)
-        ref = domainRef.child(flipped_path)
-        exist = ref.get()
-        print(exist)
+        ref = domain_ref.child(flipped_path)
+        ip_data = ref.get()
+        print(ip_data)
 
-        if exist:
-            return exist
+        if ip_data:
+            try:
+                match ip_data['routing_policy']:
+                    case "single":
+                        if ip_data['ip']['health'] == "healthy":
+                            return ip_data['ip']['address']
+                        else:
+                            return "Esa dirección está unhealthy", 500
+                    case "multi":
+                        retries = 0
+                        while retries < len(ip_data['ips']):
+                            index = ip_data['counter'] % len(ip_data['ips'])
+                            ip = ip_data['ips'][index]
+                            if ip['health']:
+                                ref.update({"counter": ip_data['counter'] + 1})
+                                return ip['address']
+                            else:
+                                ip_data['counter'] += 1
+                                retries += 1
+                        return "Esa dirección está unhealthy", 500
+                    case "weight":
+                        weights = [ip['weight'] for ip in ip_data['ips']]
+                        indices = list(range(len(weights)))
+                        retries = 0
+                        while retries < 5:
+                            index = random.choices(indices, weights=weights, k=1)[0]
+                            ip = ip_data['ips'][index]
+                            if ip['health']:
+                                return ip['address']
+                            else:
+                                retries += 1
+                        return "No se encontraron direcciones healthy", 500
+                    case "geo":
+                        ip_address = data.get('ip_address')
+                        if not ip_address:
+                            return jsonify({"error": "No se dio un IP address"}), 400
+                        
+                        ip_num = ip_to_int(ip_address)
+                       
+                        snapshot = ip_to_country_ref.order_by_key().end_at(str(ip_num)).limit_to_last(1).get()
+
+                        if snapshot:
+                            for key, ip_record in snapshot.items():
+                                end_ip_num = ip_to_int(ip_record['end_ip'])
+                                if  end_ip_num >= ip_num >= int(key):
+                                    country_code = ip_record['country_iso_code']
+                                    break
+                        else:
+                            return "No se encontró el país", 500
+                        try:
+                            ip = ip_data['ips'][country_code]
+                            if ip['health']:
+                                return ip['address']
+                            else:
+                                return "Esa dirección está healthy", 500
+                        except Exception as e:
+                            retries = 0
+                            while retries < 5:
+                                ip = random.choice(list(ip_data['ips'].values()))
+                                if ip['health']:
+                                    return ip['address']
+                                else:
+                                    retries += 1
+                            return "No se encontraron direcciones healthy", 500
+                    case "round-trip":
+                        return "Using latency-based routing policy"
+                    case _:
+                        return "El routing policy no existe", 500
+                
+            except Exception as e:
+                logger.debug("Ese dominio no existe", e)
+                return "Ese dominio no existe", 404
         else:
             return "Ese dominio no existe", 404
+        
+@app.route("/domains", methods=["POST", "PUT", "DELETE"]) 
+def add_domain():
+
+    if request.method == "POST":
+        data = request.get_json()
+        domain = data.get('domain')
+        print(domain)
+        if not domain:
+            return jsonify({"error": "No domain provided"}), 400
+        routing_policy = data.get('routing_policy')
+        
+        # Depending on the routing policy, we can add more information to the domain.
+        ip_data = {}
+        match routing_policy:
+            case "single":
+                return "Using single routing policy"
+            case "multi":
+                return "Using multi-value routing policy"
+            case "weight":
+                return "Using weighted routing policy"
+            case "geo":
+                return "Using geolocation routing policy"
+            case "round-trip":
+                return "Using latency-based routing policy"
+            case _:
+                return "El routing policy no existe", 500
+    
+
+        # Flip the domain
+        flipped_path = "/".join(reversed(domain.strip().split(".")))
+        print(flipped_path)
+        ref = domain_ref.child(flipped_path)
+        result = ref.set(ipData)
+        print(result)
+
+        if result:
+            return result
+        else:
+            return "El dominio no se pudo crear", 500
+    elif request.method == "PUT":
+        data = request.get_json()
+        domain = data.get('domain')
+        print(domain)
+        if not domain:
+            return jsonify({"error": "No domain provided"}), 400
+
+        # Flip the domain: google.com -> com/google
+        flipped_path = "/".join(reversed(domain.strip().split(".")))
+        print(flipped_path)
+        ref = domain_ref.child(flipped_path)
+        result = ref.update(data)
+        print(result)
+
+        if result:
+            return result
+        else:
+            return "El dominio no se pudo actualizar", 500
+    elif request.method == "DELETE":
+        data = request.get_json()
+        domain = data.get('domain')
+        print(domain)
+        if not domain:
+            return jsonify({"error": "No domain provided"}), 400
+
+        # Flip the domain: google.com -> com/google
+        flipped_path = "/".join(reversed(domain.strip().split(".")))
+        print(flipped_path)
+        ref = domain_ref.child(flipped_path)
+        result = ref.delete()
+
+        print(result)
+
+        if result:
+            return result
+        else:
+            return "El dominio no se pudo eliminar", 500
 
 
 
