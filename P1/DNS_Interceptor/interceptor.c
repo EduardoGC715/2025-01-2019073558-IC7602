@@ -6,6 +6,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <curl/curl.h>
+#include <stdbool.h>
+#include "b64/cencode.h"
+#include "b64/cdecode.h"
 
 // Referencias para threads:
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
@@ -116,6 +120,71 @@ char * parse_qname(const char *request, int *offset) {
     return qname;
 }
 
+// Para base64 encoding y decoding, se usa la biblioteca libb64
+// Basado en:
+// https://github.com/libb64/libb64/blob/master/examples/c-example1.c
+char * encode(const char * data, int length) {
+    int encoded_length = 4 * ((length + 2) / 3);
+    char * encoded_data = (char*) malloc(encoded_length + 1);
+    char * encoded_ptr = encoded_data;
+
+    if (!encoded_data) {
+        perror("malloc failed");
+        return NULL;
+    }
+
+    base64_encodestate state;
+    base64_init_encodestate(&state);
+    int count = base64_encode_block(data, length, encoded_ptr, &state);
+    encoded_ptr += count;
+    count = base64_encode_blockend(encoded_ptr, &state);
+    encoded_ptr += count;
+    *encoded_ptr = '\0'; // Null terminate the string
+    return encoded_data;
+}
+
+char * decode(const char * data, int length) {
+    int decoded_length = (length / 4) * 3;
+    char * decoded_data = (char*) malloc(decoded_length + 1);
+    char * decoded_ptr = decoded_data;
+
+    if (!decoded_data) {
+        perror("malloc failed");
+        return NULL;
+    }
+
+    base64_decodestate state;
+    base64_init_decodestate(&state);
+    int count = base64_decode_block(data, length, decoded_ptr, &state);
+
+    return decoded_data;
+}
+
+// Enviar la solicitud HTTPS al DNS API
+// Basado en:
+// https://curl.se/libcurl/c/http-post.html
+// https://curl.se/libcurl/c/https.html
+int send_https_request(const char *url, const char * data, bool encoded_data) {
+    CURL *curl;
+    CURLcode res;
+
+    curl = curl_easy_init();
+    if(curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: text/plain");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        res = curl_easy_perform(curl);
+        if(res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        }
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+    }
+}
+
 dns_request * parse_dns_request(const char *request, const int size) {
     dns_header* header = parse_dns_header(request);
     printf("Transaction ID: %u\n", header->id);
@@ -171,6 +240,13 @@ dns_request * parse_dns_request(const char *request, const int size) {
     return req;
 }
 
+void free_dns_request(dns_request *req) {
+    if (req) {
+        free(req->header);
+        free(req->qname);
+        free(req);
+    }
+}
 
 void * process_dns_request(void * arg) {
     dns_thread_args *args = (dns_thread_args *)arg;
@@ -197,9 +273,7 @@ void * process_dns_request(void * arg) {
 
     free(args->request);
     free(args);
-    free(req->header);
-    free(req->qname);
-    free(req);
+    free_dns_request(req);
 }
 
 // Referencias para sockets:
@@ -221,6 +295,9 @@ int main() {
     }
     listen(dns_socket, 5);
     printf("DNS Interceptor is running...\n");
+
+    // Inicialización CURL
+    curl_global_init(CURL_GLOBAL_DEFAULT);
 
     while (1) {
         struct sockaddr_in client_addr;
