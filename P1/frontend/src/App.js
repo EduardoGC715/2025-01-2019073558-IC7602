@@ -1,20 +1,7 @@
 import React from "react";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import IPToCountryDashboard from "./pages/IPToCountryDashboard";
+import AppRouter from "./AppRouter"
 
-
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Dashboard />,
-  },
-  {
-    path: "/ip-to-country",
-    element: <IPToCountryDashboard />,
-  }
-]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return <AppRouter />;
 }

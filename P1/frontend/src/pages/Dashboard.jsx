@@ -34,67 +34,32 @@ const Dashboard = () => {
     direction: ""
   });
 
-  // Carga de datos desde la API
   useEffect(() => {
-    // Aquí se hace llamada al API
     const fetchData = async () => {
       setLoading(true);
       try {
-        const mockData = [
-          {
-            id: 1,
-            domain: "www.amazon.com",
-            type: "geo",
-            direction: "23.35.214.20",
-            status: "active",
-          },
-          {
-            id: 2,
-            domain: "www.apple.com",
-            type: "Simple",
-            direction: "23.35.214.20",
-            status: "active",
-          },
-          {
-            id: 3,
-            domain: "net.minecraft.com",
-            type: "Geoproximity",
-            direction: "23.35.214.30",
-            status: "warning",
-          },
-          {
-            id: 4,
-            domain: "www.amazon.com",
-            type: "Latency",
-            direction: "23.35.214.30",
-            status: "error",
-          },
-          {
-            id: 5,
-            domain: "dev.ejemplo.com",
-            type: "Latency",
-            direction: "192.168.1.3",
-            status: "active",
-          },
-        ];
+        // Obtener todos los registros de la tabla
+        const records = await dnsApi.getAllRecords(); 
+
+        // Obtener los estados
+        const updatedRecords = await Promise.all(
+          records.map(async (record) => {
+            const healthResult = await dnsApi.checkHealth(record.domain, record.direction);
   
-        // Simular retardo de 1 segundo
-        setTimeout(() => {
-          setDnsRecords(mockData);
-          setLoading(false);
-        }, 1000);
-  
-        // Si después vas a usar la API real, puedes usar esto:
-        /*
-        const [records, health] = await Promise.all([
-          dnsApi.getAllRecords(),
-          systemApi.getHealthStatus()
-        ]);
-        setDnsRecords(records);
-        setHealthStatus(health);
-        */
+            return {
+              ...record,
+              status: healthResult.health ? 'active' : 'error',
+              statusMessage: healthResult.message
+            };
+          })
+        );
+
+        // Guardar el estado
+        setDnsRecords(updatedRecords);
       } catch (error) {
         console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
       }
     };
   
@@ -118,7 +83,6 @@ const Dashboard = () => {
   // Añadir nuevo registro
 
   const handleAddRecord = () => {
-  // Aca se hace llamda del API
   const newId = dnsRecords.length + 1;
   const recordWithId = {
     id: newId,

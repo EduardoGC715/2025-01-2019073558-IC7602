@@ -265,6 +265,80 @@ def exists():
             return "Ese dominio no existe", 404
 
 
+@app.route("/api/all-domains", methods=["GET"])
+def get_all_domains():
+    try:
+        raw_data = domain_ref.get()
+        if not raw_data:
+            return jsonify([]), 200
+
+        response = []
+        id_counter = 1
+
+        for tld, domain_block in raw_data.items():  # tld = com, net, etc.
+            for domain, www_data in domain_block.items():
+                routing_policy = www_data["www"]["routing_policy"]
+                www_info = www_data["www"]
+
+                if routing_policy == "single":
+                    ip = www_info["ip"]
+                    response.append(
+                        {
+                            "id": id_counter,
+                            "domain": f"{domain}.{tld}",
+                            "type": routing_policy,
+                            "direction": ip["address"],
+                            "status": ip["health"],
+                        }
+                    )
+                    id_counter += 1
+
+                elif routing_policy == "multi" or routing_policy == "weight":
+                    for ip in www_info["ips"]:
+                        response.append(
+                            {
+                                "id": id_counter,
+                                "domain": f"{domain}.{tld}",
+                                "type": routing_policy,
+                                "direction": ip["address"],
+                                "status": ip["health"],
+                            }
+                        )
+                        id_counter += 1
+
+                elif routing_policy == "geo":
+                    for country, ip in www_info["ips"].items():
+                        response.append(
+                            {
+                                "id": id_counter,
+                                "domain": f"{domain}.{tld}",
+                                "type": f"{routing_policy} ({country})",
+                                "direction": ip["address"],
+                                "status": ip["health"],
+                            }
+                        )
+                        id_counter += 1
+
+                elif routing_policy == "round-trip":
+                    ip = www_info["ip"]
+                    response.append(
+                        {
+                            "id": id_counter,
+                            "domain": f"{domain}.{tld}",
+                            "type": routing_policy,
+                            "direction": ip["address"],
+                            "status": ip["health"],
+                        }
+                    )
+                    id_counter += 1
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        print("Error al obtener los dominios:", e)
+        return jsonify({"error": "No se pudo obtener la información"}), 500
+
+
 @app.route("/domains", methods=["POST", "PUT", "DELETE"])
 def add_domain():
 

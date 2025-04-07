@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { responsivePropType } from 'react-bootstrap/esm/createUtilityClasses';
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api'; // Adjust this to your actual backend URL
 
@@ -14,11 +15,20 @@ export const dnsApi = {
   // Get all DNS records
   getAllRecords: async () => {
     try {
-      const response = await api.get('/dns-records');
-      return response.data;
+      console.log("Estamo arriba")
+      const response = await api.get('/all-domains');
+      if (response.status === 200) {
+        console.log(response.data[0])
+        console.log(response.data[1])
+        console.log(response.data)
+        return response.data; // [{ id, domain, type, direction, status }]
+      } else {
+        console.warn('Respuesta inesperada al obtener dominios:', response.status);
+        return [];
+      }
     } catch (error) {
-      console.error('Error fetching DNS records:', error);
-      throw error;
+      console.error('Error al cargar dominios:', error);
+      return [];
     }
   },
 
@@ -57,13 +67,17 @@ export const dnsApi = {
 
   checkHealth: async (domain, direction) => {
     try {
+      // Asegura que el dominio empiece con "www."
+      const fullDomain = domain.startsWith("www.") ? domain : `www.${domain}`;
+  
       const response = await api.get('/exists', {
         params: {
-          domain: domain,
+          domain: fullDomain,
           ip_address: direction
         }
       });
-        if (response.status === 200) {
+  
+      if (response.status === 200) {
         return {
           health: true,
           message: `Dirección obtenida: ${response.data}`
@@ -82,7 +96,6 @@ export const dnsApi = {
     } catch (error) {
       console.error('Error checking DNS health:', error);
   
-      // Si ocurre un error en la llamada, lo marcamos como error
       return {
         health: false,
         message: error.response?.data?.error || error.message || 'Error al verificar el estado'
