@@ -23,7 +23,7 @@ const Dashboard = () => {
 
   const [healthStatus, setHealthStatus] = useState({
     servers: "healthy",
-    database: "healthy",
+    database: "error",
     api: "warning",
   });
 
@@ -31,8 +31,7 @@ const Dashboard = () => {
   const [newRecord, setNewRecord] = useState({
     domain: "",
     type: "A",
-    value: "",
-    ttl: 3600,
+    direction: ""
   });
 
   // Carga de datos desde la API
@@ -44,42 +43,37 @@ const Dashboard = () => {
         const mockData = [
           {
             id: 1,
-            domain: "ejemplo.com",
-            type: "A",
-            value: "192.168.1.1",
-            ttl: 3600,
+            domain: "www.amazon.com",
+            type: "geo",
+            direction: "23.35.214.20",
             status: "active",
           },
           {
             id: 2,
-            domain: "test.com",
-            type: "CNAME",
-            value: "ejemplo.com",
-            ttl: 1800,
+            domain: "www.apple.com",
+            type: "Simple",
+            direction: "23.35.214.20",
             status: "active",
           },
           {
             id: 3,
-            domain: "mail.ejemplo.com",
-            type: "MX",
-            value: "mail.ejemplo.com",
-            ttl: 7200,
+            domain: "net.minecraft.com",
+            type: "Geoproximity",
+            direction: "23.35.214.30",
             status: "warning",
           },
           {
             id: 4,
-            domain: "api.ejemplo.com",
-            type: "A",
-            value: "192.168.1.2",
-            ttl: 3600,
+            domain: "www.amazon.com",
+            type: "Latency",
+            direction: "23.35.214.30",
             status: "error",
           },
           {
             id: 5,
             domain: "dev.ejemplo.com",
-            type: "A",
-            value: "192.168.1.3",
-            ttl: 600,
+            type: "Latency",
+            direction: "192.168.1.3",
             status: "active",
           },
         ];
@@ -135,27 +129,11 @@ const Dashboard = () => {
   setNewRecord({
     domain: "",
     type: "A",
-    value: "",
-    ttl: 3600,
+    direction: ""
   });
   handleCloseAddModal();
   };
 
-  //const handleAddRecord = async () => {
-  //  try {
-  //    const addedRecord = await dnsApi.addRecord(newRecord);
-  //    setDnsRecords([...dnsRecords, addedRecord]);
-  //    setNewRecord({
-  //      domain: "",
-  //      type: "A",
-  //      value: "",
-  //      ttl: 3600,
-  //    });
-  //    handleCloseAddModal();
-  //  } catch (error) {
-  //    console.error("Error adding record:", error);
-  //  }
-  //};
 
   // Función para renderizar el indicador de estado
   const renderStatusBadge = (status) => {
@@ -182,6 +160,50 @@ const Dashboard = () => {
         return <XCircle className="text-danger" />;
       default:
         return <AlertTriangle className="text-secondary" />;
+    }
+  };
+
+  const handleRefreshStatus = async (recordId, domain, direction) => {
+    try {
+      const updatedRecords = dnsRecords.map(record =>
+        record.id === recordId
+          ? { ...record, status: "loading" }
+          : record
+      );
+  
+      setDnsRecords(updatedRecords); 
+  
+      const healthCheck = await dnsApi.checkHealth(domain, direction);
+  
+      console.log("Resultado del checkHealth:", healthCheck);
+  
+      // Actualiza el estado del registro con el resultado del check
+      const finalRecords = updatedRecords.map(record =>
+        record.id === recordId
+          ? {
+              ...record,
+              status:
+                healthCheck && typeof healthCheck.health === "boolean"
+                  ? healthCheck.health
+                    ? "active"
+                    : "error"
+                  : "unknown",
+            }
+          : record
+      );
+  
+      setDnsRecords(finalRecords);
+    } catch (error) {
+      console.error("Error refreshing record status:", error);
+  
+      // En caso de error, actualiza el estado a "error"
+      const errorRecords = dnsRecords.map(record =>
+        record.id === recordId
+          ? { ...record, status: "error" }
+          : record
+      );
+  
+      setDnsRecords(errorRecords);
     }
   };
 
@@ -225,6 +247,7 @@ const Dashboard = () => {
           dnsRecords={dnsRecords}
           loading={loading}
           renderStatusBadge={renderStatusBadge}
+          onRefreshStatus={handleRefreshStatus}
         />
       </div>
 

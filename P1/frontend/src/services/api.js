@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Adjust this to your actual backend URL
+const API_BASE_URL = 'http://127.0.0.1:5000/api'; // Adjust this to your actual backend URL
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -54,6 +54,42 @@ export const dnsApi = {
       throw error;
     }
   },
+
+  checkHealth: async (domain, direction) => {
+    try {
+      const response = await api.get('/exists', {
+        params: {
+          domain: domain,
+          ip_address: direction
+        }
+      });
+        if (response.status === 200) {
+        return {
+          health: true,
+          message: `Dirección obtenida: ${response.data}`
+        };
+      } else if (response.status === 500) {
+        return {
+          health: false,
+          message: 'Estado de salud: Error 500'
+        };
+      } else {
+        return {
+          health: false,
+          message: `Error HTTP: ${response.status}`
+        };
+      }
+    } catch (error) {
+      console.error('Error checking DNS health:', error);
+  
+      // Si ocurre un error en la llamada, lo marcamos como error
+      return {
+        health: false,
+        message: error.response?.data?.error || error.message || 'Error al verificar el estado'
+      };
+    }
+  }
+  
 };
 
 // System Status API

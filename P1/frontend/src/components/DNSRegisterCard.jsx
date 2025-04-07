@@ -27,14 +27,11 @@ const DNSRegisterCard = ({ show, handleClose, newRecord, handleInputChange, hand
               value={newRecord.type}
               onChange={handleInputChange}
             >
-              <option value="A">A</option>
-              <option value="AAAA">AAAA</option>
-              <option value="CNAME">CNAME</option>
-              <option value="MX">MX</option>
-              <option value="TXT">TXT</option>
-              <option value="NS">NS</option>
-              <option value="SOA">SOA</option>
-              <option value="SRV">SRV</option>
+              <option value="single">Single</option>
+              <option value="multi">Multi</option>
+              <option value="weight">Weight</option>
+              <option value="geo">Geolocation</option>
+              <option value="round-trip">Round-trip</option>
             </Form.Select>
           </Form.Group>
 
@@ -49,16 +46,6 @@ const DNSRegisterCard = ({ show, handleClose, newRecord, handleInputChange, hand
             />
           </Form.Group>
 
-          <Form.Group className="mb-3">
-            <Form.Label>TTL (segundos)</Form.Label>
-            <Form.Control 
-              type="number" 
-              name="ttl"
-              value={newRecord.ttl}
-              onChange={handleInputChange}
-              placeholder="60" 
-            />
-          </Form.Group>
         </Form>
       </Modal.Body>
       <Modal.Footer>

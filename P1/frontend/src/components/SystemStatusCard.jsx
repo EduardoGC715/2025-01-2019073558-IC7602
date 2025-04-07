@@ -1,52 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Row, Col, Card } from 'react-bootstrap';
-import { systemApi } from '../services/api';
 
-const SystemStatusCard = ({ renderHealthIcon }) => {
-  const [healthStatus, setHealthStatus] = useState({
-    servers: 'unknown',
-    database: 'unknown',
-    api: 'unknown'
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchHealthStatus = async () => {
-      try {
-        const status = await systemApi.getHealthStatus();
-        setHealthStatus(status);
-      } catch (error) {
-        console.error('Error fetching health status:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHealthStatus();
-    // Set up polling every 30 seconds
-    const interval = setInterval(fetchHealthStatus, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (loading) {
-    return (
-      <Row className="mb-4">
-        <Col>
-          <Card>
-            <Card.Header>Estado del Sistema</Card.Header>
-            <Card.Body>
-              <div className="text-center p-4">
-                <div className="spinner-border" role="status">
-                  <span className="visually-hidden">Cargando...</span>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    );
-  }
-
+const SystemStatusCard = ({ healthStatus, renderHealthIcon }) => {
   return (
     <Row className="mb-4">
       <Col>
