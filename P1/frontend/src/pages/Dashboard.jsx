@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Table, Badge, Button, Container, Row, Col } from "react-bootstrap";
+import {Badge, Button, Container} from "react-bootstrap";
 import {
   PlusCircle,
   Database,
@@ -12,7 +12,7 @@ import SystemStatusCard from "../components/SystemStatusCard";
 import DatabaseModal from "../components/DatabaseModal";
 import DNSRecordsTable from "../components/DNSRecordsTable";
 import DNSRegisterCard from "../components/DNSRegisterCard";
-import { dnsApi, systemApi } from "../services/api";
+import { dnsApi , databaseApi} from "../services/api";
 
 const Dashboard = () => {
   // Estados para los datos y modales
@@ -22,9 +22,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [healthStatus, setHealthStatus] = useState({
-    servers: "healthy",
+    servers: "error",
     database: "error",
-    api: "warning",
+    api: "error",
   });
 
   // Estado para el nuevo registro
@@ -53,9 +53,10 @@ const Dashboard = () => {
             };
           })
         );
-
         // Guardar el estado
         setDnsRecords(updatedRecords);
+        // Update el APIHealth
+        updateApiHealthStatus();
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -171,6 +172,16 @@ const Dashboard = () => {
     }
   };
 
+  const updateApiHealthStatus = async () => {
+    const result = await dnsApi.checkApiStatus();
+  
+    setHealthStatus(prev => ({
+      ...prev,
+      api: result.message ? "healthy" : "error"
+    }));
+  };
+
+  // Esta es la parte visual del FRONTEND donde se importan todos los componentes a usar
   return (
     <Container fluid className="p-4">
       <h1 className="mb-4">Panel de Control DNS</h1>
@@ -184,8 +195,8 @@ const Dashboard = () => {
       </div>
 
       {/* Botones de Acción */}
-      <Row className="mb-4">
-        <Col className="d-flex justify-content-end">
+      <div className="container mt-4 ">
+        <div className="d-flex justify-content-end">
           <Button
             variant="primary"
             className="me-2 d-flex align-items-center"
@@ -202,8 +213,8 @@ const Dashboard = () => {
             <Database size={18} className="me-1" />
             Gestionar IP to Country
           </Button>
-        </Col>
-      </Row>
+        </div>
+      </div>
 
       {/* Tabla de Registros DNS */}
       <div className="container mt-4">

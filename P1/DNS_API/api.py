@@ -265,6 +265,15 @@ def exists():
             return "Ese dominio no existe", 404
 
 
+@app.route("/api/status", methods=["GET"])
+def get_api_status():
+    try:
+        return jsonify([]), 200
+    except Exception as e:
+        print("Error con el API backend", e)
+        return jsonify({"error": "No se pudo obtener la información"}), 500
+
+
 @app.route("/api/all-domains", methods=["GET"])
 def get_all_domains():
     try:
