@@ -1,0 +1,20 @@
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - davfer20/p1-ui:1.0
+        - davfer20/p1-ui:latest
+    ports:
+      - "3000:3000"
+  ui-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./:/app # Bind mount: current directory to /app
+    working_dir: /app
+    tty: true # Keep container open for interactive shell
+    ports:
+      - "3000:3000"
