@@ -1,0 +1,26 @@
+# Firebase credentials
+dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json
+
+# Compiled files
+health_checker
+*.o
+*.exe
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Docker
+.dockerignore
+.docker/
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
