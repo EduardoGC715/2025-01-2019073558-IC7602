@@ -2,7 +2,7 @@
 import firebase_admin
 from firebase_admin import credentials, auth
 from firebase_admin import db
-from pprint import pprint
+import base64
 
 cred = credentials.Certificate(
     "DNS_API/dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json"
@@ -22,6 +22,12 @@ import json
 import random
 import requests
 import ipaddress
+import socket
+import dns.message
+import dns.query
+import dns.rdatatype
+
+                    
 
 
 domain_ref = db.reference("/domains")
@@ -122,52 +128,50 @@ def home():
 #             return json.dumps({"error": {"code": 500, "message": "The user has already been registered"}})
 
 
+# Example: 8.8.8.8 is Google Public DNS
+dns_server = ('8.8.8.8', 53)
+
+def request_dns(dns_query):
+    # Create a UDP socket
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.sendto(dns_query, dns_server)
+        data, _ = s.recvfrom(512)  # 512 bytes max in standard DNS over UDP
+        print("Received response (raw bytes):", data)
+    return data
+
+@app.route("/api/set_dns_server", methods=["POST"])
+def set_dns():
+    if request.method == "POST":
+        server = request.args.get("server")
+        port = request.args.get("port")
+        if server and port:
+            try:
+                port = int(port)
+                dns_server = (server, port)
+                return jsonify({"message": "DNS server updated successfully"}), 200
+            except ValueError:
+                return jsonify({"error": "Invalid port number"}), 400
+
+
 @app.route("/api/dns_resolver", methods=["POST"])
 def dns_resolver():
     if request.method == "POST":
-        data = request.get_json()
-        pEmail = data["email"]
-        pPassword = data["password"]
-        pPhone = data["phone"]
-        pDisplayName = (
-            data["name"] + " " + data["last_name1"] + " " + data["last_name2"]
-        )
-        try:
-            user = auth.create_user(
-                email=pEmail,
-                password=pPassword,
-                phone_number=pPhone,
-                display_name=pDisplayName,
-            )
-            record = {
-                "logId": int(time.time()) + random.randint(0, 30000),
-                "title": "register",
-                "bagInfo": json.dumps(
-                    {
-                        "email": pEmail,
-                        "password": pPassword,
-                        "phone": pPhone,
-                        "name": pDisplayName,
-                    }
-                ),
-            }
-            return {
-                "success": {
-                    "code": 200,
-                    "message": "The user has been registered correctly",
-                }
-            }
-        except Exception as e:
-            logger.debug(str(e))
-            logger.debug("El usuario ya está registrado.", e)
-            return json.dumps(
-                {
-                    "error": {
-                        "code": 500,
-                        "message": "The user has already been registered",
-                    }
-                }
-            )
+        data = request.get_data(as_text=True)
+        dns_query = base64.b64decode(data)
+        logger.debug(dns_query)
+
+        # Your binary DNS query (must be correctly constructed)
+        dns_query = b'\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00' \
+                    b'\x03www\x06google\x03com\x00\x00\x01\x00\x01'  # Example for www.google.com
+
+        # Create a UDP socket
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.sendto(dns_query, dns_server)
+            data, _ = s.recvfrom(512)  # 512 bytes max in standard DNS over UDP
+            print("Received response (raw bytes):", data)
+        codified_data = data# = base64.b64encode(data).decode("utf-8")
+        return codified_data
+        
 
 
 @app.route("/api/exists", methods=["GET"])
@@ -183,16 +187,16 @@ def exists():
         flipped_path = "/".join(reversed(domain.strip().split(".")))
         ref = domain_ref.child(flipped_path)
         ip_data = ref.get()
-
+        ip_response = ""
         if ip_data:
             try:
                 match ip_data["routing_policy"]:
                     case "single":
                         if ip_data["ip"]["health"] == "healthy":
-                            return ip_data["ip"]["address"]
+                            ip_response = ip_data["ip"]["address"]
 
                         else:
-                            return "Unhealthy", 500
+                            ip_response = "Unhealthy"
                     case "multi":
                         retries = 0
                         while retries < len(ip_data["ips"]):
@@ -200,11 +204,11 @@ def exists():
                             ip = ip_data["ips"][index]
                             if ip["health"]:
                                 ref.update({"counter": ip_data["counter"] + 1})
-                                return ip["address"]
+                                ip_response = ip["address"]
                             else:
                                 ip_data["counter"] += 1
                                 retries += 1
-                        return "Unhealthy", 500
+                        ip_response = "Unhealthy"
                     case "weight":
                         weights = [ip["weight"] for ip in ip_data["ips"]]
                         indices = list(range(len(weights)))
@@ -213,10 +217,10 @@ def exists():
                             index = random.choices(indices, weights=weights, k=1)[0]
                             ip = ip_data["ips"][index]
                             if ip["health"]:
-                                return ip["address"]
+                                ip_response = ip["address"]
                             else:
                                 retries += 1
-                        return "Unhealthy", 500
+                        ip_response = "Unhealthy"
                     case "geo":
                         if not ip_address:
                             return jsonify({"error": "No se dio un IP address"}), 400
@@ -241,28 +245,45 @@ def exists():
                         try:
                             ip = ip_data["ips"][country_code]
                             if ip["health"]:
-                                return ip["address"]
+                                ip_response = ip["address"]
                             else:
-                                return "Unhealthy", 500
+                                ip_response = "Unhealthy"
                         except Exception:
                             retries = 0
                             while retries < 5:
                                 ip = random.choice(list(ip_data["ips"].values()))
                                 if ip["health"]:
-                                    return ip["address"]
+                                    ip_response = ip["address"]
                                 else:
                                     retries += 1
-                            return "Unhealthy", 500
+                            ip_response = "Unhealthy"
                     case "round-trip":
                         return "Using latency-based routing policy"
                     case _:
                         return "El routing policy no existe", 500
+                
 
             except Exception as e:
                 logger.debug("Ese dominio no existe", e)
                 return "Ese dominio no existe", 404
+        if ip_response != "Unhealthy" and ip_response != "":
+            logger.debug(ip_response)
+            return ip_response
         else:
-            return "Ese dominio no existe", 404
+
+            # Create a DNS query message for the domain 'example.com' and record type 'A'
+            query = dns.message.make_query(domain, dns.rdatatype.A)
+
+            # Send the query over UDP
+            response = dns.query.udp(query, dns_server)
+            answer = response.answer
+
+            # Convert all RRsets to text and join them into a single string
+            answer_string = "\n".join(rrset.to_text() for rrset in answer)
+            # Print the response
+            logger.debug(response.to_text())
+            
+            return answer_string
 
 
 @app.route("/api/status", methods=["GET"])
