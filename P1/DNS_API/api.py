@@ -178,7 +178,7 @@ def dns_resolver():
 def exists():
     if request.method == "GET":
         domain = request.args.get("domain")
-        ip_address = request.args.get("ip_address")  # Para usarlo más abajo si aplica
+        ip_address = request.args.get("ip")  # Para usarlo más abajo si aplica
 
         if not domain:
             return jsonify({"error": "No domain provided"}), 400
