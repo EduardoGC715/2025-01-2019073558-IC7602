@@ -192,7 +192,7 @@ def exists():
             try:
                 match ip_data["routing_policy"]:
                     case "single":
-                        if ip_data["ip"]["health"] == "healthy":
+                        if ip_data["ip"]["health"]:
                             ip_response = ip_data["ip"]["address"]
 
                         else:
