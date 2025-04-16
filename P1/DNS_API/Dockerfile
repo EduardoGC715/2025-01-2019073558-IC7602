@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11.12-slim
 
 WORKDIR /app
 
@@ -7,12 +7,12 @@ RUN pip install --upgrade pip
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY apiFlask.py .
+COPY api.py .
 COPY logs ./logs
-COPY bibliotec-98a06-firebase-adminsdk-qiahh-ea76f83463.json .
+COPY dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json .
 
 EXPOSE 5000
 
 EXPOSE 8000
 
-CMD [ "python", "-u", "./apiFlask.py" ]
+CMD [ "python", "-u", "./api.py" ]

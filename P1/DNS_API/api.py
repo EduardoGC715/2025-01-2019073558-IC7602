@@ -178,7 +178,7 @@ def dns_resolver():
 def exists():
     if request.method == "GET":
         domain = request.args.get("domain")
-        ip_address = request.args.get("ip_address")  # Para usarlo más abajo si aplica
+        ip_address = request.args.get("ip")  # Para usarlo más abajo si aplica
 
         if not domain:
             return jsonify({"error": "No domain provided"}), 400
@@ -273,15 +273,16 @@ def exists():
 
             # Create a DNS query message for the domain 'example.com' and record type 'A'
             query = dns.message.make_query(domain, dns.rdatatype.A)
-
+            logger.debug(query.to_text())
             # Send the query over UDP
-            response = dns.query.udp(query, dns_server)
+            response = dns.query.udp(query, dns_server[0])
+            logger.debug(response.to_text())
             answer = response.answer
 
             # Convert all RRsets to text and join them into a single string
             answer_string = "\n".join(rrset.to_text() for rrset in answer)
             # Print the response
-            logger.debug(response.to_text())
+            
             
             return answer_string
 
