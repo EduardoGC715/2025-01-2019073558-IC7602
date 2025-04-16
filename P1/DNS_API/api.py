@@ -205,10 +205,11 @@ def exists():
                             if ip["health"]:
                                 ref.update({"counter": ip_data["counter"] + 1})
                                 ip_response = ip["address"]
+                                break
                             else:
                                 ip_data["counter"] += 1
                                 retries += 1
-                        ip_response = "Unhealthy"
+                                ip_response = "Unhealthy"
                     case "weight":
                         weights = [ip["weight"] for ip in ip_data["ips"]]
                         indices = list(range(len(weights)))
@@ -218,9 +219,10 @@ def exists():
                             ip = ip_data["ips"][index]
                             if ip["health"]:
                                 ip_response = ip["address"]
+                                break
                             else:
                                 retries += 1
-                        ip_response = "Unhealthy"
+                                ip_response = "Unhealthy"
                     case "geo":
                         if not ip_address:
                             return jsonify({"error": "No se dio un IP address"}), 400
@@ -254,9 +256,10 @@ def exists():
                                 ip = random.choice(list(ip_data["ips"].values()))
                                 if ip["health"]:
                                     ip_response = ip["address"]
+                                    break
                                 else:
                                     retries += 1
-                            ip_response = "Unhealthy"
+                                    ip_response = "Unhealthy"
                     case "round-trip":
                         return "Using latency-based routing policy"
                     case _:
@@ -270,7 +273,7 @@ def exists():
             logger.debug(ip_response)
             return ip_response
         else:
-
+            logger.debug(ip_response)
             # Create a DNS query message for the domain 'example.com' and record type 'A'
             query = dns.message.make_query(domain, dns.rdatatype.A)
             logger.debug(query.to_text())
