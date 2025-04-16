@@ -13,4 +13,4 @@ COPY dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json .
 
 EXPOSE 5000
 
-CMD [ "python", "-u", "./api.py" ]
+CMD ["/bin/bash"]

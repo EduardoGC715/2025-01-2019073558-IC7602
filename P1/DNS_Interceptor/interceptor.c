@@ -20,6 +20,8 @@ typedef struct {
     socklen_t addr_len; // Length of the address structure
     char *request; // Pointer to the DNS request data
     int request_size; // Size of the DNS request data
+    const char * dns_api; // DNS API URL
+    const char * dns_api_port; // DNS API port
 } dns_thread_args;
 
 // Parsing de header basado en RFC-1035, sección 4.1.1.
@@ -159,6 +161,33 @@ char * decode(const char * data, int length) {
     return decoded_data;
 }
 
+
+char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoint, const char *ip_address, const char *domain) {
+    const char *prefix = "http://";
+
+    size_t total_length = strlen(prefix) + strlen(dns_api) + 1 + strlen(dns_api_port) +
+                          strlen(endpoint) + 1;
+    if (ip_address && domain) {
+        total_length += strlen(ip_address) + strlen(domain) + 12;
+    }
+
+    char *url = malloc(total_length);
+    if (!url) {
+        perror("malloc failed");
+        return NULL;
+    }
+
+    if (!ip_address && !domain) {
+        snprintf(url, total_length, "%s%s:%s%s", prefix, dns_api, dns_api_port, endpoint);
+    } else {
+
+    }
+    // Step 3: Format the string
+    snprintf(url, total_length, "%s%s:%s%s?domain=%s&ip=%s",
+             prefix, dns_api, dns_api_port, endpoint, domain, ip_address);
+    return url;
+}
+
 // Almacenar la respuesta de la request HTTPS en memoria.
 // Basado en:
 // https://curl.se/libcurl/c/getinmemory.html
@@ -208,9 +237,14 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
         headers = curl_slist_append(headers, "Content-Type: text/plain");
         
         curl_easy_setopt(curl, CURLOPT_URL, url);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, length);
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        if (data != NULL && length > 0) {
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, length);
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        } else {
+            curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+        }
+        
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)resp_mem);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
@@ -303,12 +337,13 @@ void * process_dns_request(void * arg) {
     socklen_t addr_len = args->addr_len; // Length of the address structure
     char *request = args->request; // Pointer to the DNS request data
     int request_size = args->request_size; // Size of the DNS request data
+    const char * dns_api = args->dns_api; // DNS API URL
+    const char * dns_api_port = args->dns_api_port; // DNS API port
 
     printf("Processing DNS request of size %d bytes\n", request_size);
     printf("Received DNS request from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
         
     dns_request * req = parse_dns_request(request, request_size);
-
     if (!req) {
         // Query no estándar, codificar en base 64 y enviar al dns_api/dns_resolver
         printf("Failed to parse DNS request\n");
@@ -320,19 +355,27 @@ void * process_dns_request(void * arg) {
             free(args);
             return NULL;
         }
-        memory_struct * response = send_https_request("https://dns_api/dns_resolver", encoded_data, encoded_length);
+        char * url = build_dns_url(dns_api, dns_api_port, "/api/dns_resolver", NULL, NULL);
+        memory_struct * response = send_https_request(url, encoded_data, encoded_length);
         if (response) {
             printf("Failed to send HTTPS request\n");
         }
         free(encoded_data);
         free(request);
         free(args);
+        free(url);
         return NULL;
     }
+    char * client_ip = inet_ntoa(client_addr.sin_addr); // Client IP address
+    char * url = build_dns_url(dns_api, dns_api_port, "/api/exists", client_ip, req->qname);
+    printf("Sending HTTP Request to %s\n", url);
+    memory_struct * response = send_https_request(url, NULL, 0);
+    printf("Response: %s\n", response->memory);
     // Query estándar, enviar al dns_api/exists
     sendto(dns_socket, request, request_size, 0, (struct sockaddr *) &client_addr, addr_len);
 
-    free(args->request);
+    free(url);
+    free(request);
     free(args);
     free_dns_request(req);
 }
@@ -340,7 +383,16 @@ void * process_dns_request(void * arg) {
 // Referencias para sockets:
 // https://www.geeksforgeeks.org/udp-client-server-using-connect-c-implementation/
 // https://www.youtube.com/watch?v=5PPfy-nUWIM
+// Para env variables:
+// https://www.gnu.org/software/libc/manual/html_node/Environment-Access.html#:~:text=The%20value%20of%20an%20environment,accidentally%20use%20untrusted%20environment%20variables.
 int main() {
+    const char *dns_api = getenv("DNS_API");
+    const char *dns_api_port = getenv("DNS_API_PORT");
+    if (!dns_api || !dns_api_port) {
+        fprintf(stderr, "Environment variables DNS_API and DNS_API_PORT must be set\n");
+        return 1;
+    }
+
     int dns_socket;
     dns_socket = socket(AF_INET, SOCK_DGRAM, 0);
     
@@ -381,6 +433,8 @@ int main() {
         args->socket_fd = dns_socket; // Pass the socket file descriptor to the thread
         args->client_addr = client_addr; // Pass the client address to the thread
         args->addr_len = addr_len; // Pass the address length to the thread
+        args->dns_api = dns_api; // Pass the DNS API URL to the thread
+        args->dns_api_port = dns_api_port; // Pass the DNS API port to the thread
         pthread_create(&thread_id, NULL, process_dns_request, args);
         pthread_detach(thread_id);
     }

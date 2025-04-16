@@ -5,7 +5,7 @@ from firebase_admin import db
 import base64
 
 cred = credentials.Certificate(
-    "DNS_API/dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json"
+    "dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json"
 )
 firebase_admin.initialize_app(
     cred, {"databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"}
@@ -275,7 +275,7 @@ def exists():
             query = dns.message.make_query(domain, dns.rdatatype.A)
 
             # Send the query over UDP
-            response = dns.query.udp(query, dns_server)
+            response = dns.query.udp(query, dns_server[0])
             answer = response.answer
 
             # Convert all RRsets to text and join them into a single string
@@ -448,5 +448,5 @@ def add_domain():
 
 if __name__ == "__main__":
     # Start up the server to expose the metrics.
-    app.run()
+    app.run(host="0.0.0.0")
     # https://synchronizing.medium.com/running-a-simple-flask-application-inside-a-docker-container-b83bf3e07dd5
