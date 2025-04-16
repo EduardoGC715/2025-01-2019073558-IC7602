@@ -273,15 +273,16 @@ def exists():
 
             # Create a DNS query message for the domain 'example.com' and record type 'A'
             query = dns.message.make_query(domain, dns.rdatatype.A)
-
+            logger.debug(query.to_text())
             # Send the query over UDP
-            response = dns.query.udp(query, dns_server)
+            response = dns.query.udp(query, dns_server[0])
+            logger.debug(response.to_text())
             answer = response.answer
 
             # Convert all RRsets to text and join them into a single string
             answer_string = "\n".join(rrset.to_text() for rrset in answer)
             # Print the response
-            logger.debug(response.to_text())
+            
             
             return answer_string
 
