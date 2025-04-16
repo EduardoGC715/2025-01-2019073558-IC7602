@@ -33,8 +33,8 @@ RUN chmod +x update_firebase.py
 
 # Create a startup script
 RUN echo '#!/bin/bash\n\
-    echo "*/5 * * * * cd /app && python3 update_firebase.py tcp example.com 80 >> /var/log/cron.log 2>&1" > /etc/cron.d/health-checks\n\
-    echo "*/5 * * * * cd /app && python3 update_firebase.py http example.com 80 / >> /var/log/cron.log 2>&1" >> /etc/cron.d/health-checks\n\
+    echo "*/2 * * * * cd /app && python3 update_firebase.py tcp example.com 80 5 3 >> /var/log/cron.log 2>&1" > /etc/cron.d/health-checks\n\
+    echo "*/2 * * * * cd /app && python3 update_firebase.py http google.com 80 / 5 3 "200,301,302,307" >> /var/log/cron.log 2>&1" >> /etc/cron.d/health-checks\n\
     chmod 0644 /etc/cron.d/health-checks\n\
     crontab /etc/cron.d/health-checks\n\
     touch /var/log/cron.log\n\
