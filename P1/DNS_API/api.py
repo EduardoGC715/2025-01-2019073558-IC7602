@@ -169,7 +169,7 @@ def dns_resolver():
             s.sendto(dns_query, dns_server)
             data, _ = s.recvfrom(512)  # 512 bytes max in standard DNS over UDP
             print("Received response (raw bytes):", data)
-        codified_data = data# = base64.b64encode(data).decode("utf-8")
+        codified_data = base64.b64encode(data).decode("utf-8")
         return codified_data
         
 
@@ -271,23 +271,25 @@ def exists():
                 return "Ese dominio no existe", 404
         if ip_response != "Unhealthy" and ip_response != "":
             logger.debug(ip_response)
-            return ip_response
+            return ip_response, 200
         else:
             logger.debug(ip_response)
             # Create a DNS query message for the domain 'example.com' and record type 'A'
             query = dns.message.make_query(domain, dns.rdatatype.A)
             logger.debug(query.to_text())
-            # Send the query over UDP
             response = dns.query.udp(query, dns_server[0])
             logger.debug(response.to_text())
             answer = response.answer
-
+            bytes = response.to_wire()
+            encodedBytes = base64.b64encode(bytes).decode("utf-8")
+            logger.debug("Received response (raw bytes) base 64:", bytes)
+            # Print the response in a human-readable format
             # Convert all RRsets to text and join them into a single string
             answer_string = "\n".join(rrset.to_text() for rrset in answer)
             # Print the response
             
             
-            return answer_string
+            return encodedBytes, 264
 
 
 @app.route("/api/status", methods=["GET"])
