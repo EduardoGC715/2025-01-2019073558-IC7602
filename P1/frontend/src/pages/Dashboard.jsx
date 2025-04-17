@@ -12,6 +12,7 @@ import SystemStatusCard from "../components/SystemStatusCard";
 import DatabaseModal from "../components/DatabaseModal";
 import DNSRecordsTable from "../components/DNSRecordsTable";
 import DNSRegisterCard from "../components/DNSRegisterCard";
+import EditRecordModal from "../components/EditRecordModal";
 import { dnsApi , databaseApi} from "../services/api";
 
 const Dashboard = () => {
@@ -20,6 +21,8 @@ const Dashboard = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDatabaseModal, setShowDatabaseModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
   const [healthStatus, setHealthStatus] = useState({
     servers: "error",
@@ -30,8 +33,9 @@ const Dashboard = () => {
   // Estado para el nuevo registro
   const [newRecord, setNewRecord] = useState({
     domain: "",
-    type: "A",
-    direction: ""
+    type: "single",
+    direction: "",
+    directions: [] // Array para almacenar múltiples direcciones cuando type es "multi"
   });
 
   useEffect(() => {
@@ -44,7 +48,11 @@ const Dashboard = () => {
         // Obtener los estados
         const updatedRecords = await Promise.all(
           records.map(async (record) => {
+            console.log("Registro:");
+            console.log("  Domain:", record.domain);
+            console.log("  Direction:", record.direction);
             const healthResult = await dnsApi.checkHealth(record.domain, record.direction);
+            console.log("  Health result:", healthResult.health);
   
             return {
               ...record,
@@ -57,6 +65,7 @@ const Dashboard = () => {
         setDnsRecords(updatedRecords);
         // Update el APIHealth
         updateApiHealthStatus();
+        updateFirebaseStatus();
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -84,19 +93,22 @@ const Dashboard = () => {
   // Añadir nuevo registro
 
   const handleAddRecord = () => {
-  const newId = dnsRecords.length + 1;
-  const recordWithId = {
-    id: newId,
-    ...newRecord,
-    status: "active",
-  }
-  setDnsRecords([...dnsRecords, recordWithId]);
-  setNewRecord({
-    domain: "",
-    type: "A",
-    direction: ""
-  });
-  handleCloseAddModal();
+    const newId = dnsRecords.length + 1;
+    const recordWithId = {
+      id: newId,
+      ...newRecord,
+      status: "active",
+      // Si es tipo multi, usamos el array de directions, si no, usamos la dirección única
+      direction: newRecord.type === "multi" ? newRecord.directions.join(", ") : newRecord.direction
+    }
+    setDnsRecords([...dnsRecords, recordWithId]);
+    setNewRecord({
+      domain: "",
+      type: "single",
+      direction: "",
+      directions: []
+    });
+    handleCloseAddModal();
   };
 
 
@@ -181,6 +193,33 @@ const Dashboard = () => {
     }));
   };
 
+  const updateFirebaseStatus = async () => {
+    const result = await dnsApi.checkFirebaseStatus();
+  
+    setHealthStatus(prev => ({
+      ...prev,
+      database: result.message ? "healthy" : "error"
+    }));
+  };
+
+  const handleEditRecord = (record) => {
+    setSelectedRecord(record);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedRecord(null);
+  };
+
+  const handleSaveEdit = (updatedRecord) => {
+    setDnsRecords(prevRecords =>
+      prevRecords.map(record =>
+        record.id === updatedRecord.id ? updatedRecord : record
+      )
+    );
+  };
+
   // Esta es la parte visual del FRONTEND donde se importan todos los componentes a usar
   return (
     <Container fluid className="p-4">
@@ -223,6 +262,7 @@ const Dashboard = () => {
           loading={loading}
           renderStatusBadge={renderStatusBadge}
           onRefreshStatus={handleRefreshStatus}
+          onEditRecord={handleEditRecord}
         />
       </div>
 
@@ -242,8 +282,17 @@ const Dashboard = () => {
           handleClose={handleCloseDatabaseModal}
         />
       </div>
+
+      {/* Modal de Edición */}
+      <EditRecordModal
+        show={showEditModal}
+        handleClose={handleCloseEditModal}
+        record={selectedRecord}
+        onSave={handleSaveEdit}
+      />
     </Container>
   );
 };
 
 export default Dashboard;
+
