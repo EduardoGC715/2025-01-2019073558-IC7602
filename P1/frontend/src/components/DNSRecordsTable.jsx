@@ -1,11 +1,13 @@
-// src/components/DNSRecordsTable.jsx (ajusta la ruta según tu estructura)
 import React from 'react';
-import { Row, Col, Card, Table, Button, ListGroup } from 'react-bootstrap';
+import { Row, Col, Card, Table, Button } from 'react-bootstrap';
 import { RotateCw, Edit2 } from "lucide-react";
 
 const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStatus, onEditRecord }) => {
+  // Permite devolver los registros en base al tipo donde se ordenan para la tabla
   const renderDirections = (record) => {
     if (record.type === "multi") {
+      // Si esta vacio las direcciones se ignora
+      if (!record.direction) return ;
       const directions = record.direction.split(",").map(d => d.trim());
       return (
         <div>
@@ -18,7 +20,35 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
         </div>
       );
     }
-    return record.direction;
+  
+    if (record.type === "weight") {
+      if (!Array.isArray(record.weightedDirections)) return ;
+      return (
+        <div>
+          {record.weightedDirections.map((item, index) => (
+            <div key={index}>
+              IP: {item.ip} - Peso: {item.weight}
+              {index < record.weightedDirections.length - 1 && <hr className="my-1" />}
+            </div>
+          ))}
+        </div>
+      );
+    }
+  
+    if (record.type === "geo") {
+      if (!Array.isArray(record.geoDirections)) return;
+      return (
+        <div>
+          {record.geoDirections.map((item, index) => (
+            <div key={index}>
+              IP: {item.ip} - País: {item.country}
+              {index < record.geoDirections.length - 1 && <hr className="my-1" />}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return record.direction ?? "Sin datos";
   };
 
   return (

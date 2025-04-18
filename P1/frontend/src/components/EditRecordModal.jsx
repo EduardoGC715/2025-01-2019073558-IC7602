@@ -1,26 +1,52 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Form, Button } from "react-bootstrap";
+import { Modal, Form, Button, Card } from "react-bootstrap";
 import { Plus, Trash2 } from "lucide-react";
+
+import SingleConfig from "./configCards/singleConfig";
+import MultiConfig from "./configCards/multiConfig";
+import WeightConfig from "./configCards/weightConfig";
+import GeoConfig from "./configCards/geoConfig";
+import RoundTripConfig from "./configCards/roundTripConfig";
 
 const EditRecordModal = ({ show, handleClose, record, onSave }) => {
   const [editedRecord, setEditedRecord] = useState({
     domain: "",
     type: "single",
     direction: "",
-    directions: []
+    directions: [],
+    counter: "",
+    weightedDirections: [],
+    geoDirections: []
   });
 
   useEffect(() => {
     if (record) {
       let directions = [];
+      let weightedDirections = [];
+      let geoDirections = [];
+
       if (record.type === "multi") {
         directions = record.direction.split(",").map(d => d.trim());
+      } else if (record.type === "weight" && record.direction) {
+        // Convertir de formato "ip:peso,ip:peso" a array de objetos
+        weightedDirections = record.direction.split(",").map(item => {
+          const [ip, weight] = item.trim().split(":");
+          return { ip: ip || "", weight: weight || "" };
+        });
+      } else if (record.type === "geo" && record.direction) {
+        // Convertir de formato "ip:país,ip:país" a array de objetos
+        geoDirections = record.direction.split(",").map(item => {
+          const [ip, country] = item.trim().split(":");
+          return { ip: ip || "", country: country || "" };
+        });
       }
 
       setEditedRecord({
         ...record,
         directions,
-        direction: record.type === "multi" ? "" : record.direction
+        weightedDirections,
+        geoDirections,
+        direction: ["multi", "weight", "geo"].includes(record.type) ? "" : record.direction
       });
     }
   }, [record]);
@@ -33,6 +59,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     }));
   };
 
+  // Handlers para direcciones múltiples (tipo "multi")
   const handleAddDirection = () => {
     setEditedRecord(prev => ({
       ...prev,
@@ -54,26 +81,96 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     }));
   };
 
+  // Handlers para tipo "weight"
+  const handleAddWeightedDirection = () => {
+    setEditedRecord(prev => ({
+      ...prev,
+      weightedDirections: [...(prev.weightedDirections || []), { ip: '', weight: '' }]
+    }));
+  };
+
+  const handleWeightedDirectionChange = (index, field, value) => {
+    const newDirections = [...editedRecord.weightedDirections];
+    newDirections[index] = { ...newDirections[index], [field]: value };
+    setEditedRecord(prev => ({
+      ...prev,
+      weightedDirections: newDirections
+    }));
+  };
+
+  const handleRemoveWeightedDirection = (index) => {
+    const newDirections = [...editedRecord.weightedDirections];
+    newDirections.splice(index, 1);
+    setEditedRecord(prev => ({
+      ...prev,
+      weightedDirections: newDirections
+    }));
+  };
+
+  // Handlers para tipo "geo"
+  const handleAddGeoDirection = () => {
+    setEditedRecord(prev => ({
+      ...prev,
+      geoDirections: [...(prev.geoDirections || []), { ip: '', country: '' }]
+    }));
+  };
+
+  const handleGeoDirectionChange = (index, field, value) => {
+    const newDirections = [...editedRecord.geoDirections];
+    newDirections[index] = { ...newDirections[index], [field]: value };
+    setEditedRecord(prev => ({
+      ...prev,
+      geoDirections: newDirections
+    }));
+  };
+
+  const handleRemoveGeoDirection = (index) => {
+    const newDirections = [...editedRecord.geoDirections];
+    newDirections.splice(index, 1);
+    setEditedRecord(prev => ({
+      ...prev,
+      geoDirections: newDirections
+    }));
+  };
+
+  const isValidDomain = (domain) => {
+    const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z]{2,})+$/;
+    return domainRegex.test(domain);
+  };
+
   const handleSave = () => {
+    let updatedDirection = editedRecord.direction;
+
+    if (editedRecord.type === "multi") {
+      updatedDirection = editedRecord.directions.join(", ");
+    } else if (editedRecord.type === "weight") {
+      updatedDirection = editedRecord.weightedDirections
+        .map(item => `${item.ip}:${item.weight}`)
+        .join(", ");
+    } else if (editedRecord.type === "geo") {
+      updatedDirection = editedRecord.geoDirections
+        .map(item => `${item.ip}:${item.country}`)
+        .join(", ");
+    }
+
     const updatedRecord = {
       ...editedRecord,
-      direction: editedRecord.type === "multi" 
-        ? editedRecord.directions.join(", ")
-        : editedRecord.direction
+      direction: updatedDirection
     };
+
     onSave(updatedRecord);
     handleClose();
   };
 
   return (
-    <Modal show={show} onHide={handleClose}>
+    <Modal show={show} onHide={handleClose} size="lg">
       <Modal.Header closeButton>
         <Modal.Title>Editar Registro DNS</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form>
           <Form.Group className="mb-3">
-            <Form.Label>Dominio</Form.Label>
+            <Form.Label>Dominio <span style={{ color: "#6c757d" }}>(Debe terminar en .com, .net o similares)</span></Form.Label>
             <Form.Control 
               type="text" 
               name="domain"
@@ -98,75 +195,48 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
             </Form.Select>
           </Form.Group>
 
-          {editedRecord.type === "multi" ? (
-            <>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <Form.Label>Direcciones IP</Form.Label>
-                <Button 
-                  variant="outline-primary" 
-                  size="sm"
-                  onClick={handleAddDirection}
-                >
-                  <Plus size={16} className="me-1" />
-                  Agregar IP
-                </Button>
-              </div>
-              
-              {editedRecord.directions.map((direction, index) => (
-                <div key={index} className="d-flex mb-2">
-                  <Form.Control 
-                    type="text" 
-                    value={direction}
-                    onChange={(e) => handleDirectionChange(index, e.target.value)}
-                    placeholder="192.168.1.1"
-                    className="me-2"
-                  />
-                  <Button 
-                    variant="outline-danger"
-                    size="sm"
-                    onClick={() => handleRemoveDirection(index)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                </div>
-              ))}
-            </>
-          ) : (
-            <Form.Group className="mb-3">
-              <Form.Label>
-                {editedRecord.type === "weight" ? "Dirección IP y Peso (IP:peso)" :
-                 editedRecord.type === "geo" ? "Dirección IP y Ubicación (IP:ubicación)" :
-                 editedRecord.type === "round-trip" ? "Dirección IP y Latencia (IP:latencia)" :
-                 "Dirección IP"}
-              </Form.Label>
-              <Form.Control 
-                type="text" 
-                name="direction"
-                value={editedRecord.direction}
-                onChange={handleInputChange}
-                placeholder={
-                  editedRecord.type === "weight" ? "192.168.1.1:10" :
-                  editedRecord.type === "geo" ? "192.168.1.1:US" :
-                  editedRecord.type === "round-trip" ? "192.168.1.1:50ms" :
-                  "192.168.1.1"
-                }
-              />
-              {editedRecord.type === "weight" && (
-                <Form.Text className="text-muted">
-                  Formato: IP:peso (ejemplo: 192.168.1.1:10)
-                </Form.Text>
-              )}
-              {editedRecord.type === "geo" && (
-                <Form.Text className="text-muted">
-                  Formato: IP:código_país (ejemplo: 192.168.1.1:US)
-                </Form.Text>
-              )}
-              {editedRecord.type === "round-trip" && (
-                <Form.Text className="text-muted">
-                  Formato: IP:latencia (ejemplo: 192.168.1.1:50ms)
-                </Form.Text>
-              )}
-            </Form.Group>
+          {/* SINGLE */}
+          {editedRecord.type === "single" && (
+            <SingleConfig editedRecord={editedRecord} handleInputChange={handleInputChange} />
+          )}
+
+          {/* MULTI */}
+          {editedRecord.type === "multi" && (
+            <MultiConfig
+              editedRecord={editedRecord}
+              handleInputChange={handleInputChange}
+              handleAddDirection={handleAddDirection}
+              handleDirectionChange={handleDirectionChange}
+              handleRemoveDirection={handleRemoveDirection}
+            />
+          )}
+
+          {/* WEIGHT */}
+          {editedRecord.type === "weight" && (
+            <WeightConfig
+              editedRecord={editedRecord}
+              handleAddWeightedDirection={handleAddWeightedDirection}
+              handleWeightedDirectionChange={handleWeightedDirectionChange}
+              handleRemoveWeightedDirection={handleRemoveWeightedDirection}
+            />
+          )}
+
+          {/* GEO */}
+          {editedRecord.type === "geo" && (
+            <GeoConfig
+              editedRecord={editedRecord}
+              handleAddGeoDirection={handleAddGeoDirection}
+              handleGeoDirectionChange={handleGeoDirectionChange}
+              handleRemoveGeoDirection={handleRemoveGeoDirection}
+            />
+          )}
+
+          {/* ROUND-TRIP */}
+          {editedRecord.type === "round-trip" && (
+            <RoundTripConfig
+              editedRecord={editedRecord}
+              handleInputChange={handleInputChange}
+            />
           )}
         </Form>
       </Modal.Body>
@@ -175,14 +245,20 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
           Cancelar
         </Button>
         <Button 
-          variant="primary" 
-          onClick={handleSave}
-          disabled={
-            editedRecord.type === "multi" 
-              ? editedRecord.directions.length === 0 
-              : !editedRecord.direction
-          }
-        >
+        variant="primary" 
+        onClick={handleSave}
+        disabled={
+          !isValidDomain(editedRecord.domain) || (
+            editedRecord.type === "multi"
+              ? editedRecord.directions.length === 0
+              : editedRecord.type === "weight"
+                ? !editedRecord.weightedDirections || editedRecord.weightedDirections.length === 0
+                : editedRecord.type === "geo"
+                  ? !editedRecord.geoDirections || editedRecord.geoDirections.length === 0
+                  : !editedRecord.direction
+          )
+        }
+      >
           Guardar Cambios
         </Button>
       </Modal.Footer>
@@ -190,4 +266,4 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
   );
 };
 
-export default EditRecordModal; 
+export default EditRecordModal;

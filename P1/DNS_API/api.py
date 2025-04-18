@@ -314,17 +314,26 @@ def get_all_domains():
     try:
         raw_data = domain_ref.get()
         if not raw_data:
+            logger.warning("No se encontraron datos en la base de datos")
             return jsonify([]), 200
 
         response = []
-        id_counter = 1
+        id_counter = 0
         domain_map = {}  # To group IPs by domain
 
+        logger.debug(f"Raw data from Firebase: {raw_data}")
+
         for tld, domain_block in raw_data.items():  # tld = com, net, etc.
+            logger.debug(f"Processing TLD: {tld}")
             for domain, www_data in domain_block.items():
+                logger.debug(f"Processing domain: {domain}.{tld}")
                 www_info = www_data.get("www", {})
                 routing_policy = www_info.get("routing_policy")
                 domain_name = f"{domain}.{tld}"
+
+                logger.debug(
+                    f"Domain {domain_name} has routing policy: {routing_policy}"
+                )
 
                 if routing_policy == "single" or routing_policy == "round-trip":
                     ip = www_info.get("ip")
@@ -339,6 +348,10 @@ def get_all_domains():
                             }
                         )
                         id_counter += 1
+                    else:
+                        logger.warning(
+                            f"No IP found for domain {domain_name} with routing policy {routing_policy}"
+                        )
 
                 elif routing_policy in ["multi", "weight", "geo"]:
                     if domain_name not in domain_map:
@@ -353,6 +366,7 @@ def get_all_domains():
 
                     if routing_policy in ["multi", "weight"]:
                         ips = www_info.get("ips", [])
+                        logger.debug(f"Found {len(ips)} IPs for domain {domain_name}")
                         for ip in ips:
                             domain_map[domain_name]["direction"].append(
                                 ip.get("address", "N/A")
@@ -362,6 +376,9 @@ def get_all_domains():
                             )
                     elif routing_policy == "geo":
                         geo_ips = www_info.get("ips", {})
+                        logger.debug(
+                            f"Found {len(geo_ips)} geo IPs for domain {domain_name}"
+                        )
                         for country, ip in geo_ips.items():
                             domain_map[domain_name]["direction"].append(
                                 f"{country}: {ip.get('address', 'N/A')}"
@@ -376,10 +393,14 @@ def get_all_domains():
             domain_info["status"] = ", ".join(map(str, domain_info["status"]))
             response.append(domain_info)
 
+        # Sort response by ID
+        response.sort(key=lambda x: x["id"])
+
+        logger.debug(f"Final response with {len(response)} domains: {response}")
         return jsonify(response), 200
 
     except Exception as e:
-        print("Error al obtener los dominios:", e)
+        logger.error(f"Error al obtener los dominios: {str(e)}")
         import traceback
 
         traceback.print_exc()
