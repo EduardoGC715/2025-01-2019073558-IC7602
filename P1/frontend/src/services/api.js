@@ -40,7 +40,7 @@ export const dnsApi = {
       const response = await api.get('/exists', {
         params: {
           domain: fullDomain,
-          ip_address: direction
+          ip: direction
         }
       });
   
@@ -76,7 +76,6 @@ export const dnsApi = {
 
     if (response.status === 200) {
       return {
-        
         message: true
       };
     }
@@ -85,7 +84,24 @@ export const dnsApi = {
           message: false
         };  
     }
-  }
+  },
+
+  checkFirebaseStatus : async () =>
+    {
+      const response = await api.get('/firebase-status');
+  
+      if (response.status === 200) {
+        return {
+          
+          message: true
+        };
+      }
+        else {
+          return {
+            message: false
+          };  
+      }
+    }
 };
 
 
