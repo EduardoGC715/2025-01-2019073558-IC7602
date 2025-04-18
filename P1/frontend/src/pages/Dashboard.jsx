@@ -48,11 +48,7 @@ const Dashboard = () => {
         // Obtener los estados
         const updatedRecords = await Promise.all(
           records.map(async (record) => {
-            console.log("Registro:");
-            console.log("  Domain:", record.domain);
-            console.log("  Direction:", record.direction);
             const healthResult = await dnsApi.checkHealth(record.domain, record.direction);
-            console.log("  Health result:", healthResult.health);
   
             return {
               ...record,

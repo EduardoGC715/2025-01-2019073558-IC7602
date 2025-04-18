@@ -287,6 +287,7 @@ def exists():
             return answer_string
 
 
+# Ruta para verificar el estado del backend API
 @app.route("/api/status", methods=["GET"])
 def get_api_status():
     try:
@@ -296,6 +297,7 @@ def get_api_status():
         return jsonify({"error": "No se pudo obtener la información"}), 500
 
 
+# Ruta para verificar el estado de la base de datos Firebase
 @app.route("/api/firebase-status", methods=["GET"])
 def get_firebase_status():
     try:
@@ -309,6 +311,7 @@ def get_firebase_status():
         return jsonify([]), 500
 
 
+# Ruta para obtener todos los dominios del firebase y ordenarlos en base al tipo
 @app.route("/api/all-domains", methods=["GET"])
 def get_all_domains():
     try:
@@ -319,23 +322,17 @@ def get_all_domains():
 
         response = []
         id_counter = 0
-        domain_map = {}  # To group IPs by domain
+        domain_map = {}
 
-        logger.debug(f"Raw data from Firebase: {raw_data}")
-
-        for tld, domain_block in raw_data.items():  # tld = com, net, etc.
-            logger.debug(f"Processing TLD: {tld}")
+        # Ciclo por dominio
+        for tld, domain_block in raw_data.items():
             for domain, www_data in domain_block.items():
-                logger.debug(f"Processing domain: {domain}.{tld}")
                 www_info = www_data.get("www", {})
                 routing_policy = www_info.get("routing_policy")
                 domain_name = f"{domain}.{tld}"
 
-                logger.debug(
-                    f"Domain {domain_name} has routing policy: {routing_policy}"
-                )
-
-                if routing_policy == "single" or routing_policy == "round-trip":
+                # Clasifica el dominio por su tipo de routing policy
+                if routing_policy == "single":
                     ip = www_info.get("ip")
                     if ip:
                         response.append(
@@ -353,50 +350,58 @@ def get_all_domains():
                             f"No IP found for domain {domain_name} with routing policy {routing_policy}"
                         )
 
-                elif routing_policy in ["multi", "weight", "geo"]:
+                elif routing_policy in ["multi", "weight", "geo", "round-trip"]:
+                    # Para los otros tipos debido a que permiten mas de un address
                     if domain_name not in domain_map:
                         domain_map[domain_name] = {
                             "id": id_counter,
                             "domain": domain_name,
                             "type": routing_policy,
-                            "direction": [],
+                            "direction": "",
                             "status": [],
                         }
                         id_counter += 1
 
-                    if routing_policy in ["multi", "weight"]:
+                    # Para multi y round-trip: formato "ip1,ip2,ip3"
+                    if routing_policy in ["multi", "round-trip"]:
                         ips = www_info.get("ips", [])
-                        logger.debug(f"Found {len(ips)} IPs for domain {domain_name}")
-                        for ip in ips:
-                            domain_map[domain_name]["direction"].append(
-                                ip.get("address", "N/A")
-                            )
-                            domain_map[domain_name]["status"].append(
-                                ip.get("health", "unknown")
-                            )
+                        ip_addresses = [ip.get("address", "N/A") for ip in ips]
+                        domain_map[domain_name]["direction"] = ",".join(ip_addresses)
+                        domain_map[domain_name]["status"] = ",".join(
+                            [str(ip.get("health", "unknown")) for ip in ips]
+                        )
+
+                    # Para weight: formato "ip1:peso1,ip2:peso2"
+                    elif routing_policy == "weight":
+                        ips = www_info.get("ips", [])
+                        weighted_ips = [
+                            f"{ip.get('address', 'N/A')}:{ip.get('weight', '0')}"
+                            for ip in ips
+                        ]
+                        domain_map[domain_name]["direction"] = ",".join(weighted_ips)
+                        domain_map[domain_name]["status"] = ",".join(
+                            [str(ip.get("health", "unknown")) for ip in ips]
+                        )
+
+                    # Para geo: formato "ip1:país1,ip2:país2"
                     elif routing_policy == "geo":
                         geo_ips = www_info.get("ips", {})
-                        logger.debug(
-                            f"Found {len(geo_ips)} geo IPs for domain {domain_name}"
-                        )
+                        geo_entries = []
+                        statuses = []
                         for country, ip in geo_ips.items():
-                            domain_map[domain_name]["direction"].append(
-                                f"{country}: {ip.get('address', 'N/A')}"
-                            )
-                            domain_map[domain_name]["status"].append(
-                                ip.get("health", "unknown")
-                            )
+                            geo_entries.append(f"{ip.get('address', 'N/A')}:{country}")
+                            statuses.append(ip.get("health", "unknown"))
+                        domain_map[domain_name]["direction"] = ",".join(geo_entries)
+                        domain_map[domain_name]["status"] = ",".join(map(str, statuses))
 
-        # Add grouped domains to response
+        # Añadir los dominios agrupados a la respuesta
         for domain_info in domain_map.values():
-            domain_info["direction"] = ", ".join(domain_info["direction"])
-            domain_info["status"] = ", ".join(map(str, domain_info["status"]))
+            if isinstance(domain_info["status"], list):
+                domain_info["status"] = ",".join(map(str, domain_info["status"]))
             response.append(domain_info)
 
-        # Sort response by ID
+        # Ordenar respuesta por ID
         response.sort(key=lambda x: x["id"])
-
-        logger.debug(f"Final response with {len(response)} domains: {response}")
         return jsonify(response), 200
 
     except Exception as e:
@@ -407,45 +412,36 @@ def get_all_domains():
         return jsonify({"error": "No se pudo obtener la información"}), 500
 
 
-# Metodo para publicar, actualizar o eliminar un dominio
+# Convierte google.com en com/google.
 def flip_domain(domain):
-    """Convierte google.com en com/google."""
     return "/".join(reversed(domain.strip().split(".")))
 
 
+# Valida que exista dominio
 def validate_domain(data):
-    """Valida si el campo 'domain' existe."""
     domain = data.get("domain")
     if not domain:
         return None, jsonify({"error": "No domain provided"}), 400
     return domain, None, None
 
 
-def handle_routing_policy(policy):
-    """Manejo básico de políticas de ruteo. Podrías expandir aquí según necesidad."""
-    routing_messages = {
-        "single": "Using single routing policy",
-        "multi": "Using multi-value routing policy",
-        "weight": "Using weighted routing policy",
-        "geo": "Using geolocation routing policy",
-        "round-trip": "Using latency-based routing policy",
-    }
-    return routing_messages.get(policy, None)
-
-
 def create_Domain(ref, domain, data):
     domain_type = data.get("type")
     direction = data.get("direction")
     status_flag = data.get("status")
+    counter_value = data.get("counter")
+    weights = data.get("weight")
 
     if not all([domain_type, direction is not None, status_flag is not None]):
         return jsonify({"error": "Missing one or more required fields"}), 400
 
     ip_data = {"routing_policy": domain_type}
 
+    # Se van creando los dominos segun sus tipos
     if domain_type == "single":
         ip_data["ip"] = {"address": direction, "health": status_flag}
-    elif domain_type in ["multi", "weight"]:
+
+    elif domain_type in ["multi", "round-trip"]:
         if not isinstance(direction, list):
             return jsonify(
                 {
@@ -454,11 +450,34 @@ def create_Domain(ref, domain, data):
                 400,
             )
         ip_data["ips"] = [{"address": ip, "health": status_flag} for ip in direction]
-        ip_data["counter"] = 0
-        if domain_type == "weight":
+        if domain_type == "multi":
+            ip_data["counter"] = counter_value  # Solo multi tiene contador
+
+    elif domain_type == "weight":
+        if not isinstance(direction, list) or not isinstance(weights, list):
+            return jsonify(
+                {
+                    "error": "For 'weight' type, both 'direction' and 'weight' must be lists"
+                },
+                400,
+            )
+        if len(direction) != len(weights):
+            return jsonify(
+                {"error": "'direction' and 'weight' lists must be of the same length"},
+                400,
+            )
+        try:
             ip_data["ips"] = [
-                {"address": ip, "health": status_flag, "weight": 1} for ip in direction
+                {
+                    "address": ip,
+                    "health": status_flag,
+                    "weight": int(weights[i]),
+                }
+                for i, ip in enumerate(direction)
             ]
+        except ValueError:
+            return jsonify({"error": "'weight' values must be integers"}), 400
+
     elif domain_type == "geo":
         if not isinstance(direction, dict):
             return jsonify(
@@ -471,8 +490,6 @@ def create_Domain(ref, domain, data):
             country: {"address": ip, "health": status_flag}
             for country, ip in direction.items()
         }
-    elif domain_type == "round-trip":
-        ip_data["ip"] = {"address": direction, "health": status_flag}
 
     try:
         ref.set(ip_data)
@@ -486,33 +503,39 @@ def create_Domain(ref, domain, data):
             201,
         )
     except Exception as e:
-        logger.error(f"Error creating domain: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
+# Ruta para crear, acutalizar o eliminar un dominio
 @app.route("/api/domains", methods=["POST", "PUT", "DELETE"])
 def manage_domain():
     data = request.get_json()
     if not data:
         return jsonify({"error": "Invalid or missing JSON body"}), 400
 
+    # Se valida el dominio enviado en el JSON
     domain, error_response, status = validate_domain(data)
     if error_response:
         return error_response, status
 
+    # Se separa el dominio en partes (por ejemplo: "www.example.com" → ["www", "example", "com"])
     domain_parts = domain.strip().split(".")
+    # Se valida que el dominio tenga al menos dos partes ("example.com")
     if len(domain_parts) < 2:
         return jsonify({"error": "Invalid domain format"}), 400
 
-    # Remove the dot from TLD and construct proper path
-    tld = domain_parts[-1]  # "com" instead of ".com"
-    name = domain_parts[-2]  # "example"
+    # construye la ruta invertida
+    # "example.com" se guarda como "com/example/www"
+    tld = domain_parts[-1]
+    name = domain_parts[-2]
     flipped_path = f"{tld}/{name}/www"
     ref = domain_ref.child(flipped_path)
 
+    # Si es una solicitud POST, se crea el dominio nuevo
     if request.method == "POST":
         return create_Domain(ref, domain, data)
 
+    # Si es una solicitud PUT, primero se elimina el dominio anterior y luego se crea uno nuevo
     elif request.method == "PUT":
         try:
             ref.delete()
@@ -521,6 +544,7 @@ def manage_domain():
 
         return create_Domain(ref, domain, data)
 
+    # Si es una solicitud DELETE, se elimina el dominio
     elif request.method == "DELETE":
         try:
             ref.delete()

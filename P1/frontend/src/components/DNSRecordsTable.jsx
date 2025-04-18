@@ -5,9 +5,8 @@ import { RotateCw, Edit2 } from "lucide-react";
 const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStatus, onEditRecord }) => {
   // Permite devolver los registros en base al tipo donde se ordenan para la tabla
   const renderDirections = (record) => {
-    if (record.type === "multi") {
-      // Si esta vacio las direcciones se ignora
-      if (!record.direction) return ;
+    if (record.type === "multi" || record.type === "round-trip") {
+      if (!record.direction) return;
       const directions = record.direction.split(",").map(d => d.trim());
       return (
         <div>
@@ -22,13 +21,18 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
     }
   
     if (record.type === "weight") {
-      if (!Array.isArray(record.weightedDirections)) return ;
+      if (!record.direction) return;
+      const weightedDirections = record.direction.split(",").map(item => {
+        const [ip, weight] = item.trim().split(":");
+        return { ip, weight };
+      });
+      
       return (
         <div>
-          {record.weightedDirections.map((item, index) => (
+          {weightedDirections.map((item, index) => (
             <div key={index}>
               IP: {item.ip} - Peso: {item.weight}
-              {index < record.weightedDirections.length - 1 && <hr className="my-1" />}
+              {index < weightedDirections.length - 1 && <hr className="my-1" />}
             </div>
           ))}
         </div>
@@ -36,13 +40,18 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
     }
   
     if (record.type === "geo") {
-      if (!Array.isArray(record.geoDirections)) return;
+      if (!record.direction) return;
+      const geoDirections = record.direction.split(",").map(item => {
+        const [ip, country] = item.trim().split(":");
+        return { ip, country };
+      });
+      
       return (
         <div>
-          {record.geoDirections.map((item, index) => (
+          {geoDirections.map((item, index) => (
             <div key={index}>
               IP: {item.ip} - País: {item.country}
-              {index < record.geoDirections.length - 1 && <hr className="my-1" />}
+              {index < geoDirections.length - 1 && <hr className="my-1" />}
             </div>
           ))}
         </div>
