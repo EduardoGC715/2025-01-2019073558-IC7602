@@ -11,11 +11,39 @@
 #include <sys/types.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #define BUFFER_SIZE 4096
 #define DEFAULT_TIMEOUT 5     // 5 seconds default timeout
 #define DEFAULT_MAX_RETRIES 3 // 3 retries by default
 #define DEFAULT_HTTP_OK "200" // Default acceptable HTTP status code
+FILE *log_file = NULL;
+const char *LOG_FILENAME = "health_checker.log";
+
+void log_message(const char *format, ...)
+{
+    // Get current time
+    time_t now = time(NULL);
+    char timestamp[26];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+
+    // Format the message with variable arguments
+    va_list args;
+    va_start(args, format);
+    char message[2048];
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+
+    // Print to console
+    printf("%s %s\n", timestamp, message);
+
+    // Write to log file if open
+    if (log_file)
+    {
+        fprintf(log_file, "%s %s\n", timestamp, message);
+        fflush(log_file); // Ensure it's written immediately
+    }
+}
 
 // Structure to hold check results
 typedef struct
@@ -147,7 +175,7 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
     {
         if (retry_count > 0)
         {
-            printf("TCP Connect: Retry attempt %d of %d\n", retry_count, max_retries);
+            log_message("TCP Connect: Retry attempt %d of %d\n", retry_count, max_retries);
             sleep(1);
         }
 
@@ -233,13 +261,13 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
     }
 
     freeaddrinfo(res);
-    fprintf(stderr, "Connection failed after %d attempts\n", max_retries + 1);
+    log_message(stderr, "Connection failed after %d attempts\n", max_retries + 1);
     return result;
 }
 
 check_result_t http_check(const char *hostname, const char *port, const char *path,
-                          int timeout_secs, int max_retries, const char *acceptable_status_codes)
-// Performs an HTTP GET request with timeout and retries
+                          int timeout_secs, int max_retries, const char *acceptable_status_codes,
+                          const char *host_header)
 {
     int retry_count = 0;
     check_result_t result = {0, 0.0, ""};
@@ -249,7 +277,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
     {
         if (retry_count > 0)
         {
-            printf("HTTP Check: Retry attempt %d of %d\n", retry_count, max_retries);
+            log_message("HTTP Check: Retry attempt %d of %d\n", retry_count, max_retries);
             sleep(1);
         }
 
@@ -266,7 +294,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
 
         if (getaddrinfo(hostname, port, &hints, &res) != 0)
         {
-            fprintf(stderr, "getaddrinfo failed\n");
+            log_message("getaddrinfo failed");
             retry_count++;
             continue;
         }
@@ -274,7 +302,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
         if (sockfd == -1)
         {
-            fprintf(stderr, "socket creation failed\n");
+            log_message("socket creation failed");
             freeaddrinfo(res);
             retry_count++;
             continue;
@@ -283,7 +311,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         // Set non-blocking and connect with timeout
         if (set_nonblock(sockfd) < 0)
         {
-            fprintf(stderr, "Failed to set non-blocking mode\n");
+            log_message("Failed to set non-blocking mode");
             close(sockfd);
             freeaddrinfo(res);
             retry_count++;
@@ -293,7 +321,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         int connect_result = connect(sockfd, res->ai_addr, res->ai_addrlen);
         if (connect_result < 0 && errno != EINPROGRESS)
         {
-            fprintf(stderr, "connect failed: %s\n", strerror(errno));
+            log_message("connect failed: %s", strerror(errno));
             close(sockfd);
             freeaddrinfo(res);
             retry_count++;
@@ -306,7 +334,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             int select_result = wait_for_socket(sockfd, 1, timeout_secs);
             if (select_result <= 0)
             {
-                fprintf(stderr, "Connection timed out or failed\n");
+                log_message("Connection timed out or failed");
                 close(sockfd);
                 freeaddrinfo(res);
                 retry_count++;
@@ -320,7 +348,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
 
             if (so_error != 0)
             {
-                fprintf(stderr, "Connection failed after select: %s\n", strerror(so_error));
+                log_message("Connection failed after select: %s", strerror(so_error));
                 close(sockfd);
                 freeaddrinfo(res);
                 retry_count++;
@@ -339,9 +367,11 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
 
         char request[1024];
+        const char *effective_host = host_header && strlen(host_header) > 0 ? host_header : hostname;
+
         snprintf(request, sizeof(request),
-                 "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
-                 path, hostname);
+                 "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nUser-Agent: HealthChecker/1.0\r\n\r\n",
+                 path, effective_host);
 
         send(sockfd, request, strlen(request), 0);
 
@@ -358,7 +388,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
 
         if (bytes <= 0)
         {
-            fprintf(stderr, "Failed to receive HTTP response.\n");
+            log_message("Failed to receive HTTP response.");
             retry_count++;
             continue;
         }
@@ -371,20 +401,20 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         // Check if the HTTP status code is in our list of acceptable codes
         if (is_acceptable_status(buffer, acceptable_status_codes))
         {
-            printf("HTTP check passed: %s status code (%.2f ms)\n", result.status_code, duration);
+            log_message("HTTP check passed: %s status code (%.2f ms)\n", result.status_code, duration);
             result.success = 1;
             result.duration_ms = duration;
             return result;
         }
         else
         {
-            printf("HTTP check failed. Status code: %s. Response first line:\n", result.status_code);
+            log_message("HTTP check failed. Status code: %s. Response first line:\n", result.status_code);
 
             // Print just the first line of the response
             char *newline = strchr(buffer, '\n');
             if (newline)
                 *newline = '\0';
-            printf("%s\n", buffer);
+            log_message("%s\n", buffer);
 
             retry_count++;
             continue;
@@ -407,6 +437,13 @@ void print_usage(const char *program_name)
 
 int main(int argc, char *argv[])
 {
+    // Initialize log file
+    log_file = fopen(LOG_FILENAME, "a");
+    if (!log_file)
+    {
+        fprintf(stderr, "Warning: Could not open log file %s\n", LOG_FILENAME);
+    }
+
     if (argc < 4)
     {
         print_usage(argv[0]);
@@ -444,8 +481,8 @@ int main(int argc, char *argv[])
         if (max_retries < 0)
             max_retries = DEFAULT_MAX_RETRIES;
 
-        printf("Checking TCP connection to %s:%s (timeout: %ds, max retries: %d)...\n",
-               hostname, port, timeout, max_retries);
+        log_message("Checking TCP connection to %s:%s (timeout: %ds, max retries: %d)...\n",
+                    hostname, port, timeout, max_retries);
 
         check_result_t result = tcp_check(hostname, port, timeout, max_retries);
         success = result.success;
@@ -453,16 +490,16 @@ int main(int argc, char *argv[])
 
         if (!success)
         {
-            fprintf(stderr, "TCP check failed.\n");
+            log_message("TCP check failed.");
         }
         else
         {
-            printf("TCP connection successful (%.2f ms).\n", duration_ms);
+            log_message("TCP connection successful (%.2f ms).\n", duration_ms);
         }
 
         // Output machine-readable result
-        printf("RESULT: {\"host\": \"%s\", \"port\": \"%s\", \"check_type\": \"tcp\", \"timeout\": %d, \"max_retries\": %d, \"success\": %s, \"duration_ms\": %.2f}\n",
-               hostname, port, timeout, max_retries, success ? "true" : "false", duration_ms);
+        log_message("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
+                    success ? "true" : "false", duration_ms);
         fflush(stdout);
     }
     else if (strcmp(check_type, "--http") == 0)
@@ -484,29 +521,40 @@ int main(int argc, char *argv[])
             max_retries = atoi(argv[6]);
         if (argc > 7)
             acceptable_codes = argv[7];
+        const char *host_header = "";
+        if (argc > 8)
+        {
+            host_header = argv[8];
+        }
 
         if (timeout <= 0)
             timeout = DEFAULT_TIMEOUT;
         if (max_retries < 0)
             max_retries = DEFAULT_MAX_RETRIES;
 
-        printf("Checking HTTP path %s on %s:%s (timeout: %ds, max retries: %d, acceptable codes: %s)...\n",
-               path, hostname, port, timeout, max_retries, acceptable_codes);
+        log_message("Checking HTTP path %s on %s:%s (timeout: %ds, max retries: %d, acceptable codes: %s)...\n",
+                    path, hostname, port, timeout, max_retries, acceptable_codes);
 
-        check_result_t result = http_check(hostname, port, path, timeout, max_retries, acceptable_codes);
+        check_result_t result = http_check(hostname, port, path, timeout, max_retries, acceptable_codes, host_header);
         success = result.success;
         duration_ms = result.duration_ms;
         strncpy(status_code, result.status_code, sizeof(status_code));
 
         // Output machine-readable result
-        printf("RESULT: {\"host\": \"%s\", \"port\": \"%s\", \"path\": \"%s\", \"check_type\": \"http\", \"timeout\": %d, \"max_retries\": %d, \"acceptable_codes\": \"%s\", \"status_code\": \"%s\", \"success\": %s, \"duration_ms\": %.2f}\n",
-               hostname, port, path, timeout, max_retries, acceptable_codes, status_code, success ? "true" : "false", duration_ms);
+        log_message("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
+                    success ? "true" : "false", duration_ms);
         fflush(stdout);
     }
     else
     {
         print_usage(argv[0]);
         return 1;
+    }
+
+    // Add this before returning
+    if (log_file)
+    {
+        fclose(log_file);
     }
 
     return success ? 0 : 1;

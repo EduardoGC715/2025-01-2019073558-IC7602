@@ -9,3 +9,5 @@ firebase_admin
 oracledb
 oci
 dnspython
+pytest
+pytest-mock

@@ -58,7 +58,7 @@ Este módulo escucha el tráfico DNS en la red y decide si redirigir ciertas sol
 
 ### Backend (`DNSAPI`)
 
-En el directorio del P1 se corren los siguientes comandos:
+En el directorio de DNS/API se corren los siguientes comandos:
 
 1. pip install -r requirements.txt
-2. python ./DNS_API/api.py
+2. python api.py
