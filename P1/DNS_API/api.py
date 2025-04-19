@@ -136,11 +136,15 @@ def request_dns(dns_query):
         print("Received response (raw bytes):", data)
     return data
 
+
 def closest_health_distance(ip_entry, ip_location):
     return min(
-        geodesic(ip_location, (hc["location"]["latitude"], hc["location"]["longitude"])).km
+        geodesic(
+            ip_location, (hc["location"]["latitude"], hc["location"]["longitude"])
+        ).km
         for hc in ip_entry["healthcheck_results"].values()
     )
+
 
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():
@@ -265,7 +269,9 @@ def exists():
                                     retries += 1
                                     ip_response = "Unhealthy"
                     case "round-trip":
-                        geo_request = requests.get(f"http://ip-api.com/json/{ip_address}")
+                        geo_request = requests.get(
+                            f"http://ip-api.com/json/{ip_address}"
+                        )
                         location = geo_request.json()
 
                         lat = location.get("lat")
@@ -274,7 +280,7 @@ def exists():
 
                         sorted_ips = sorted(
                             ip_data["ips"],
-                            key=lambda ip: closest_health_distance(ip, ip_location)
+                            key=lambda ip: closest_health_distance(ip, ip_location),
                         )
                         logger.debug(sorted_ips)
                         retries = 0
@@ -290,8 +296,6 @@ def exists():
                                 retries += 1
                             else:
                                 break
-                
-
 
                         # retries = 0
                         # minDistance = float("inf")
@@ -338,15 +342,9 @@ def exists():
             logger.debug(query.to_text())
             response = dns.query.udp(query, dns_server[0])
             logger.debug(response.to_text())
-            answer = response.answer
             bytes = response.to_wire()
             encodedBytes = base64.b64encode(bytes).decode("utf-8")
             logger.debug("Received response (raw bytes) base 64:", bytes)
-            # Print the response in a human-readable format
-            # Convert all RRsets to text and join them into a single string
-            answer_string = "\n".join(rrset.to_text() for rrset in answer)
-            # Print the response
-
             return encodedBytes, 264
 
 
