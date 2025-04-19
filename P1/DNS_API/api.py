@@ -24,7 +24,7 @@ import socket
 import dns.message
 import dns.query
 import dns.rdatatype
-
+from geopy.distance import geodesic
 
 domain_ref = db.reference("/domains")
 ip_to_country_ref = db.reference("/ip_to_country")
@@ -136,6 +136,11 @@ def request_dns(dns_query):
         print("Received response (raw bytes):", data)
     return data
 
+def closest_health_distance(ip_entry, ip_location):
+    return min(
+        geodesic(ip_location, (hc["location"]["latitude"], hc["location"]["longitude"])).km
+        for hc in ip_entry["healthcheck_results"].values()
+    )
 
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():
@@ -248,7 +253,7 @@ def exists():
                             if ip["health"]:
                                 ip_response = ip["address"]
                             else:
-                                ip_response = "Unhealthy"
+                                raise Exception("IP Unhealthy")
                         except Exception:
                             retries = 0
                             while retries < 5:
@@ -260,7 +265,63 @@ def exists():
                                     retries += 1
                                     ip_response = "Unhealthy"
                     case "round-trip":
-                        return "Using latency-based routing policy"
+                        geo_request = requests.get(f"http://ip-api.com/json/{ip_address}")
+                        location = geo_request.json()
+
+                        lat = location.get("lat")
+                        lon = location.get("lon")
+                        ip_location = (lat, lon)
+
+                        sorted_ips = sorted(
+                            ip_data["ips"],
+                            key=lambda ip: closest_health_distance(ip, ip_location)
+                        )
+                        logger.debug(sorted_ips)
+                        retries = 0
+                        while retries < 3:
+                            for ip in sorted_ips:
+                                logger.debug(ip)
+                                if ip["health"]:
+                                    ip_response = ip["address"]
+                                    break
+                                else:
+                                    ip_response = "Unhealthy"
+                            if ip_response == "Unhealthy":
+                                retries += 1
+                            else:
+                                break
+                
+
+
+                        # retries = 0
+                        # minDistance = float("inf")
+                        # closest_ip = None
+                        # for ip in ip_data["ips"]:
+                        #     for healthChecker in ip["healthcheck_results"]:
+                        #         distance = geodesic((lat, lon), (healthChecker["latitude"], healthChecker["longitude"])).km
+                        #         logger.debug(f"Distance: {distance} km")
+                        #         if distance < minDistance:
+                        #             minDistance = distance
+                        #             closest_ip = ip
+                        # try:
+                        #     if closest_ip["health"]:
+                        #         ip_response = closest_ip["address"]
+                        #     else:
+                        #         ip_response = "Unhealthy"
+                        # except Exception:
+                        #     retries = 0
+                        #     while retries < 5:
+                        #         if closest_ip["health"]:
+                        #             ip_response = closest_ip["address"]
+                        #             break
+                        #         else:
+                        #             ip_response = "Unhealthy"
+                        #         if ip["health"]:
+                        #             ip_response = ip["address"]
+                        #             break
+                        #         else:
+                        #             retries += 1
+                        #             ip_response = "Unhealthy"
                     case _:
                         return "El routing policy no existe", 500
 
