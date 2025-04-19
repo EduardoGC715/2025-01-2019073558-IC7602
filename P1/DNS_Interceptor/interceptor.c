@@ -64,6 +64,7 @@ typedef struct {
     uint16_t rdlength; // Length of the RDATA field
     char * rdata; // Resource data
 } dns_resource;
+
 typedef struct {
     dns_header * header;
     char * question;
@@ -142,7 +143,7 @@ char * parse_qname(const char *request, int *offset) {
 // Para base64 encoding y decoding, se usa la biblioteca libb64
 // Basado en:
 // https://github.com/libb64/libb64/blob/master/examples/c-example1.c
-char * encode(const char * data, int encoded_length) {
+char * encode_b64(const char * data, int encoded_length) {
     char * encoded_data = (char*) malloc(encoded_length);
     char * encoded_ptr = encoded_data;
 
@@ -161,7 +162,12 @@ char * encode(const char * data, int encoded_length) {
     return encoded_data;
 }
 
-char * decode(const char * data, int length) {
+typedef struct {
+    char * data;
+    int length;
+} base64_decoded_data;
+
+base64_decoded_data * decode_b64(const char * data, int length) {
     int decoded_length = (length / 4) * 3;
     char * decoded_data = (char*) malloc(decoded_length + 1);
     char * decoded_ptr = decoded_data;
@@ -170,12 +176,17 @@ char * decode(const char * data, int length) {
         perror("malloc failed");
         return NULL;
     }
-
+    printf("HERE1\n");
     base64_decodestate state;
+    printf("HERE1.25\n");
     base64_init_decodestate(&state);
+    printf("HERE1.5\n");
     int count = base64_decode_block(data, length, decoded_ptr, &state);
-
-    return decoded_data;
+    printf("HERE2\n");
+    base64_decoded_data * result = malloc(sizeof(base64_decoded_data));
+    result->data = decoded_data;
+    result->length = count;
+    return result;
 }
 
 
@@ -367,7 +378,7 @@ void * process_dns_request(void * arg) {
         // Query no estándar, codificar en base 64 y enviar al dns_api/dns_resolver
         printf("Failed to parse DNS request\n");
         int encoded_length = 4 * ((request_size + 2) / 3) + 1;
-        char *encoded_data = encode(request, encoded_length);
+        char *encoded_data = encode_b64(request, encoded_length);
         if (!encoded_data) {
             printf("Failed to encode DNS request\n");
             free(request);
@@ -377,9 +388,26 @@ void * process_dns_request(void * arg) {
         char * url = build_dns_url(dns_api, dns_api_port, "/api/dns_resolver", NULL, NULL);
         memory_struct * response = send_https_request(url, encoded_data, encoded_length);
         if (response) {
-            printf("Failed to send HTTPS request\n");
+            // Decode the base64 response
+            base64_decoded_data * decoded_data = decode_b64(response->memory, response->size);
+
+            if (!decoded_data) {
+                printf("Failed to decode base64 response\n");
+                free(response->memory);
+                free(response);
+                free(request);
+                free(args);
+                return NULL;
+            }
+            // Send the decoded data back to the client
+            sendto(dns_socket, decoded_data->data, decoded_data->length, 0, (struct sockaddr *) &client_addr, addr_len);
+            free(decoded_data->data);
+            free(decoded_data);
         }
         free(encoded_data);
+        free(response->memory);
+        free(response);
+        free(url);
         free(request);
         free(args);
         free(url);
@@ -389,7 +417,6 @@ void * process_dns_request(void * arg) {
     char * url = build_dns_url(dns_api, dns_api_port, "/api/exists", client_ip, req->qname);
     printf("Sending HTTP Request to %s\n", url);
     memory_struct * response = send_https_request(url, NULL, 0);
-    printf("Response: %s\n", response->memory);
     if (response->status_code == IP_STATUS_CODE) {
         char *endptr;
         unsigned int ip = strtoul(response->memory, &endptr, 10);
@@ -432,14 +459,36 @@ void * process_dns_request(void * arg) {
         
         // Send the response
         sendto(dns_socket, response_buffer, offset, 0, (struct sockaddr *) &client_addr, addr_len);
+    } else if (response->status_code == B64_STATUS_CODE) {
+        // Decode the base64 response
+        base64_decoded_data * decoded_data = decode_b64(response->memory, response->size);
+        printf("Decoded data length: %d\n", decoded_data->length);
+        if (!decoded_data) {
+            printf("Failed to decode base64 response\n");
+            free(response->memory);
+            free(response);
+            free(request);
+            free(args);
+            return NULL;
+        }
+        // Reemplazar identificador de transacción en el header por el original.
+        *(uint16_t *)&decoded_data->data[0] = htons(req->header->id);
+        // Send the decoded data back to the client
+        sendto(dns_socket, decoded_data->data, decoded_data->length, 0, (struct sockaddr *) &client_addr, addr_len);
+        free(decoded_data->data);
+        free(decoded_data);
+    } else {
+        printf("Invalid response from DNS API\n");
     }
 
 
-
+    free(response->memory);
+    free(response);
     free(url);
     free(request);
     free(args);
     free_dns_request(req);
+    return NULL;
 }
 
 // Referencias para sockets:

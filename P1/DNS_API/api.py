@@ -336,16 +336,16 @@ def exists():
             logger.debug(ip_response)
             return str(ip_to_int(ip_response)), 200
         else:
-            logger.debug(ip_response)
-            # Create a DNS query message for the domain 'example.com' and record type 'A'
-            query = dns.message.make_query(domain, dns.rdatatype.A)
-            logger.debug(query.to_text())
-            response = dns.query.udp(query, dns_server[0])
-            logger.debug(response.to_text())
-            bytes = response.to_wire()
-            encodedBytes = base64.b64encode(bytes).decode("utf-8")
-            logger.debug("Received response (raw bytes) base 64:", bytes)
-            return encodedBytes, 264
+            # logger.debug(f"Here1: {ip_response}")
+            # # Create a DNS query message for the domain 'example.com' and record type 'A'
+            # query = dns.message.make_query(domain, dns.rdatatype.A)
+            # logger.debug(query.to_text())
+            # response = dns.query.udp(query, dns_server[0])
+            # logger.debug(response.to_text())
+            # bytes = response.to_wire()
+            # encodedBytes = base64.b64encode(bytes).decode("utf-8")
+            # logger.debug("Received response (raw bytes) base 64: %s", bytes)
+            return "Ese dominio no existe", 404
 
 
 @app.route("/api/status", methods=["GET"])
