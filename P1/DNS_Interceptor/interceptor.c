@@ -11,6 +11,9 @@
 #include "b64/cencode.h"
 #include "b64/cdecode.h"
 
+#define IP_STATUS_CODE 200
+#define B64_STATUS_CODE 264
+
 // Referencias para threads:
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
 
@@ -52,6 +55,20 @@ typedef struct {
     uint16_t qtype; // Query type
     uint16_t qclass; // Query class
 } dns_request;
+
+typedef struct {
+    char * name;
+    uint16_t type; // Query type
+    uint16_t class; // Query class
+    uint32_t ttl; // Time to live
+    uint16_t rdlength; // Length of the RDATA field
+    char * rdata; // Resource data
+} dns_resource;
+typedef struct {
+    dns_header * header;
+    char * question;
+    dns_resource * answer; // Answer resource
+} dns_response;
 
 dns_header * parse_dns_header(const char * request){
     uint16_t id = ntohs(*(uint16_t *)(request)); // Transaction ID
@@ -194,6 +211,7 @@ char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoi
 typedef struct {
     char *memory;
     size_t size;
+    long status_code;
 } memory_struct;
 
 static size_t write_callback(void * contents, size_t size, size_t nmemb, void * userp) {
@@ -251,7 +269,8 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         
         res = curl_easy_perform(curl);
-        
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
+
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         if(res != CURLE_OK) {
@@ -371,8 +390,51 @@ void * process_dns_request(void * arg) {
     printf("Sending HTTP Request to %s\n", url);
     memory_struct * response = send_https_request(url, NULL, 0);
     printf("Response: %s\n", response->memory);
-    // Query estándar, enviar al dns_api/exists
-    sendto(dns_socket, request, request_size, 0, (struct sockaddr *) &client_addr, addr_len);
+    if (response->status_code == IP_STATUS_CODE) {
+        char *endptr;
+        unsigned int ip = strtoul(response->memory, &endptr, 10);
+    
+        // Build DNS header (response)
+        unsigned char response_buffer[512];
+        memset(response_buffer, 0, sizeof(response_buffer));
+        int offset = 0;
+        
+        // DNS Header
+        *(uint16_t *)&response_buffer[offset] = htons(req->header->id); offset += 2;
+        *(uint16_t *)&response_buffer[offset] = htons(0x8180);          offset += 2; // QR=1, RD=1, RA=1, RCODE=0
+        *(uint16_t *)&response_buffer[offset] = htons(1);               offset += 2; // QDCOUNT
+        *(uint16_t *)&response_buffer[offset] = htons(1);               offset += 2; // ANCOUNT
+        *(uint16_t *)&response_buffer[offset] = htons(0);               offset += 2; // NSCOUNT
+        *(uint16_t *)&response_buffer[offset] = htons(0);               offset += 2; // ARCOUNT
+        
+        int qname_len = 0;
+        while (request[offset + qname_len] != 0) {
+            qname_len += request[offset + qname_len] + 1;
+        }
+        qname_len++; // include null byte
+        int question_len = qname_len + 4; // QTYPE + QCLASS
+        memcpy(&response_buffer[offset], &request[12], question_len);
+        offset += question_len;
+        
+        // Answer section
+        response_buffer[offset++] = 0xC0; response_buffer[offset++] = 0x0C; // Pointer to QNAME
+        
+        *(uint16_t *)&response_buffer[offset] = htons(1); offset += 2;  // TYPE A
+        *(uint16_t *)&response_buffer[offset] = htons(1); offset += 2;  // CLASS IN
+        *(uint32_t *)&response_buffer[offset] = htonl(6000); offset += 4;  // TTL
+        *(uint16_t *)&response_buffer[offset] = htons(4); offset += 2; // RDLENGTH
+        
+        // IP address bytes
+        response_buffer[offset++] = (ip >> 24) & 0xFF;
+        response_buffer[offset++] = (ip >> 16) & 0xFF;
+        response_buffer[offset++] = (ip >> 8) & 0xFF;
+        response_buffer[offset++] = ip & 0xFF;
+        
+        // Send the response
+        sendto(dns_socket, response_buffer, offset, 0, (struct sockaddr *) &client_addr, addr_len);
+    }
+
+
 
     free(url);
     free(request);
