@@ -9,14 +9,10 @@ firebase_admin.initialize_app(
     cred, {"databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"}
 )
 
-import datetime as dt
-from flask import Flask, request, render_template_string, current_app, g, jsonify
-from werkzeug.local import LocalProxy
+from flask import Flask, request, render_template_string, jsonify
 from flask_cors import CORS
-import os
 import logging
 import time
-import json
 import random
 import requests
 import ipaddress
@@ -136,10 +132,10 @@ def request_dns(dns_query):
         print("Received response (raw bytes):", data)
     return data
 
-def closest_health_distance(ip_entry, ip_location):
+def least_latency(ips, health_checker):
     return min(
-        geodesic(ip_location, (hc["location"]["latitude"], hc["location"]["longitude"])).km
-        for hc in ip_entry["healthcheck_results"].values()
+        ip["healthcheck_results"][health_checker]["duration_ms"]
+        for ip in ips
     )
 
 @app.route("/api/set_dns_server", methods=["POST"])
@@ -191,6 +187,7 @@ def exists():
         flipped_path = "/".join(reversed(domain.strip().split(".")))
         ref = domain_ref.child(flipped_path)
         ip_data = ref.get()
+        logger.debug(ip_data)
         ip_response = ""
         if ip_data:
             try:
@@ -271,17 +268,35 @@ def exists():
                         lat = location.get("lat")
                         lon = location.get("lon")
                         ip_location = (lat, lon)
+                        closest_hc = None
+                        closest_distance = float("inf")
+                        try:
+                            for health_checker, results in ip_data["ips"][0]["healthcheck_results"].items():
+                                distance = geodesic(ip_location, (results["location"]["latitude"], results["location"]["longitude"])).km
+                                if distance < closest_distance:
+                                    closest_distance = distance
+                                    closest_hc = health_checker
+                        except Exception as e:
+                            logger.debug("No se encontró el healthcheck", e)
+                            return "No se encontró el healthcheck", 500
 
+                        # sorted_ips = sorted(
+                        #     ip_data["ips"],
+                        #     key=lambda ip: least_latency(ip, closest_hc)
+                        # )
+                        logger.debug(closest_hc)
                         sorted_ips = sorted(
-                            ip_data["ips"],
-                            key=lambda ip: closest_health_distance(ip, ip_location)
+                            (ip for ip in ip_data["ips"] if ip.get("healthcheck_results",{}).get(closest_hc, {}).get("success", False)),
+                            key=lambda ip: ip["healthcheck_results"][closest_hc]["duration_ms"]
                         )
+
                         logger.debug(sorted_ips)
                         retries = 0
                         while retries < 3:
                             for ip in sorted_ips:
-                                logger.debug(ip)
                                 if ip["health"]:
+                                    
+                                    logger.debug(ip)
                                     ip_response = ip["address"]
                                     break
                                 else:
