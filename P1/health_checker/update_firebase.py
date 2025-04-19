@@ -164,9 +164,42 @@ def fetch_domains_and_run_health_checks():
             for subdomain, subdomain_data in domain_data.items():
                 domain_path = f"{tld_name}/{domain_name}/{subdomain}"
                 print(f"    Processing subdomain: {subdomain}")
-                print (f"      Domain data: {subdomain_data}")
-                # Check if we have IPs
-                if isinstance(subdomain_data, dict) and "ips" in subdomain_data:
+                
+                if not isinstance(subdomain_data, dict):
+                    continue
+                
+                # CASE 1: Single IP directly in the subdomain data
+                if "address" in subdomain_data:
+                    ip = subdomain_data.get("address")
+                    print(f"      Checking single IP: {ip}")
+                    
+                    # Get health check settings from the IP data
+                    health_check_config = subdomain_data.get("healthcheck_settings", {})
+                    
+                    if not health_check_config:
+                        print(f"      No health check configuration for IP {ip}")
+                        continue
+                    
+                    # Get health check type and parameters
+                    check_type = health_check_config.get("type")
+                    if not check_type:
+                        print(f"      No health check type specified for IP {ip}")
+                        continue
+                    
+                    # Build health check arguments based on the check type
+                    check_args = build_health_check_args(check_type, ip, health_check_config, domain_path)
+                    
+                    if check_args:
+                        # Run the health check
+                        health_result = run_health_check(check_type, *check_args)
+                        print(f"        Health check result for {ip}: {health_result}")
+                        # Update the health status in Firebase (use "ip" as the key for single IP)
+                        update_ip_health_status(domain_path, "ip", ip, health_result)
+                    else:
+                        print(f"        Invalid health check configuration for {ip}")
+                
+                # CASE 2: Multiple IPs in the "ips" field
+                elif "ips" in subdomain_data:
                     ips_data = subdomain_data.get("ips", {})
                     
                     # Process each IP index
@@ -179,6 +212,8 @@ def fetch_domains_and_run_health_checks():
                     else:
                         print(f"      IPs data is neither a dictionary nor a list: {type(ips_data)}")
                         continue
+                    
+                    # Process each IP in the collection
                     for ip_idx, ip_data in items:
                         # Convert index to string if it's an integer (from list enumeration)
                         ip_idx = str(ip_idx)
@@ -188,7 +223,6 @@ def fetch_domains_and_run_health_checks():
                             print(f"      Invalid IP data at index {ip_idx}")
                             continue
                         
-                        # Continue with existing code...
                         ip = ip_data.get("address")
                         print(f"      Checking IP: {ip} (index: {ip_idx})")
                         
@@ -216,6 +250,8 @@ def fetch_domains_and_run_health_checks():
                             update_ip_health_status(domain_path, ip_idx, ip, health_result)
                         else:
                             print(f"        Invalid health check configuration for {ip}")
+                else:
+                    print(f"      No IPs found for subdomain: {subdomain}")
 
 def setup_logging():
     """Initialize log file with header information"""
@@ -444,7 +480,44 @@ def scan_and_update_crontab():
             for subdomain, subdomain_data in domain_data.items():
                 domain_path = f"{tld_name}/{domain_name}/{subdomain}"
                 
-                if isinstance(subdomain_data, dict) and "ips" in subdomain_data:
+                if not isinstance(subdomain_data, dict):
+                    continue
+                
+                # CASE 1: Single IP directly in the subdomain data
+                if "address" in subdomain_data:
+                    ip = subdomain_data.get("address")
+                    health_check_config = subdomain_data.get("healthcheck_settings", {})
+                    
+                    if not health_check_config:
+                        continue
+                    
+                    check_type = health_check_config.get("type")
+                    if not check_type:
+                        continue
+                    
+                    # Create a cron job for this single IP
+                    frequency = health_check_config.get("crontab", "*/2 * * * *")
+                    
+                    # Check if frequency already includes full cron format (5 parts)
+                    if " " not in frequency or frequency.count(" ") < 4:
+                        # If it's just the minute part or incomplete, add the rest
+                        frequency = f"{frequency} * * * *"
+                    
+                    command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx 'ip' --ip '{ip}' --check-type '{check_type}'"
+                    
+                    # Create cron job with the appropriate frequency
+                    job = cron.new(command=command, comment="health_check")
+                    try:
+                        job.setall(frequency)  # Set the full cron expression
+                    except Exception as e:
+                        print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
+                        print(f"Using default schedule '*/2 * * * *' instead")
+                        job.setall("*/2 * * * *")
+                    
+                    job_count += 1
+                
+                # CASE 2: Multiple IPs in the "ips" field
+                elif "ips" in subdomain_data:
                     ips_data = subdomain_data.get("ips", {})
                     
                     if isinstance(ips_data, dict):
