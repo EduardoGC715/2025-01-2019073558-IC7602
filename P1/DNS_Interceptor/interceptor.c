@@ -13,6 +13,8 @@
 
 #define DOMAIN_EXISTS 200
 #define DOMAIN_NOT_EXISTS 404
+#define DNS_PORT 53
+#define MAX_DNS_REQUEST_SIZE 512
 
 // Referencias para threads:
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
@@ -20,9 +22,9 @@
 typedef struct {
     int socket_fd; // Socket file descriptor
     struct sockaddr_in client_addr;
-    socklen_t addr_len; // Length of the address structure
-    char *request; // Pointer to the DNS request data
-    int request_size; // Size of the DNS request data
+    socklen_t addr_len; // Longitud de struct de direccion
+    char *request; // Puntero al request DNS
+    int request_size; // Tamaño de DNS request
     const char * dns_api; // DNS API URL
     const char * dns_api_port; // DNS API port
 } dns_thread_args;
@@ -31,6 +33,8 @@ typedef struct {
 // RFC-2535, sección 6.1
 // https://gist.github.com/fffaraz/9d9170b57791c28ccda9255b48315168
 // https://www.ibm.com/docs/en/zos/2.4.0?topic=lf-ntohs-translate-unsigned-short-integer-into-host-byte-order
+
+// Struct para el header DNS
 typedef struct {
     uint16_t id; // Transaction ID
     unsigned char qr :1; // Query/Response flag
@@ -49,6 +53,7 @@ typedef struct {
     uint16_t arcount; // Number of additional records
 } dns_header;
 
+// Struct para la request DNS
 typedef struct {
     dns_header * header;
     char * qname; // Query name
@@ -56,6 +61,8 @@ typedef struct {
     uint16_t qclass; // Query class
 } dns_request;
 
+// Struct para un resource record DNS
+// Basado en RFC-1035, sección 4.1.3
 typedef struct {
     char * name;
     uint16_t type; // Query type
@@ -65,12 +72,15 @@ typedef struct {
     char * rdata; // Resource data
 } dns_resource;
 
+// Struct para la respuesta DNS
 typedef struct {
     dns_header * header;
     char * question;
     dns_resource * answer; // Answer resource
 } dns_response;
 
+// Función para parsear el header DNS
+// Basado en RFC-1035, sección 4.1.1
 dns_header * parse_dns_header(const char * request){
     uint16_t id = ntohs(*(uint16_t *)(request)); // Transaction ID
     uint16_t flags = ntohs(*(uint16_t *)(request + 2)); // Flags
@@ -97,6 +107,7 @@ dns_header * parse_dns_header(const char * request){
     return header;
 }
 
+// Función para parsear el QNAME de la request DNS
 char * parse_qname(const char *request, int *offset) {
     int start = *offset;
     int label_len = request[*offset];
@@ -159,7 +170,7 @@ char * encode_b64(const char * data, int request_size, int *actual_length) {
     encoded_ptr += count;
     count = base64_encode_blockend(encoded_ptr, &state);
     encoded_ptr += count;
-    *encoded_ptr = '\0'; // Null terminate the string
+    *encoded_ptr = '\0';
     *actual_length = encoded_ptr - encoded_data;
     printf("Encoded length: %d\n", encoded_length);
     printf("Actual length: %d\n", *actual_length);
@@ -167,11 +178,13 @@ char * encode_b64(const char * data, int request_size, int *actual_length) {
     return encoded_data;
 }
 
+// Estructura para almacenar los datos decodificados de base64
 typedef struct {
     char * data;
     int length;
 } base64_decoded_data;
 
+// Decodificar base64 usando la biblioteca libb64
 base64_decoded_data * decode_b64(const char * data, int length) {
     int decoded_length = (length / 4) * 3;
     char * decoded_data = (char*) malloc(decoded_length + 1);
@@ -190,7 +203,7 @@ base64_decoded_data * decode_b64(const char * data, int length) {
     return result;
 }
 
-
+// Construir la URL para la API de DNS
 char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoint, const char *ip_address, const char *domain) {
     const char *prefix = "http://";
 
@@ -211,7 +224,8 @@ char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoi
     } else {
 
     }
-    // Step 3: Format the string
+    // Formato de la URL
+    // http://dns_api:dns_api_port/api/dns_resolver?domain=domain&ip=ip_address
     snprintf(url, total_length, "%s%s:%s%s?domain=%s&ip=%s",
              prefix, dns_api, dns_api_port, endpoint, domain, ip_address);
     return url;
@@ -220,12 +234,15 @@ char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoi
 // Almacenar la respuesta de la request HTTPS en memoria.
 // Basado en:
 // https://curl.se/libcurl/c/getinmemory.html
+
+// Struct para almacenar la respuesta de la request HTTPS
 typedef struct {
     char *memory;
     size_t size;
     long status_code;
 } memory_struct;
 
+// Callback para escribir la respuesta en memoria
 static size_t write_callback(void * contents, size_t size, size_t nmemb, void * userp) {
     size_t realsize = size * nmemb;
     memory_struct *mem = (memory_struct *)userp;
@@ -260,8 +277,8 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
             return NULL;
         }
 
-        resp_mem->memory = malloc(1); // Initial memory allocation
-        resp_mem->size = 0; // No data at this point
+        resp_mem->memory = malloc(1); // Allocar memoria para la respuesta
+        resp_mem->size = 0;
 
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: text/plain");
@@ -298,6 +315,7 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
     return NULL;
 }
 
+// Función para parsear la request DNS
 dns_request * parse_dns_request(const char *request, const int size) {
     dns_header* header = parse_dns_header(request);
     printf("Transaction ID: %u\n", header->id);
@@ -353,6 +371,8 @@ dns_request * parse_dns_request(const char *request, const int size) {
     return req;
 }
 
+// Función para enviar la request al DNS resolver
+// y enviar la respuesta al cliente
 void query_dns_resolver(
     const char * dns_api,
     const char * dns_api_port,
@@ -362,16 +382,20 @@ void query_dns_resolver(
     char * request,
     int request_size
 ) {
+    // Codificar la request DNS en base64
     int encoded_length = 0;
     char *encoded_data = encode_b64(request, request_size, &encoded_length);
     if (!encoded_data) {
         printf("Failed to encode DNS request\n");
         return;
     }
+    
+    // Enviar la request HTTPS al DNS resolver
     char * url = build_dns_url(dns_api, dns_api_port, "/api/dns_resolver", NULL, NULL);
     memory_struct * response = send_https_request(url, encoded_data, encoded_length);
+
     if (response->status_code == 200) {
-        // Decode the base64 response
+        // Decodificar la respuesta base64
         base64_decoded_data * decoded_data = decode_b64(response->memory, response->size);
 
         if (!decoded_data) {
@@ -380,7 +404,7 @@ void query_dns_resolver(
             free(response);
             return;
         }
-        // Send the decoded data back to the client
+        // Enviar la respuesta decodificada al cliente
         sendto(dns_socket, decoded_data->data, decoded_data->length, 0, (struct sockaddr *) &client_addr, addr_len);
         free(decoded_data->data);
         free(decoded_data);
@@ -431,7 +455,7 @@ void * process_dns_request(void * arg) {
         char *endptr;
         unsigned int ip = strtoul(response->memory, &endptr, 10);
     
-        // Build DNS header (response)
+        // Construir DNS header del response
         unsigned char response_buffer[512];
         memset(response_buffer, 0, sizeof(response_buffer));
         int offset = 0;
@@ -448,13 +472,13 @@ void * process_dns_request(void * arg) {
         while (request[offset + qname_len] != 0) {
             qname_len += request[offset + qname_len] + 1;
         }
-        qname_len++; // include null byte
+        qname_len++; // null byte
         int question_len = qname_len + 4; // QTYPE + QCLASS
         memcpy(&response_buffer[offset], &request[12], question_len);
         offset += question_len;
         
-        // Answer section
-        response_buffer[offset++] = 0xC0; response_buffer[offset++] = 0x0C; // Pointer to QNAME
+        // Sección de respuesta
+        response_buffer[offset++] = 0xC0; response_buffer[offset++] = 0x0C; // Pointer a QNAME
         
         *(uint16_t *)&response_buffer[offset] = htons(1); offset += 2;  // TYPE A
         *(uint16_t *)&response_buffer[offset] = htons(1); offset += 2;  // CLASS IN
@@ -467,7 +491,7 @@ void * process_dns_request(void * arg) {
         response_buffer[offset++] = (ip >> 8) & 0xFF;
         response_buffer[offset++] = ip & 0xFF;
         
-        // Send the response
+        // Enviar la respuesta
         sendto(dns_socket, response_buffer, offset, 0, (struct sockaddr *) &client_addr, addr_len);
     } else if (response->status_code == DOMAIN_NOT_EXISTS) {
         printf("Domain does not exist, querying dns_resolver\n");
@@ -507,7 +531,7 @@ int main() {
     
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(53); // DNS port
+    server_addr.sin_port = htons(DNS_PORT); // DNS port
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(dns_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
@@ -515,7 +539,7 @@ int main() {
         close(dns_socket);
         return 1;
     }
-    listen(dns_socket, 5);
+
     printf("DNS Interceptor is running...\n");
 
     // Inicialización CURL
@@ -524,7 +548,7 @@ int main() {
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
-        char buffer[512];
+        char buffer[MAX_DNS_REQUEST_SIZE];
         pthread_t thread_id;
 
         // Receive DNS request
