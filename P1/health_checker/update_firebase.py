@@ -118,7 +118,7 @@ def run_health_check(check_type, *args):
         }
 
 def initialize_firebase():
-    """Initialize Firebase connection"""
+    """Initialize Firebase connection and register health checker info"""
     # Find the credentials file
     credential_path = "dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json"
     
@@ -129,12 +129,135 @@ def initialize_firebase():
             "databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"
         })
         print("Firebase initialized successfully.")
+        
+        # Register health checker information in a central location
+        checker_id = os.environ.get("CHECKER_ID", "default-checker")
+        checker_info = {
+            "latitude": float(os.environ.get("CHECKER_LAT", "0.0")),
+            "longitude": float(os.environ.get("CHECKER_LON", "0.0")),
+            "country": os.environ.get("CHECKER_COUNTRY", "Unknown"),
+            "continent": os.environ.get("CHECKER_CONTINENT", "Unknown"),
+            "last_active": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Store checker info in a central location
+        checker_ref = db.reference(f"/healthcheckers/{checker_id}")
+        checker_ref.update(checker_info)
+        print(f"Registered health checker: {checker_id} from {checker_info['country']}")
+        
     except ValueError:
-        # App already initialized
-        print("Firebase already initialized.")
+        # App already initialized, just update the last_active timestamp
+        checker_id = os.environ.get("CHECKER_ID", "default-checker")
+        checker_ref = db.reference(f"/healthcheckers/{checker_id}")
+        checker_ref.update({
+            "last_active": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        print("Firebase already initialized, updated last_active timestamp.")
     except Exception as e:
         print(f"Error initializing Firebase: {e}")
         sys.exit(1)
+
+def update_ip_health_status(domain_path, ip_idx, ip, health_result):
+    """Update the health status of a specific IP in Firebase without storing history"""
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Get health checker information from environment
+    checker_id = os.environ.get("CHECKER_ID", "default-checker")
+    
+    # Get the checker info from Firebase
+    checker_ref = db.reference(f"/healthcheckers/{checker_id}")
+    checker_info = checker_ref.get() or {}
+    
+    # Simulate varying latency based on location
+    import random
+    
+    # Base multiplier depends on geographic distance (simulated)
+    # US-based checkers: 1.0x baseline 
+    # EU-based checkers: 1.2-1.5x baseline
+    # Asia-based checkers: 1.5-2.0x baseline
+    # Unknown location: Random between 1.0-1.8x
+    latency_multiplier = 1.0
+    continent = checker_info.get("continent", "").lower()
+    
+    if "europe" in continent:
+        latency_multiplier = random.uniform(1.2, 1.5)
+    elif "asia" in continent:
+        latency_multiplier = random.uniform(1.5, 2.0)
+    elif "north america" in continent:
+        latency_multiplier = random.uniform(0.9, 1.1)
+    else:
+        # For unknown or other continents
+        latency_multiplier = random.uniform(1.0, 1.8)
+    
+    # Add some randomness to make it realistic (+/- 20%)
+    latency_jitter = random.uniform(0.8, 1.2)
+    final_multiplier = latency_multiplier * latency_jitter
+    
+    # Apply the multiplier to duration
+    original_duration = 0
+    if "duration_ms" in health_result:
+        original_duration = health_result["duration_ms"]
+        simulated_duration = original_duration * final_multiplier
+        health_result["duration_ms"] = simulated_duration
+        print(f"Simulated latency for {checker_id}: {original_duration:.2f}ms → {simulated_duration:.2f}ms (multiplier: {final_multiplier:.2f}x)")
+    
+    # Update the health field for the IP using index
+    # Check if this is a single IP case or multiple IPs case
+    if ip_idx == "ip":
+        # Single IP case - update at the subdomain level
+        ip_ref = db.reference(f"/domains/{domain_path}/ip")
+    else:
+        # Multiple IPs case - update at the indexed IP level
+        ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
+    
+    # Get the current IP data to determine overall health
+    ip_data = ip_ref.get()
+    
+    # Get all current checker results or initialize empty dict
+    current_results = {}
+    if ip_data and "healthcheck_results" in ip_data:
+        current_results = ip_data["healthcheck_results"]
+    
+    # Update this checker's result - now just storing ID and basic results
+    current_results[checker_id] = {
+        "success": health_result["success"],
+        "duration_ms": health_result["duration_ms"],
+        "timestamp": health_result["timestamp"],
+    }
+    
+    # Calculate overall health (true if any checker reports success)
+    overall_health = any(result.get("success", False) for result in current_results.values())
+    
+    # Prepare health data
+    health_data = {
+        "health": overall_health,
+        "healthcheck_results": current_results
+    }
+    
+    # Log the update to a file
+    log_entry = {
+        "timestamp": timestamp,
+        "checker_id": checker_id,
+        "domain_path": domain_path,
+        "ip": ip,
+        "ip_idx": ip_idx,
+        "success": health_result["success"],
+        "duration_ms": health_result["duration_ms"],
+        "original_duration_ms": original_duration if "duration_ms" in health_result else 0,
+        "latency_multiplier": final_multiplier,
+        "health_data": health_data
+    }
+    
+    # Write to log file
+    try:
+        with open("/app/fb_update.log", "a") as log_file:
+            log_file.write(f"{timestamp} - {checker_id} - {domain_path}/{ip}: {json.dumps(log_entry)}\n")
+    except Exception as e:
+        print(f"Error writing to log file: {e}")
+    
+    # Update Firebase
+    ip_ref.update(health_data)
+    print(f"{timestamp} Updated health status for {ip} (idx: {ip_idx}) in {domain_path} from {checker_info.get('country', 'Unknown')}: {health_result['success']}")
 
 def fetch_domains_and_run_health_checks():
     """Fetch domains from Firebase and run health checks on all IPs"""
@@ -163,41 +286,45 @@ def fetch_domains_and_run_health_checks():
             # Process each subdomain (www, etc.)
             for subdomain, subdomain_data in domain_data.items():
                 domain_path = f"{tld_name}/{domain_name}/{subdomain}"
-                print(f"    Processing subdomain: {subdomain}")
                 
                 if not isinstance(subdomain_data, dict):
                     continue
                 
                 # CASE 1: Single IP directly in the subdomain data
-                if "address" in subdomain_data:
-                    ip = subdomain_data.get("address")
-                    print(f"      Checking single IP: {ip}")
+                if "ip" in subdomain_data:
+                    ip_data = subdomain_data.get("ip", {})
                     
-                    # Get health check settings from the IP data
-                    health_check_config = subdomain_data.get("healthcheck_settings", {})
-                    
-                    if not health_check_config:
-                        print(f"      No health check configuration for IP {ip}")
-                        continue
-                    
-                    # Get health check type and parameters
-                    check_type = health_check_config.get("type")
-                    if not check_type:
-                        print(f"      No health check type specified for IP {ip}")
-                        continue
-                    
-                    # Build health check arguments based on the check type
-                    check_args = build_health_check_args(check_type, ip, health_check_config, domain_path)
-                    
-                    if check_args:
-                        # Run the health check
-                        health_result = run_health_check(check_type, *check_args)
-                        print(f"        Health check result for {ip}: {health_result}")
-                        # Update the health status in Firebase (use "ip" as the key for single IP)
-                        update_ip_health_status(domain_path, "ip", ip, health_result)
+                    # Check if ip_data is a dictionary and has an address
+                    if "address" in ip_data:
+                        ip = ip_data.get("address")
+                        print(f"      Checking single IP: {ip}")
+                        
+                        # Get health check settings from the IP data
+                        health_check_config = ip_data.get("healthcheck_settings", {})
+                        
+                        if not health_check_config:
+                            print(f"      No health check configuration for IP {ip}")
+                            continue
+                        
+                        # Get health check type and parameters
+                        check_type = health_check_config.get("type")
+                        if not check_type:
+                            print(f"      No health check type specified for IP {ip}")
+                            continue
+                        
+                        # Build health check arguments based on the check type
+                        check_args = build_health_check_args(check_type, ip, health_check_config, domain_path)
+                        
+                        if check_args:
+                            # Run the health check
+                            health_result = run_health_check(check_type, *check_args)
+                            print(f"        Health check result for {ip}: {health_result}")
+                            # Update the health status in Firebase (use "ip" as the key for single IP)
+                            update_ip_health_status(domain_path, "ip", ip, health_result)
+                        else:
+                            print(f"        Invalid health check configuration for {ip}")
                     else:
-                        print(f"        Invalid health check configuration for {ip}")
-                
+                        print(f"      Invalid IP data structure for subdomain {subdomain}")
                 # CASE 2: Multiple IPs in the "ips" field
                 elif "ips" in subdomain_data:
                     ips_data = subdomain_data.get("ips", {})
@@ -272,104 +399,6 @@ def setup_logging():
             log_file.write(f"{'-'*80}\n\n")
     except Exception as e:
         print(f"Error initializing log file: {e}")
-
-def update_ip_health_status(domain_path, ip_idx, ip, health_result):
-    """Update the health status of a specific IP in Firebase without storing history"""
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Get health checker information from environment
-    checker_id = os.environ.get("CHECKER_ID", "default-checker")
-    checker_info = {
-        "latitude": float(os.environ.get("CHECKER_LAT", "0.0")),
-        "longitude": float(os.environ.get("CHECKER_LON", "0.0")),
-        "country": os.environ.get("CHECKER_COUNTRY", "Unknown"),
-        "continent": os.environ.get("CHECKER_CONTINENT", "Unknown")
-    }
-    
-    # Simulate varying latency based on location
-    import random
-    
-    # Base multiplier depends on geographic distance (simulated)
-    # US-based checkers: 1.0x baseline 
-    # EU-based checkers: 1.2-1.5x baseline
-    # Asia-based checkers: 1.5-2.0x baseline
-    # Unknown location: Random between 1.0-1.8x
-    latency_multiplier = 1.0
-    continent = checker_info["continent"].lower()
-    
-    if "europe" in continent:
-        latency_multiplier = random.uniform(1.2, 1.5)
-    elif "asia" in continent:
-        latency_multiplier = random.uniform(1.5, 2.0)
-    elif "north america" in continent:
-        latency_multiplier = random.uniform(0.9, 1.1)
-    else:
-        # For unknown or other continents
-        latency_multiplier = random.uniform(1.0, 1.8)
-    
-    # Add some randomness to make it realistic (+/- 20%)
-    latency_jitter = random.uniform(0.8, 1.2)
-    final_multiplier = latency_multiplier * latency_jitter
-    
-    # Apply the multiplier to duration
-    if "duration_ms" in health_result:
-        original_duration = health_result["duration_ms"]
-        simulated_duration = original_duration * final_multiplier
-        health_result["duration_ms"] = simulated_duration
-        print(f"Simulated latency for {checker_id}: {original_duration:.2f}ms → {simulated_duration:.2f}ms (multiplier: {final_multiplier:.2f}x)")
-    
-    # Update the health field for the IP using index
-    ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
-    
-    # Get the current IP data to determine overall health
-    ip_data = ip_ref.get()
-    
-    # Get all current checker results or initialize empty dict
-    current_results = {}
-    if ip_data and "healthcheck_results" in ip_data:
-        current_results = ip_data["healthcheck_results"]
-    
-    # Update this checker's result
-    current_results[checker_id] = {
-        "success": health_result["success"],
-        "duration_ms": health_result["duration_ms"],
-        "timestamp": health_result["timestamp"],
-        "location": checker_info
-    }
-    
-    # Calculate overall health (true if any checker reports success)
-    overall_health = any(result.get("success", False) for result in current_results.values())
-    
-    # Prepare health data
-    health_data = {
-        "health": overall_health,
-        "healthcheck_results": current_results
-    }
-    
-    # Log the update to a file
-    log_entry = {
-        "timestamp": timestamp,
-        "checker_id": checker_id,
-        "domain_path": domain_path,
-        "ip": ip,
-        "ip_idx": ip_idx,
-        "success": health_result["success"],
-        "duration_ms": health_result["duration_ms"],
-        "original_duration_ms": original_duration if "duration_ms" in health_result else 0,
-        "latency_multiplier": final_multiplier,
-        "health_data": health_data
-    }
-    
-    # Write to log file
-    try:
-        with open("/app/fb_update.log", "a") as log_file:
-            log_file.write(f"{timestamp} - {checker_id} - {domain_path}/{ip}: {json.dumps(log_entry)}\n")
-    except Exception as e:
-        print(f"Error writing to log file: {e}")
-    
-    # Update Firebase
-    ip_ref.update(health_data)
-    print(f"{timestamp} Updated health status for {ip} (idx: {ip_idx}) in {domain_path} from {checker_info['country']}: {health_result['success']}")
 
 def build_health_check_args(check_type, ip, config, domain_path=None):
     """Build arguments for health check based on check type and configuration
@@ -484,37 +513,46 @@ def scan_and_update_crontab():
                     continue
                 
                 # CASE 1: Single IP directly in the subdomain data
-                if "address" in subdomain_data:
-                    ip = subdomain_data.get("address")
-                    health_check_config = subdomain_data.get("healthcheck_settings", {})
+                if "ip" in subdomain_data:
+                    ip_data = subdomain_data.get("ip", {})
                     
-                    if not health_check_config:
-                        continue
-                    
-                    check_type = health_check_config.get("type")
-                    if not check_type:
-                        continue
-                    
-                    # Create a cron job for this single IP
-                    frequency = health_check_config.get("crontab", "*/2 * * * *")
-                    
-                    # Check if frequency already includes full cron format (5 parts)
-                    if " " not in frequency or frequency.count(" ") < 4:
-                        # If it's just the minute part or incomplete, add the rest
-                        frequency = f"{frequency} * * * *"
-                    
-                    command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx 'ip' --ip '{ip}' --check-type '{check_type}'"
-                    
-                    # Create cron job with the appropriate frequency
-                    job = cron.new(command=command, comment="health_check")
-                    try:
-                        job.setall(frequency)  # Set the full cron expression
-                    except Exception as e:
-                        print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
-                        print(f"Using default schedule '*/2 * * * *' instead")
-                        job.setall("*/2 * * * *")
-                    
-                    job_count += 1
+                    # Check if ip_data is a dictionary and has an address
+                    if "address" in ip_data:
+                        ip = ip_data.get("address")
+                        try:
+                            with open("/app/fb_update.log", "a") as log_file:
+                                log_file.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Single IP reached in crontab: {ip} in {domain_path}\n")
+                        except Exception as e:
+                            print(f"Error writing to log file: {e}")
+                        health_check_config = ip_data.get("healthcheck_settings", {})
+                        
+                        if not health_check_config:
+                            continue
+                        
+                        check_type = health_check_config.get("type")
+                        if not check_type:
+                            continue
+                        
+                        # Create a cron job for this single IP
+                        frequency = health_check_config.get("crontab", "*/2 * * * *")
+                        
+                        # Check if frequency already includes full cron format (5 parts)
+                        if " " not in frequency or frequency.count(" ") < 4:
+                            # If it's just the minute part or incomplete, add the rest
+                            frequency = f"{frequency} * * * *"
+                        
+                        command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx 'ip' --ip '{ip}' --check-type '{check_type}'"
+                        
+                        # Create cron job with the appropriate frequency
+                        job = cron.new(command=command, comment="health_check")
+                        try:
+                            job.setall(frequency)  # Set the full cron expression
+                        except Exception as e:
+                            print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
+                            print(f"Using default schedule '*/2 * * * *' instead")
+                            job.setall("*/2 * * * *")
+                        
+                        job_count += 1
                 
                 # CASE 2: Multiple IPs in the "ips" field
                 elif "ips" in subdomain_data:
@@ -574,7 +612,7 @@ def execute_single_check(domain_path, ip_idx, ip, check_type):
     
     Args:
         domain_path (str): Path to the domain in Firebase (e.g., 'com/google/www')
-        ip_idx (str): The index of the IP in Firebase
+        ip_idx (str): The index of the IP in Firebase or "ip" for single IP case
         ip (str): The IP address
         check_type (str): Type of health check ('tcp' or 'http')
     """
@@ -583,12 +621,19 @@ def execute_single_check(domain_path, ip_idx, ip, check_type):
     # Initialize Firebase if not already initialized
     initialize_firebase()
     
-    # Get the health check configuration for this IP
-    ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
+    # Handle both single IP and multiple IPs cases
+    if ip_idx == "ip":
+        # Single IP case
+        ip_ref = db.reference(f"/domains/{domain_path}/ip")
+    else:
+        # Multiple IPs case
+        ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
+    
+    print(f"Fetching data from: {ip_ref.path}")
     ip_data = ip_ref.get()
     
     if not ip_data:
-        print(f"No data found for IP {ip} at path {domain_path}/ips/{ip_idx}")
+        print(f"No data found for IP {ip} at path {ip_ref.path}")
         return
     
     health_check_config = ip_data.get("healthcheck_settings", {})
@@ -607,6 +652,7 @@ def execute_single_check(domain_path, ip_idx, ip, check_type):
         
         # Update the health status in Firebase
         update_ip_health_status(domain_path, ip_idx, ip, health_result)
+        print(f"Health status updated in Firebase path: {ip_ref.path}")
     else:
         print(f"Invalid health check configuration for {ip}")
 
