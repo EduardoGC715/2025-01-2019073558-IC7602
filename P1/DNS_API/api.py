@@ -132,11 +132,9 @@ def request_dns(dns_query):
         print("Received response (raw bytes):", data)
     return data
 
+
 def least_latency(ips, health_checker):
-    return min(
-        ip["healthcheck_results"][health_checker]["duration_ms"]
-        for ip in ips
-    )
+    return min(ip["healthcheck_results"][health_checker]["duration_ms"] for ip in ips)
 
 
 @app.route("/api/set_dns_server", methods=["POST"])
@@ -159,12 +157,6 @@ def dns_resolver():
         data = request.get_data(as_text=True)
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
-
-        # Your binary DNS query (must be correctly constructed)
-        dns_query = (
-            b"\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"
-            b"\x03www\x06google\x03com\x00\x00\x01\x00\x01"
-        )  # Example for www.google.com
 
         # Create a UDP socket
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -274,8 +266,16 @@ def exists():
                         closest_hc = None
                         closest_distance = float("inf")
                         try:
-                            for health_checker, results in ip_data["ips"][0]["healthcheck_results"].items():
-                                distance = geodesic(ip_location, (results["location"]["latitude"], results["location"]["longitude"])).km
+                            for health_checker, results in ip_data["ips"][0][
+                                "healthcheck_results"
+                            ].items():
+                                distance = geodesic(
+                                    ip_location,
+                                    (
+                                        results["location"]["latitude"],
+                                        results["location"]["longitude"],
+                                    ),
+                                ).km
                                 if distance < closest_distance:
                                     closest_distance = distance
                                     closest_hc = health_checker
@@ -289,8 +289,16 @@ def exists():
                         # )
                         logger.debug(closest_hc)
                         sorted_ips = sorted(
-                            (ip for ip in ip_data["ips"] if ip.get("healthcheck_results",{}).get(closest_hc, {}).get("success", False)),
-                            key=lambda ip: ip["healthcheck_results"][closest_hc]["duration_ms"]
+                            (
+                                ip
+                                for ip in ip_data["ips"]
+                                if ip.get("healthcheck_results", {})
+                                .get(closest_hc, {})
+                                .get("success", False)
+                            ),
+                            key=lambda ip: ip["healthcheck_results"][closest_hc][
+                                "duration_ms"
+                            ],
                         )
 
                         logger.debug(sorted_ips)
@@ -298,7 +306,7 @@ def exists():
                         while retries < 3:
                             for ip in sorted_ips:
                                 if ip["health"]:
-                                    
+
                                     logger.debug(ip)
                                     ip_response = ip["address"]
                                     break
