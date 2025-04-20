@@ -551,7 +551,7 @@ int main() {
         char buffer[MAX_DNS_REQUEST_SIZE];
         pthread_t thread_id;
 
-        // Receive DNS request
+        // Recibir bytes del cliente
         int bytes_received = recvfrom(dns_socket, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_addr, &addr_len);
         
         if (bytes_received < 0) {
@@ -563,11 +563,11 @@ int main() {
         args->request = malloc(bytes_received);
         memcpy(args->request, buffer, bytes_received);
         args->request_size = bytes_received;
-        args->socket_fd = dns_socket; // Pass the socket file descriptor to the thread
-        args->client_addr = client_addr; // Pass the client address to the thread
-        args->addr_len = addr_len; // Pass the address length to the thread
-        args->dns_api = dns_api; // Pass the DNS API URL to the thread
-        args->dns_api_port = dns_api_port; // Pass the DNS API port to the thread
+        args->socket_fd = dns_socket;
+        args->client_addr = client_addr;
+        args->addr_len = addr_len;
+        args->dns_api = dns_api;
+        args->dns_api_port = dns_api_port;
         pthread_create(&thread_id, NULL, process_dns_request, args);
         pthread_detach(thread_id);
     }
