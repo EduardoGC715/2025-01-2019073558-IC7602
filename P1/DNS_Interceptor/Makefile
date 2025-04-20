@@ -1,9 +1,10 @@
-
+CC = gcc
+CFLAGS = -g -Wall -I.
 
 all: interceptor
 
-interceptor: interceptor.c
-	gcc -g -o interceptor interceptor.c b64/cencode.o b64/cdecode.o -pthread -lcurl
+interceptor: interceptor.c b64/cencode.c b64/cdecode.c
+	$(CC) $(CFLAGS) -o interceptor interceptor.c b64/cencode.c b64/cdecode.c -pthread -lcurl
 
 run: interceptor
 	./interceptor

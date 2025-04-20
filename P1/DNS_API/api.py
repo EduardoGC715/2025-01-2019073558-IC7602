@@ -133,11 +133,10 @@ def request_dns(dns_query):
         print("Received response (raw bytes):", data)
     return data
 
+
 def least_latency(ips, health_checker):
-    return min(
-        ip["healthcheck_results"][health_checker]["duration_ms"]
-        for ip in ips
-    )
+    return min(ip["healthcheck_results"][health_checker]["duration_ms"] for ip in ips)
+
 
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():
@@ -159,12 +158,6 @@ def dns_resolver():
         data = request.get_data(as_text=True)
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
-
-        # Your binary DNS query (must be correctly constructed)
-        dns_query = (
-            b"\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"
-            b"\x03www\x06google\x03com\x00\x00\x01\x00\x01"
-        )  # Example for www.google.com
 
         # Create a UDP socket
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -263,7 +256,9 @@ def exists():
                                     retries += 1
                                     ip_response = "Unhealthy"
                     case "round-trip":
-                        geo_request = requests.get(f"http://ip-api.com/json/{ip_address}")
+                        geo_request = requests.get(
+                            f"http://ip-api.com/json/{ip_address}"
+                        )
                         location = geo_request.json()
 
                         lat = location.get("lat")
@@ -288,8 +283,16 @@ def exists():
                         # )
                         logger.debug(closest_hc)
                         sorted_ips = sorted(
-                            (ip for ip in ip_data["ips"] if ip.get("healthcheck_results",{}).get(closest_hc, {}).get("success", False)),
-                            key=lambda ip: ip["healthcheck_results"][closest_hc]["duration_ms"]
+                            (
+                                ip
+                                for ip in ip_data["ips"]
+                                if ip.get("healthcheck_results", {})
+                                .get(closest_hc, {})
+                                .get("success", False)
+                            ),
+                            key=lambda ip: ip["healthcheck_results"][closest_hc][
+                                "duration_ms"
+                            ],
                         )
 
                         logger.debug(sorted_ips)
@@ -297,7 +300,7 @@ def exists():
                         while retries < 3:
                             for ip in sorted_ips:
                                 if ip["health"]:
-                                    
+
                                     logger.debug(ip)
                                     ip_response = ip["address"]
                                     break
@@ -307,8 +310,6 @@ def exists():
                                 retries += 1
                             else:
                                 break
-                
-
 
                         # retries = 0
                         # minDistance = float("inf")
@@ -349,22 +350,16 @@ def exists():
             logger.debug(ip_response)
             return str(ip_to_int(ip_response)), 200
         else:
-            logger.debug(ip_response)
-            # Create a DNS query message for the domain 'example.com' and record type 'A'
-            query = dns.message.make_query(domain, dns.rdatatype.A)
-            logger.debug(query.to_text())
-            response = dns.query.udp(query, dns_server[0])
-            logger.debug(response.to_text())
-            answer = response.answer
-            bytes = response.to_wire()
-            encodedBytes = base64.b64encode(bytes).decode("utf-8")
-            logger.debug("Received response (raw bytes) base 64:", bytes)
-            # Print the response in a human-readable format
-            # Convert all RRsets to text and join them into a single string
-            answer_string = "\n".join(rrset.to_text() for rrset in answer)
-            # Print the response
-
-            return encodedBytes, 264
+            # logger.debug(f"Here1: {ip_response}")
+            # # Create a DNS query message for the domain 'example.com' and record type 'A'
+            # query = dns.message.make_query(domain, dns.rdatatype.A)
+            # logger.debug(query.to_text())
+            # response = dns.query.udp(query, dns_server[0])
+            # logger.debug(response.to_text())
+            # bytes = response.to_wire()
+            # encodedBytes = base64.b64encode(bytes).decode("utf-8")
+            # logger.debug("Received response (raw bytes) base 64: %s", bytes)
+            return "Ese dominio no existe", 404
 
 
 @app.route("/api/status", methods=["GET"])

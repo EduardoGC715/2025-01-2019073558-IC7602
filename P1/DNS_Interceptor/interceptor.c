@@ -11,6 +11,9 @@
 #include "b64/cencode.h"
 #include "b64/cdecode.h"
 
+#define DOMAIN_EXISTS 200
+#define DOMAIN_NOT_EXISTS 404
+
 // Referencias para threads:
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
 
@@ -52,6 +55,21 @@ typedef struct {
     uint16_t qtype; // Query type
     uint16_t qclass; // Query class
 } dns_request;
+
+typedef struct {
+    char * name;
+    uint16_t type; // Query type
+    uint16_t class; // Query class
+    uint32_t ttl; // Time to live
+    uint16_t rdlength; // Length of the RDATA field
+    char * rdata; // Resource data
+} dns_resource;
+
+typedef struct {
+    dns_header * header;
+    char * question;
+    dns_resource * answer; // Answer resource
+} dns_response;
 
 dns_header * parse_dns_header(const char * request){
     uint16_t id = ntohs(*(uint16_t *)(request)); // Transaction ID
@@ -125,7 +143,8 @@ char * parse_qname(const char *request, int *offset) {
 // Para base64 encoding y decoding, se usa la biblioteca libb64
 // Basado en:
 // https://github.com/libb64/libb64/blob/master/examples/c-example1.c
-char * encode(const char * data, int encoded_length) {
+char * encode_b64(const char * data, int request_size, int *actual_length) {
+    int encoded_length = 4 * ((request_size + 2) / 3) + 1;
     char * encoded_data = (char*) malloc(encoded_length);
     char * encoded_ptr = encoded_data;
 
@@ -136,15 +155,24 @@ char * encode(const char * data, int encoded_length) {
 
     base64_encodestate state;
     base64_init_encodestate(&state);
-    int count = base64_encode_block(data, encoded_length, encoded_ptr, &state);
+    int count = base64_encode_block(data, request_size, encoded_ptr, &state);
     encoded_ptr += count;
     count = base64_encode_blockend(encoded_ptr, &state);
     encoded_ptr += count;
     *encoded_ptr = '\0'; // Null terminate the string
+    *actual_length = encoded_ptr - encoded_data;
+    printf("Encoded length: %d\n", encoded_length);
+    printf("Actual length: %d\n", *actual_length);
+    printf("Encoded data: %s\n", encoded_data);
     return encoded_data;
 }
 
-char * decode(const char * data, int length) {
+typedef struct {
+    char * data;
+    int length;
+} base64_decoded_data;
+
+base64_decoded_data * decode_b64(const char * data, int length) {
     int decoded_length = (length / 4) * 3;
     char * decoded_data = (char*) malloc(decoded_length + 1);
     char * decoded_ptr = decoded_data;
@@ -153,12 +181,13 @@ char * decode(const char * data, int length) {
         perror("malloc failed");
         return NULL;
     }
-
     base64_decodestate state;
     base64_init_decodestate(&state);
     int count = base64_decode_block(data, length, decoded_ptr, &state);
-
-    return decoded_data;
+    base64_decoded_data * result = malloc(sizeof(base64_decoded_data));
+    result->data = decoded_data;
+    result->length = count;
+    return result;
 }
 
 
@@ -194,6 +223,7 @@ char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoi
 typedef struct {
     char *memory;
     size_t size;
+    long status_code;
 } memory_struct;
 
 static size_t write_callback(void * contents, size_t size, size_t nmemb, void * userp) {
@@ -251,7 +281,8 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         
         res = curl_easy_perform(curl);
-        
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
+
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         if(res != CURLE_OK) {
@@ -322,6 +353,46 @@ dns_request * parse_dns_request(const char *request, const int size) {
     return req;
 }
 
+void query_dns_resolver(
+    const char * dns_api,
+    const char * dns_api_port,
+    int dns_socket,
+    struct sockaddr_in client_addr,
+    socklen_t addr_len,
+    char * request,
+    int request_size
+) {
+    int encoded_length = 0;
+    char *encoded_data = encode_b64(request, request_size, &encoded_length);
+    if (!encoded_data) {
+        printf("Failed to encode DNS request\n");
+        return;
+    }
+    char * url = build_dns_url(dns_api, dns_api_port, "/api/dns_resolver", NULL, NULL);
+    memory_struct * response = send_https_request(url, encoded_data, encoded_length);
+    if (response->status_code == 200) {
+        // Decode the base64 response
+        base64_decoded_data * decoded_data = decode_b64(response->memory, response->size);
+
+        if (!decoded_data) {
+            printf("Failed to decode base64 response\n");
+            free(response->memory);
+            free(response);
+            return;
+        }
+        // Send the decoded data back to the client
+        sendto(dns_socket, decoded_data->data, decoded_data->length, 0, (struct sockaddr *) &client_addr, addr_len);
+        free(decoded_data->data);
+        free(decoded_data);
+    } else {
+        printf("Failed to get valid response from DNS API, status code: %ld\n", response->status_code);
+    }
+    free(encoded_data);
+    free(response->memory);
+    free(response);
+    free(url);
+}
+
 void free_dns_request(dns_request *req) {
     if (req) {
         free(req->header);
@@ -347,37 +418,75 @@ void * process_dns_request(void * arg) {
     if (!req) {
         // Query no estándar, codificar en base 64 y enviar al dns_api/dns_resolver
         printf("Failed to parse DNS request\n");
-        int encoded_length = 4 * ((request_size + 2) / 3) + 1;
-        char *encoded_data = encode(request, encoded_length);
-        if (!encoded_data) {
-            printf("Failed to encode DNS request\n");
-            free(request);
-            free(args);
-            return NULL;
-        }
-        char * url = build_dns_url(dns_api, dns_api_port, "/api/dns_resolver", NULL, NULL);
-        memory_struct * response = send_https_request(url, encoded_data, encoded_length);
-        if (response) {
-            printf("Failed to send HTTPS request\n");
-        }
-        free(encoded_data);
+        query_dns_resolver(dns_api, dns_api_port, dns_socket, client_addr, addr_len, request, request_size);
         free(request);
         free(args);
-        free(url);
         return NULL;
     }
     char * client_ip = inet_ntoa(client_addr.sin_addr); // Client IP address
     char * url = build_dns_url(dns_api, dns_api_port, "/api/exists", client_ip, req->qname);
     printf("Sending HTTP Request to %s\n", url);
     memory_struct * response = send_https_request(url, NULL, 0);
-    printf("Response: %s\n", response->memory);
-    // Query estándar, enviar al dns_api/exists
-    sendto(dns_socket, request, request_size, 0, (struct sockaddr *) &client_addr, addr_len);
+    if (response->status_code == DOMAIN_EXISTS) {
+        char *endptr;
+        unsigned int ip = strtoul(response->memory, &endptr, 10);
+    
+        // Build DNS header (response)
+        unsigned char response_buffer[512];
+        memset(response_buffer, 0, sizeof(response_buffer));
+        int offset = 0;
+        
+        // DNS Header
+        *(uint16_t *)&response_buffer[offset] = htons(req->header->id); offset += 2;
+        *(uint16_t *)&response_buffer[offset] = htons(0x8180);          offset += 2; // QR=1, RD=1, RA=1, RCODE=0
+        *(uint16_t *)&response_buffer[offset] = htons(1);               offset += 2; // QDCOUNT
+        *(uint16_t *)&response_buffer[offset] = htons(1);               offset += 2; // ANCOUNT
+        *(uint16_t *)&response_buffer[offset] = htons(0);               offset += 2; // NSCOUNT
+        *(uint16_t *)&response_buffer[offset] = htons(0);               offset += 2; // ARCOUNT
+        
+        int qname_len = 0;
+        while (request[offset + qname_len] != 0) {
+            qname_len += request[offset + qname_len] + 1;
+        }
+        qname_len++; // include null byte
+        int question_len = qname_len + 4; // QTYPE + QCLASS
+        memcpy(&response_buffer[offset], &request[12], question_len);
+        offset += question_len;
+        
+        // Answer section
+        response_buffer[offset++] = 0xC0; response_buffer[offset++] = 0x0C; // Pointer to QNAME
+        
+        *(uint16_t *)&response_buffer[offset] = htons(1); offset += 2;  // TYPE A
+        *(uint16_t *)&response_buffer[offset] = htons(1); offset += 2;  // CLASS IN
+        *(uint32_t *)&response_buffer[offset] = htonl(6000); offset += 4;  // TTL
+        *(uint16_t *)&response_buffer[offset] = htons(4); offset += 2; // RDLENGTH
+        
+        // IP address bytes
+        response_buffer[offset++] = (ip >> 24) & 0xFF;
+        response_buffer[offset++] = (ip >> 16) & 0xFF;
+        response_buffer[offset++] = (ip >> 8) & 0xFF;
+        response_buffer[offset++] = ip & 0xFF;
+        
+        // Send the response
+        sendto(dns_socket, response_buffer, offset, 0, (struct sockaddr *) &client_addr, addr_len);
+    } else if (response->status_code == DOMAIN_NOT_EXISTS) {
+        printf("Domain does not exist, querying dns_resolver\n");
+        query_dns_resolver(dns_api, dns_api_port, dns_socket, client_addr, addr_len, request, request_size);
+        free(request);
+        free(args);
+        return NULL;
+    } else {
+        printf("Invalid response from DNS API\n");
+    }
 
+
+    free(response->memory);
+    free(response);
     free(url);
     free(request);
     free(args);
     free_dns_request(req);
+    return NULL;
 }
 
 // Referencias para sockets:

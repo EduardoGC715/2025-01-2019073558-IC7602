@@ -1,13 +1,7 @@
 flask
-flask_pymongo
 flask_cors
-prometheus_client
-oracledb
-borneo
-pymongo
 firebase_admin
-oracledb
-oci
 dnspython
 pytest
 pytest-mock
+geopy
