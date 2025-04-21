@@ -296,6 +296,9 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)resp_mem);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
         
         res = curl_easy_perform(curl);
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
