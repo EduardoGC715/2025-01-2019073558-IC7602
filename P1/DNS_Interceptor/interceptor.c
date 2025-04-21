@@ -205,7 +205,7 @@ base64_decoded_data * decode_b64(const char * data, int length) {
 
 // Construir la URL para la API de DNS
 char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoint, const char *ip_address, const char *domain) {
-    const char *prefix = "http://";
+    const char *prefix = "https://";
 
     size_t total_length = strlen(prefix) + strlen(dns_api) + 1 + strlen(dns_api_port) +
                           strlen(endpoint) + 1;
