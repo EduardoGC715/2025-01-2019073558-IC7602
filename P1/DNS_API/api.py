@@ -17,9 +17,6 @@ import random
 import requests
 import ipaddress
 import socket
-import dns.message
-import dns.query
-import dns.rdatatype
 from geopy.distance import geodesic
 
 domain_ref = db.reference("/domains")
@@ -33,9 +30,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-
 # enable cors
-CORS(app)
+CORS(app, supports_credentials=True)
 
 
 # Retry with backoff implementado con base en https://keestalkstech.com/2021/03/python-utility-function-retry-with-exponential-backoff/#without-typings.
@@ -67,76 +63,15 @@ def home():
         <link rel="stylesheet" href="css url"/>
     </head>
     <body>
-        <p>Aplicación de Mongo!</p>
+        <p>Aplicación de DNS_API!</p>
     </body>
 </html>
 """
     )
 
 
-# Código basado de
-# https://stackoverflow.com/questions/58676559/how-to-authenticate-to-firebase-using-python/71398321#71398321
-# https://datagy.io/python-requests-response-object/
-
-# @app.route("/login", methods=["POST"])
-# def login():
-#     if request.method == "POST":
-
-#         data = request.get_json()
-#         try:
-
-#             email =data["email"]
-#             password = data["password"]
-
-#             logger.debug(email)
-#             logger.debug(password)
-#             userInfo = json.dumps({"email": email, "password": password, "return_secure_token":True})
-#             r = requests.post("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyAFj0oFcEqOdCL1NFlbGVhvirpxrKqx_LY", userInfo)
-#             logger.debug(r)
-#             if r:
-#                 logger.debug("El usuario sí existe")
-#             else:
-#                 logger.debug("El usuario no existe")
-#             logger.debug(r.json())
-#             return r.json()
-#         except Exception as e:
-#             logger.debug("Ese correo electrónico no está registado", e)
-#         return json.dumps({"error": {"code": 500, "message": "ERROR"}})
-
-# @app.route("/register", methods=["POST"])
-# def register():
-#     if request.method == "POST":
-#         data = request.get_json()
-#         pEmail = data["email"]
-#         pPassword = data["password"]
-#         pPhone = data["phone"]
-#         pDisplayName = data["name"] + " " + data["last_name1"] + " " + data["last_name2"]
-#         try:
-#             user = auth.create_user(email = pEmail, password = pPassword, phone_number = pPhone, display_name = pDisplayName)
-#             record = {'logId': int(time.time()) + random.randint(0, 30000), 'title': "register", 'bagInfo': json.dumps({"email": pEmail, "password": pPassword, "phone": pPhone, "name": pDisplayName})}
-#             return {"success": {"code": 200, "message": "The user has been registered correctly"}}
-#         except Exception as e:
-#             logger.debug(str(e))
-#             logger.debug("El usuario ya está registrado.", e)
-#             return json.dumps({"error": {"code": 500, "message": "The user has already been registered"}})
-
-
-# Example: 8.8.8.8 is Google Public DNS
+# 8.8.8.8 es el DNS público de Google
 dns_server = ("8.8.8.8", 53)
-
-
-def request_dns(dns_query):
-    # Create a UDP socket
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.sendto(dns_query, dns_server)
-        data, _ = s.recvfrom(512)  # 512 bytes max in standard DNS over UDP
-        print("Received response (raw bytes):", data)
-    return data
-
-
-def least_latency(ips, health_checker):
-    return min(ip["healthcheck_results"][health_checker]["duration_ms"] for ip in ips)
-
 
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():
@@ -277,10 +212,6 @@ def exists():
                             logger.debug("No se encontró el healthcheck", e)
                             return "No se encontró el healthcheck", 500
 
-                        # sorted_ips = sorted(
-                        #     ip_data["ips"],
-                        #     key=lambda ip: least_latency(ip, closest_hc)
-                        # )
                         logger.debug(closest_hc)
                         sorted_ips = sorted(
                             (
@@ -310,36 +241,6 @@ def exists():
                                 retries += 1
                             else:
                                 break
-
-                        # retries = 0
-                        # minDistance = float("inf")
-                        # closest_ip = None
-                        # for ip in ip_data["ips"]:
-                        #     for healthChecker in ip["healthcheck_results"]:
-                        #         distance = geodesic((lat, lon), (healthChecker["latitude"], healthChecker["longitude"])).km
-                        #         logger.debug(f"Distance: {distance} km")
-                        #         if distance < minDistance:
-                        #             minDistance = distance
-                        #             closest_ip = ip
-                        # try:
-                        #     if closest_ip["health"]:
-                        #         ip_response = closest_ip["address"]
-                        #     else:
-                        #         ip_response = "Unhealthy"
-                        # except Exception:
-                        #     retries = 0
-                        #     while retries < 5:
-                        #         if closest_ip["health"]:
-                        #             ip_response = closest_ip["address"]
-                        #             break
-                        #         else:
-                        #             ip_response = "Unhealthy"
-                        #         if ip["health"]:
-                        #             ip_response = ip["address"]
-                        #             break
-                        #         else:
-                        #             retries += 1
-                        #             ip_response = "Unhealthy"
                     case _:
                         return "El routing policy no existe", 500
 
@@ -511,7 +412,7 @@ def create_Domain(ref, domain, data):
 
     ip_data = {"routing_policy": domain_type}
 
-    # Se van creando los dominos segun sus tipos
+    # Se van creando los dominios según sus tipos
     if domain_type == "single":
         ip_data["ip"] = {"address": direction, "health": status_flag}
 
@@ -628,6 +529,5 @@ def manage_domain():
 
 
 if __name__ == "__main__":
-    # Start up the server to expose the metrics.
-    app.run(host="0.0.0.0")
-    # https://synchronizing.medium.com/running-a-simple-flask-application-inside-a-docker-container-b83bf3e07dd5
+    # Uso de HTTPS sacado de https://blog.miguelgrinberg.com/post/running-your-flask-application-over-https
+    app.run(host="0.0.0.0", ssl_context=("127.0.0.1.pem", "127.0.0.1-key.pem"))
