@@ -1,113 +1,370 @@
 {
-        "com": {
-            "google": {
-                "www": {
-                    "routing_policy": "single",
-                    "ip": {
-                        "address": "142.250.217.164",
-                        "health": true
-                    }
-                } 
-            },
-            "amazon": {
-                "www": {
-                    "routing_policy": "multi",
-                    "ips": [
-                        {
-                            "address": "23.35.214.20",
-                            "health": true
-                        },
-                        {
-                            "address": "23.35.214.30",
-                            "health": true
-                        },
-                        {
-                            "address": "23.35.214.40",
-                            "health": true
-                        },
-                        {
-                            "address": "23.35.214.50",
-                            "health": true
-                        },
-                        {
-                            "address": "23.35.214.60",
-                            "health": true
-                        }
-                    ],
-                    "counter": 0
-                } 
-            },
-            "guitarcenter": {
-                "www": {
-                    "routing_policy": "weight",
-                    "ips": [
-                        {
-                            "address": "184.31.180.112",
-                            "health": true,
-                            "weight": 0.8
-                        },
-                        {
-                            "address": "184.31.180.200",
-                            "health": true,
-                            "weight": 0.2
-                        }
-                    ]
-                } 
-            },
-            "microsoft": {
-                "www": {
-                    "routing_policy": "geo",
-                    "ips": {
-                        "CR": {
-                            "address": "104.91.161.240",
-                            "health": true
-                        },
-                        "US": {
-                            "address": "104.91.161.20",
-                            "health": true
-                        },
-                        "MX": {
-                            "address": "104.91.161.80",
-                            "health": true
-                        },
-                        "GB": {
-                            "address": "104.91.161.10",
-                            "health": true
-                        },
-                        "ES": {
-                            "address": "104.91.161.150",
-                            "health": true
-                        }
-                    }
-                } 
-            },
-            "apple": {
-                "www": {
-                    "routing_policy": "round-trip",
-                    "ip": {
-                        "address": "184.26.53.53",
-                        "health": true
-                    }
-                } 
+    "com": {
+      "google": {
+        "www": {
+          "routing_policy": "single",
+          "ip": {
+            "address": "142.250.217.164",
+            "health": true,
+            "healthcheck_settings": {
+              "acceptable_codes": "200, 304",
+              "crontab": "*/1 * * * *",
+              "max_retries": 3,
+              "path": "/",
+              "port": 80,
+              "timeout": 5000,
+              "type": "tcp"
             }
-        },
-        "net": {
-            "minecraft": {
-                "www": {
-                    "routing_policy": "multi",
-                    "ips": [
-                        {
-                            "address": "186.176.5.18",
-                            "health": true
-                        },
-                        {
-                            "address": "186.176.5.42",
-                            "health": true
-                        }
-                    ],
-                    "counter": 0
-                } 
-            }
+          }
         }
-    
-}
+      },
+      "amazon": {
+        "www": {
+          "routing_policy": "multi",
+          "ips": [
+            {
+              "address": "23.35.214.20",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            },
+            {
+              "address": "23.35.214.30",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            {
+              "address": "23.35.214.40",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            },
+            {
+              "address": "23.35.214.50",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            {
+              "address": "23.35.214.60",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            }
+          ],
+          "counter": 0
+        }
+      },
+      "guitarcenter": {
+        "www": {
+          "routing_policy": "weight",
+          "ips": [
+            {
+              "address": "184.31.180.112",
+              "health": true,
+              "weight": 0.8,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            {
+              "address": "184.31.180.200",
+              "health": true,
+              "weight": 0.2,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            }
+          ]
+        }
+      },
+      "microsoft": {
+        "www": {
+          "routing_policy": "geo",
+          "ips": {
+            "CR": {
+              "address": "104.91.161.240",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            "US": {
+              "address": "104.91.161.20",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            },
+            "MX": {
+              "address": "104.91.161.80",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            "GB": {
+              "address": "104.91.161.10",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            },
+            "ES": {
+              "address": "104.91.161.150",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            }
+          }
+        }
+      },
+      "apple": {
+        "www": {
+          "routing_policy": "round-trip",
+          "ips": [
+            {
+              "address": "212.27.48.10",
+              "health": true,
+              "healthcheck_results": {
+                "europe": {
+                  "duration_ms": 50,
+                  "location": {
+                    "continent": "Europe",
+                    "country": "France",
+                    "latitude": 48.8566,
+                    "longitude": 2.3522
+                  },
+                  "success": true,
+                  "timestamp": "2025-04-19 20:51:13"
+                },
+                "us-east": {
+                  "duration_ms": 10,
+                  "location": {
+                    "continent": "North America",
+                    "country": "USA",
+                    "latitude": 40.7128,
+                    "longitude": -74.006
+                  },
+                  "success": true,
+                  "timestamp": "2025-04-19 20:51:14"
+                }
+              },
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            },
+            {
+              "address": "1.1.1.1",
+              "health": true,
+              "healthcheck_results": {
+                "europe": {
+                  "duration_ms": 45.4460080514952,
+                  "location": {
+                    "continent": "Europe",
+                    "country": "France",
+                    "latitude": 48.8566,
+                    "longitude": 2.3522
+                  },
+                  "success": true,
+                  "timestamp": "2025-04-19 20:51:09"
+                },
+                "us-east": {
+                  "duration_ms": 23.917910703822784,
+                  "location": {
+                    "continent": "North America",
+                    "country": "USA",
+                    "latitude": 40.7128,
+                    "longitude": -74.006
+                  },
+                  "success": true,
+                  "timestamp": "2025-04-19 20:52:05"
+                }
+              },
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            {
+              "address": "202.14.81.135",
+              "health": true,
+              "healthcheck_results": {
+                "europe": {
+                  "duration_ms": 40,
+                  "location": {
+                    "continent": "Europe",
+                    "country": "France",
+                    "latitude": 48.8566,
+                    "longitude": 2.3522
+                  },
+                  "success": true,
+                  "timestamp": "2025-04-19 20:51:38"
+                },
+                "us-east": {
+                  "duration_ms": 22,
+                  "location": {
+                    "continent": "North America",
+                    "country": "USA",
+                    "latitude": 40.7128,
+                    "longitude": -74.006
+                  },
+                  "success": true,
+                  "timestamp": "2025-04-19 20:51:37"
+                }
+              },
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            },
+            {
+              "address": "170.82.60.2",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            }
+          ]  
+        }
+      }
+    },
+    "net": {
+      "minecraft": {
+        "www": {
+          "routing_policy": "multi",
+          "ips": [
+            {
+              "address": "186.176.5.18",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "tcp"
+              }
+            },
+            {
+              "address": "186.176.5.42",
+              "health": true,
+              "healthcheck_settings": {
+                "acceptable_codes": "200, 304",
+                "crontab": "*/1 * * * *",
+                "max_retries": 3,
+                "path": "/",
+                "port": 80,
+                "timeout": 5000,
+                "type": "http"
+              }
+            }
+          ],
+          "counter": 0
+        }
+      }
+    }
+  }
+  

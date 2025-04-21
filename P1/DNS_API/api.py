@@ -9,14 +9,10 @@ firebase_admin.initialize_app(
     cred, {"databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"}
 )
 
-import datetime as dt
-from flask import Flask, request, render_template_string, current_app, g, jsonify
-from werkzeug.local import LocalProxy
+from flask import Flask, request, render_template_string, jsonify
 from flask_cors import CORS
-import os
 import logging
 import time
-import json
 import random
 import requests
 import ipaddress
@@ -24,7 +20,7 @@ import socket
 import dns.message
 import dns.query
 import dns.rdatatype
-
+from geopy.distance import geodesic
 
 domain_ref = db.reference("/domains")
 ip_to_country_ref = db.reference("/ip_to_country")
@@ -137,6 +133,10 @@ def request_dns(dns_query):
     return data
 
 
+def least_latency(ips, health_checker):
+    return min(ip["healthcheck_results"][health_checker]["duration_ms"] for ip in ips)
+
+
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():
     if request.method == "POST":
@@ -158,18 +158,12 @@ def dns_resolver():
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
 
-        # Your binary DNS query (must be correctly constructed)
-        dns_query = (
-            b"\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"
-            b"\x03www\x06google\x03com\x00\x00\x01\x00\x01"
-        )  # Example for www.google.com
-
         # Create a UDP socket
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
             data, _ = s.recvfrom(512)  # 512 bytes max in standard DNS over UDP
             print("Received response (raw bytes):", data)
-        codified_data = data  # = base64.b64encode(data).decode("utf-8")
+        codified_data = base64.b64encode(data).decode("utf-8")
         return codified_data
 
 
@@ -186,12 +180,13 @@ def exists():
         flipped_path = "/".join(reversed(domain.strip().split(".")))
         ref = domain_ref.child(flipped_path)
         ip_data = ref.get()
+        logger.debug(ip_data)
         ip_response = ""
         if ip_data:
             try:
                 match ip_data["routing_policy"]:
                     case "single":
-                        if ip_data["ip"]["health"] == "healthy":
+                        if ip_data["ip"]["health"]:
                             ip_response = ip_data["ip"]["address"]
 
                         else:
@@ -208,7 +203,7 @@ def exists():
                             else:
                                 ip_data["counter"] += 1
                                 retries += 1
-                        ip_response = "Unhealthy"
+                                ip_response = "Unhealthy"
                     case "weight":
                         weights = [ip["weight"] for ip in ip_data["ips"]]
                         indices = list(range(len(weights)))
@@ -221,7 +216,7 @@ def exists():
                                 break
                             else:
                                 retries += 1
-                        ip_response = "Unhealthy"
+                                ip_response = "Unhealthy"
                     case "geo":
                         if not ip_address:
                             return jsonify({"error": "No se dio un IP address"}), 400
@@ -248,7 +243,7 @@ def exists():
                             if ip["health"]:
                                 ip_response = ip["address"]
                             else:
-                                ip_response = "Unhealthy"
+                                raise Exception("IP Unhealthy")
                         except Exception:
                             retries = 0
                             while retries < 5:
@@ -258,9 +253,99 @@ def exists():
                                     break
                                 else:
                                     retries += 1
-                            ip_response = "Unhealthy"
+                                    ip_response = "Unhealthy"
                     case "round-trip":
-                        return "Using latency-based routing policy"
+                        geo_request = requests.get(
+                            f"http://ip-api.com/json/{ip_address}"
+                        )
+                        location = geo_request.json()
+
+                        lat = location.get("lat")
+                        lon = location.get("lon")
+                        ip_location = (lat, lon)
+                        closest_hc = None
+                        closest_distance = float("inf")
+                        try:
+                            for health_checker, results in ip_data["ips"][0][
+                                "healthcheck_results"
+                            ].items():
+                                distance = geodesic(
+                                    ip_location,
+                                    (
+                                        results["location"]["latitude"],
+                                        results["location"]["longitude"],
+                                    ),
+                                ).km
+                                if distance < closest_distance:
+                                    closest_distance = distance
+                                    closest_hc = health_checker
+                        except Exception as e:
+                            logger.debug("No se encontró el healthcheck", e)
+                            return "No se encontró el healthcheck", 500
+
+                        # sorted_ips = sorted(
+                        #     ip_data["ips"],
+                        #     key=lambda ip: least_latency(ip, closest_hc)
+                        # )
+                        logger.debug(closest_hc)
+                        sorted_ips = sorted(
+                            (
+                                ip
+                                for ip in ip_data["ips"]
+                                if ip.get("healthcheck_results", {})
+                                .get(closest_hc, {})
+                                .get("success", False)
+                            ),
+                            key=lambda ip: ip["healthcheck_results"][closest_hc][
+                                "duration_ms"
+                            ],
+                        )
+
+                        logger.debug(sorted_ips)
+                        retries = 0
+                        while retries < 3:
+                            for ip in sorted_ips:
+                                if ip["health"]:
+
+                                    logger.debug(ip)
+                                    ip_response = ip["address"]
+                                    break
+                                else:
+                                    ip_response = "Unhealthy"
+                            if ip_response == "Unhealthy":
+                                retries += 1
+                            else:
+                                break
+
+                        # retries = 0
+                        # minDistance = float("inf")
+                        # closest_ip = None
+                        # for ip in ip_data["ips"]:
+                        #     for healthChecker in ip["healthcheck_results"]:
+                        #         distance = geodesic((lat, lon), (healthChecker["latitude"], healthChecker["longitude"])).km
+                        #         logger.debug(f"Distance: {distance} km")
+                        #         if distance < minDistance:
+                        #             minDistance = distance
+                        #             closest_ip = ip
+                        # try:
+                        #     if closest_ip["health"]:
+                        #         ip_response = closest_ip["address"]
+                        #     else:
+                        #         ip_response = "Unhealthy"
+                        # except Exception:
+                        #     retries = 0
+                        #     while retries < 5:
+                        #         if closest_ip["health"]:
+                        #             ip_response = closest_ip["address"]
+                        #             break
+                        #         else:
+                        #             ip_response = "Unhealthy"
+                        #         if ip["health"]:
+                        #             ip_response = ip["address"]
+                        #             break
+                        #         else:
+                        #             retries += 1
+                        #             ip_response = "Unhealthy"
                     case _:
                         return "El routing policy no existe", 500
 
@@ -269,26 +354,20 @@ def exists():
                 return "Ese dominio no existe", 404
         if ip_response != "Unhealthy" and ip_response != "":
             logger.debug(ip_response)
-            return ip_response
+            return str(ip_to_int(ip_response)), 200
         else:
-
-            # Create a DNS query message for the domain 'example.com' and record type 'A'
-            query = dns.message.make_query(domain, dns.rdatatype.A)
-            logger.debug(query.to_text())
-            # Send the query over UDP
-            response = dns.query.udp(query, dns_server[0])
-            logger.debug(response.to_text())
-            answer = response.answer
-
-            # Convert all RRsets to text and join them into a single string
-            answer_string = "\n".join(rrset.to_text() for rrset in answer)
-            # Print the response
-            logger.debug(response.to_text())
-
-            return answer_string
+            # logger.debug(f"Here1: {ip_response}")
+            # # Create a DNS query message for the domain 'example.com' and record type 'A'
+            # query = dns.message.make_query(domain, dns.rdatatype.A)
+            # logger.debug(query.to_text())
+            # response = dns.query.udp(query, dns_server[0])
+            # logger.debug(response.to_text())
+            # bytes = response.to_wire()
+            # encodedBytes = base64.b64encode(bytes).decode("utf-8")
+            # logger.debug("Received response (raw bytes) base 64: %s", bytes)
+            return "Ese dominio no existe", 404
 
 
-# Ruta para verificar el estado del backend API
 @app.route("/api/status", methods=["GET"])
 def get_api_status():
     try:
