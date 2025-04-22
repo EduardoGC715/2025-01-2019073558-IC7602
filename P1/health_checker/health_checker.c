@@ -261,7 +261,7 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
     }
 
     freeaddrinfo(res);
-    log_message(stderr, "Connection failed after %d attempts\n", max_retries + 1);
+    log_message("Connection failed after %d attempts", max_retries + 1);
     return result;
 }
 

@@ -17,7 +17,7 @@ ENV CHECKER_LON=$CHECKER_LON
 ENV CHECKER_COUNTRY=$CHECKER_COUNTRY
 ENV CHECKER_CONTINENT=$CHECKER_CONTINENT
 
-# Install required packages
+# Install required packages including check unit testing framework
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libssl-dev \
     cron \
+    check \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python requests library
@@ -34,8 +35,23 @@ RUN pip3 install requests firebase-admin python-crontab
 # Create working directory
 WORKDIR /app
 
-# Copy source files
-COPY health_checker.c update_firebase.py ./
+# Copy source code and test files
+COPY health_checker.c test_health_checker.c ./
+
+# Compile and run tests - build will fail if tests don't pass
+RUN mkdir -p /test-logs
+
+RUN gcc -o test_health_checker test_health_checker.c -lcheck -lsubunit -lm -pthread && \
+    ./test_health_checker && \
+    if [ -f health_checker_unittest.log ]; then \
+    cp health_checker_unittest.log /test-logs/ && \
+    echo "Test logs saved to /test-logs/health_checker_unittest.log"; \
+    fi && \
+    echo "All tests passed successfully!"
+
+# Continue with the rest of the build only if tests pass
+# Copy the rest of the files needed for the application
+COPY update_firebase.py ./
 
 # Copy the Firebase credentials file
 COPY dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json ./
