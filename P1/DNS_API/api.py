@@ -18,6 +18,7 @@ import requests
 import ipaddress
 import socket
 from geopy.distance import geodesic
+import os
 
 domain_ref = db.reference("/domains")
 ip_to_country_ref = db.reference("/ip_to_country")
@@ -129,7 +130,9 @@ def home():
 
 
 # 8.8.8.8 es el DNS público de Google
-dns_server = ("8.8.8.8", 53)
+dns_ip = os.environ.get("DNS_SERVER", "8.8.8.8")
+dns_port = os.environ.get("DNS_PORT", "53")
+dns_server = (dns_ip, dns_port)
 
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():

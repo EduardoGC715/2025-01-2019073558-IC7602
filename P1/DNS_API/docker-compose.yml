@@ -12,6 +12,9 @@ services:
     networks:
       - shared-network
     restart: unless-stopped
+    environment:
+      - DNS_SERVER=8.8.8.8
+      - DNS_PORT=53
   dev:
     build:
       context: .
