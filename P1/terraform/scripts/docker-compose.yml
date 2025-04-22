@@ -1,0 +1,34 @@
+services:
+  interceptor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - dandiego235/dns-interceptor:1.0
+        - dandiego235/dns-interceptor:latest
+    ports:
+      - "53:53/udp"
+    container_name: dns_interceptor
+    networks:
+      - shared-network
+    environment:
+      DNS_API: "dns_api"
+      DNS_API_PORT: "5000"
+    restart: unless-stopped
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - dandiego235/dns-api:1.0
+        - dandiego235/dns-api:latest
+    ports:
+      - "5000:5000"
+    container_name: dns_api
+    networks:
+      - shared-network
+    restart: unless-stopped
+
+networks:
+  shared-network:
+    driver: bridge

@@ -6,8 +6,7 @@ services:
       tags:
         - dandiego235/dns-api:1.0
         - dandiego235/dns-api:latest
-    ports:
-      - "5000:5000"
+
   dev:
     build:
       context: .

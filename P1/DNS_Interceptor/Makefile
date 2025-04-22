@@ -11,3 +11,10 @@ run: interceptor
 
 clean:
 	rm -f interceptor
+
+push:
+	@echo "Pushing to DockerHub"
+ifdef version
+	docker push dandiego235/dns-interceptor:$(version)
+endif
+	docker push dandiego235/dns-interceptor:latest

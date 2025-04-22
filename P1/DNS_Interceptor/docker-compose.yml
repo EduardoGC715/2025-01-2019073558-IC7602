@@ -6,8 +6,6 @@ services:
       tags:
         - dandiego235/dns-interceptor:1.0
         - dandiego235/dns-interceptor:latest
-    ports:
-      - "6000:53/udp"
   dev:
     build:
       context: .
