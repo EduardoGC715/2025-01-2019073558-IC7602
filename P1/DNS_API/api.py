@@ -598,28 +598,30 @@ def get_country_from_ip():
 
         # Buscar el registro con la clave (start_ip_int) más cercana hacia abajo
         snapshot = (
-            ip_to_country_ref.order_by_key()
-            .end_at(str(ip_int))
-            .limit_to_last(1)
-            .get()
-        )
+            ip_to_country_ref
+              .order_by_key()
+              .end_at(str(ip_int))
+              .limit_to_last(1)
+              .get()
+        ) 
 
         if snapshot:
             for key, record in snapshot.items():
                 record_start = int(key)
-                record_end = ip_to_int(record["end_ip"])
+                record_end   = ip_to_int(record["end_ip"])
 
                 if record_start <= ip_int <= record_end:
                     return jsonify({
-                        "ip": ip_str,
-                        "matched_range": f"{record['start_ip']} - {record['end_ip']}",
+                        "id":               record_start,
+                        "country_name":     record["country_name"],
                         "country_iso_code": record["country_iso_code"],
-                        "country_name": record["country_name"],
-                        "continent_code": record["continent_code"],
-                        "continent_name": record["continent_name"]
+                        "continent_name":   record["continent_name"],
+                        "continent_code":   record["continent_code"],
+                        "start_ip":         record["start_ip"],
+                        "end_ip":           record["end_ip"]
                     }), 200
 
-        return jsonify({"error": "No matching record found for this IP"}), 404
+            return jsonify({"error": "No matching record found for this IP"}), 404
 
     except Exception as e:
         logger.exception("Error buscando país por IP")

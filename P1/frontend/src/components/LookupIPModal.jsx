@@ -59,13 +59,13 @@ export default function LookupIPModal({ show, onHide }) {
             </thead>
             <tbody>
               <tr>
-                <td>{ipToInteger(lookupResult.ip)}</td>
+                <td>{lookupResult.id}</td>
                 <td>{lookupResult.country_name}</td>
                 <td>{lookupResult.country_iso_code}</td>
                 <td>{lookupResult.continent_name}</td>
                 <td>{lookupResult.continent_code}</td>
-                <td>{lookupResult.matched_range.split(' - ')[0]}</td>
-                <td>{lookupResult.matched_range.split(' - ')[1]}</td>
+                <td>{lookupResult.start_ip}</td>
+                <td>{lookupResult.end_ip}</td>
               </tr>
             </tbody>
           </Table>
