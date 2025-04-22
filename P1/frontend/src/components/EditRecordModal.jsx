@@ -138,6 +138,22 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     return domainRegex.test(domain);
   };
 
+  const checkWeights = (weightedAddresses) => {
+    let sum = 0;
+    for (let i = 0; i < weightedAddresses.length; i++) {
+      const address = weightedAddresses[i];
+      if (address.weight === "" || address.ip === "") {
+        return true; // Si hay un campo vacío, no es válido
+      }
+      const numWeight = Number(address.weight);
+      if (isNaN(numWeight) || numWeight < 0) {
+        return true; // Si no es un número o es negativo, no es válido
+      }
+      sum += numWeight;
+    }
+    return sum !== 1; // Si todo es válido, retorna false
+  };
+
   const handleSave = () => {
     let updatedDirection = editedRecord.direction;
 
@@ -252,11 +268,12 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
             editedRecord.type === "multi"
               ? editedRecord.directions.length === 0
               : editedRecord.type === "weight"
-                ? !editedRecord.weightedDirections || editedRecord.weightedDirections.length === 0
+                ? !editedRecord.weightedDirections ||
+                  editedRecord.weightedDirections.length === 0 || checkWeights(editedRecord.weightedDirections)
                 : editedRecord.type === "geo"
                   ? !editedRecord.geoDirections || editedRecord.geoDirections.length === 0
                   : !editedRecord.direction
-          )
+          )          
         }
       >
           Guardar Cambios
