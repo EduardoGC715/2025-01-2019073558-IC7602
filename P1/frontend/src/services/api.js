@@ -1,8 +1,13 @@
 import axios from 'axios';
-import { EmojiKiss } from 'react-bootstrap-icons';
-import { responsivePropType } from 'react-bootstrap/esm/createUtilityClasses';
 
-const API_BASE_URL = 'https://127.0.0.1:5000/api'; // Adjust this to your actual backend URL
+// Sin docker
+const API_BASE_URL = 'http://127.0.0.1:5000/api';
+
+// Con docker
+// const API_BASE_URL = `http://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
+
+// console.log(API_BASE_URL); // para verificar
+
 
 const api = axios.create({
   baseURL: API_BASE_URL,
