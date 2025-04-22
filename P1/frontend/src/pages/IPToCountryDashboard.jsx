@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Form, InputGroup, FormControl, Button, Modal } from 'react-bootstrap';
 import { ArrowDown, Pencil, Trash2, Plus } from 'lucide-react';
 import IPToCountryFormModal from './../components/IPToCountryFormModal';
+import LookupIPModal from "../components/LookupIPModal";
 import { toast } from 'react-toastify';
-
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeftCircle } from 'lucide-react';
+import { databaseApi } from "../services/api";
+ 
 const ipToInteger = (ip) => {
   return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0);
 };
 
 const IPToCountryDashboard = () => {
+  const navigate = useNavigate();
+
   // States for search/filtering
   const [searchValue, setSearchValue] = useState('');
   const [searchColumn, setSearchColumn] = useState('all');
@@ -20,7 +26,7 @@ const IPToCountryDashboard = () => {
 
   // States for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50; // Adjust as needed
+  const itemsPerPage = 50; 
 
   // States for sorting
   const [sortField, setSortField] = useState('');
@@ -30,75 +36,56 @@ const IPToCountryDashboard = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
 
-  // Dummy data defined as an object with keys as the id
-  const dummyData = {
-    "16777472": {
-      continent_code: "AS",
-      continent_name: "Asia",
-      country_iso_code: "CN",
-      country_name: "China",
-      start_ip: "1.0.1.0",
-      end_ip: "1.0.3.255"
-    },
-    "33554432": {
-      continent_code: "EU",
-      continent_name: "Europe",
-      country_iso_code: "DE",
-      country_name: "Germany",
-      start_ip: "2.16.0.0",
-      end_ip: "2.16.255.255"
-    },
-    "50331648": {
-      continent_code: "SA",
-      continent_name: "South America",
-      country_iso_code: "BR",
-      country_name: "Brazil",
-      start_ip: "177.0.0.0",
-      end_ip: "177.255.255.255"
-    },
-    "67108864": {
-      continent_code: "NA",
-      continent_name: "North America",
-      country_iso_code: "US",
-      country_name: "United States",
-      start_ip: "3.0.0.0",
-      end_ip: "3.255.255.255"
-    }
+  const [showLookupModal, setShowLookupModal] = useState(false);
+    
+  const [records, setRecords] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const data = await databaseApi.getAllIPToCountryRecords();
+      setRecords(data);
+    };
+    load();
+  }, []);
+
+  const handleRecordSaved = (newRecord, oldId) => {
+    setRecords(prev => {
+      const lookupId = oldId != null && oldId !== newRecord.id ? oldId : newRecord.id;
+      const idx = prev.findIndex(r => r.id === lookupId);
+      if (idx > -1) {
+        const next = [...prev];
+        next[idx] = newRecord;
+        return next;
+      }
+      return [...prev, newRecord];
+    });
   };
 
-  const dummyDataArray = Object.entries(dummyData).map(([id, item]) => ({ id, ...item }));
-
-  const filteredData = dummyDataArray.filter(item => {
+  const filteredData = records.filter(item => {
     if (!searchValue) return true;
     if (searchColumn === 'all') {
       return Object.values(item).some(val =>
         String(val).toLowerCase().includes(searchValue.toLowerCase())
       );
     } else if (searchColumn === 'ip') {
-      try {
-        const ipValue = ipToInteger(searchValue);
-        const start = ipToInteger(item.start_ip);
-        const end = ipToInteger(item.end_ip);
-        return ipValue >= start && ipValue <= end;
-      } catch (error) {
-        return false;
-      }
-    } else {
-      return String(item[searchColumn] || '').toLowerCase().includes(searchValue.toLowerCase());
+      return (
+        item.start_ip.includes(searchValue) ||
+        item.end_ip.includes(searchValue) ||
+        String(item.id).includes(searchValue)
+        );
+      } else {
+        return String(item[searchColumn] || '').toLowerCase().includes(searchValue.toLowerCase());
     }
   });
 
-  // Sorting logic
   const sortedData = [...filteredData].sort((a, b) => {
     if (!sortField) return 0;
     let aValue = a[sortField];
     let bValue = b[sortField];
-    // For IP fields, convert to integer
     if (sortField === 'start_ip' || sortField === 'end_ip') {
       aValue = ipToInteger(aValue);
       bValue = ipToInteger(bValue);
     }
-    // For id, compare numerically
     if (sortField === 'id') {
       aValue = parseInt(aValue, 10);
       bValue = parseInt(bValue, 10);
@@ -108,12 +95,10 @@ const IPToCountryDashboard = () => {
     return 0;
   });
 
-  // Pagination logic
   const totalItems = sortedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Handlers for sorting, pagination, and modal actions
   const handleSort = (field) => {
     if (sortField === field) {
       setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -150,34 +135,42 @@ const IPToCountryDashboard = () => {
     setModalOpen(false);
   };
 
-  // When delete is clicked, set the candidate and show the deletion confirmation modal
   const handleDelete = (item) => {
     setDeleteCandidate(item);
     setShowDeleteModal(true);
   };
 
-  // Called when the user confirms deletion
-  const confirmDelete = () => {
-    if (deleteCandidate) {
-      console.log('Deleted:', deleteCandidate);
-      toast.success(`IPToCountry ${deleteCandidate.country_name} deleted successfully`);
-      // Optionally: remove the item from your data source.
+  const confirmDelete = async () => {
+    if (!deleteCandidate) {
+      setShowDeleteModal(false);
+      return;
     }
+  
+    const result = await databaseApi.deleteIPToCountryRecord(deleteCandidate.id);
+    if (result.error) {
+      toast.error(`Error deleting ${deleteCandidate.country_name}: ${result.error}`);
+    } else {
+      toast.success(result.message);
+      setRecords(prev => prev.filter(r => r.id !== deleteCandidate.id));
+    }
+  
     setShowDeleteModal(false);
     setDeleteCandidate(null);
     setModalOpen(false);
   };
 
-  // Called when the user cancels deletion
   const cancelDelete = () => {
-    toast.info('Deletion cancelled');
     setShowDeleteModal(false);
     setDeleteCandidate(null);
   };
 
   const renderPagination = () => {
-    let pages = [];
-    for (let i = 1; i <= totalPages; i++) {
+    const pages = [];
+    const maxToShow = 5;
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(start + maxToShow - 1, totalPages);
+    
+    for (let i = start; i <= end; i++) {
       pages.push(
         <Button
           key={i}
@@ -189,6 +182,20 @@ const IPToCountryDashboard = () => {
         </Button>
       );
     }
+    
+    if (end < totalPages) {
+      pages.push(<span key="ellipsis" className="mx-2">…</span>);
+      pages.push(
+        <Button
+          key={totalPages}
+          variant={currentPage === totalPages ? 'primary' : 'outline-primary'}
+          onClick={() => handlePageChange(totalPages)}
+        >
+        {totalPages}
+        </Button>
+        );
+    }
+    
     return pages;
   };
 
@@ -197,6 +204,14 @@ const IPToCountryDashboard = () => {
       {/* Search and filter controls */}
       <div className="d-flex gap-2 mb-3 align-items-center justify-content-between">
         <div className="d-flex gap-2 align-items-center">
+          <Button
+            variant="link"
+            className="p-0 me-4 text-dark"
+            onClick={() => navigate("/")}
+            title="Back to Dashboard" // optional tooltip on hover
+          >
+            <ArrowLeftCircle size={24} />
+          </Button>
           <InputGroup>
             <FormControl
               value={searchValue}
@@ -221,9 +236,17 @@ const IPToCountryDashboard = () => {
             <option value="ip">IP</option>
           </Form.Select>
         </div>
-        <Button variant="success" onClick={openCreateModal}>
-          <Plus size={16} className="me-1" /> Add IPToCountry
-        </Button>
+        <div className="d-flex gap-2">
+          <Button variant="success" onClick={openCreateModal}>
+            <Plus size={16} className="me-1" /> Add IPToCountry
+          </Button>
+          <Button
+            variant="info"
+            onClick={() => setShowLookupModal(true)}
+          >
+            Lookup IP
+          </Button>
+        </div>
       </div>
 
       {/* Table displaying the data */}
@@ -295,6 +318,7 @@ const IPToCountryDashboard = () => {
         onClose={handleModalClose}
         onSubmit={handleModalSubmit}
         onDelete={handleDelete}
+        onSaved={handleRecordSaved} 
         ipToCountry={selectedIPToCountry || {}}
         isEditing={isEditing}
       />
@@ -306,7 +330,7 @@ const IPToCountryDashboard = () => {
         </Modal.Header>
         <Modal.Body>
           {deleteCandidate && (
-            <p>Are you sure you want to delete IPToCountry {deleteCandidate.country_name}?</p>
+            <p>Are you sure you want to delete IPToCountry {deleteCandidate.country_name} with range {deleteCandidate.start_ip} - {deleteCandidate.end_ip}?</p>
           )}
         </Modal.Body>
         <Modal.Footer>
@@ -314,6 +338,11 @@ const IPToCountryDashboard = () => {
           <Button variant="danger" onClick={confirmDelete}>Delete</Button>
         </Modal.Footer>
       </Modal>
+      {/* Lookup‑IP Modal */}
+      <LookupIPModal
+        show={showLookupModal}
+        onHide={() => setShowLookupModal(false)}
+      />
     </div>
   );
 };
