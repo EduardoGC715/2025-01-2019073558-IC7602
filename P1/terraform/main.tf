@@ -33,8 +33,9 @@ module "dns_instance" {
   aws_ami  = var.aws_ami
   api_port = var.api_port
 
-  user_data = templatefile("${path.module}/scripts/install.sh", {
+  user_data = templatefile("${path.module}/scripts/install.tftpl", {
     DOCKER_COMPOSE_YML = file("${path.module}/scripts/docker-compose.yml")
+    checkers = var.checkers
   })
 
   vpc_id    = module.networking.vpc_id

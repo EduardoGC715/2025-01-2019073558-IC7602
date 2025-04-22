@@ -1,0 +1,8 @@
+services:
+  checker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - dandiego235/dns-health-checker:1.0
+        - dandiego235/dns-health-checker:latest
