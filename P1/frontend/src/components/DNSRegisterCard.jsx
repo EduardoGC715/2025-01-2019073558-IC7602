@@ -198,7 +198,7 @@ const DNSRegisterCard = ({
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label>Tipo</Form.Label>
+            <Form.Label>Routing Policy</Form.Label>
             <Form.Select
               name="type"
               value={localRecord.type}
@@ -249,6 +249,87 @@ const DNSRegisterCard = ({
           {localRecord.type === "round-trip" && (
             <RoundTripConfig editedRecord={localRecord} handleInputChange={handleLocalInputChange} />
           )}
+        <hr />
+        <h6>Configuración del Healthcheck</h6>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Códigos aceptados</Form.Label>
+          <Form.Control
+            type="text"
+            name="acceptable_codes"
+            placeholder="200, 304"
+            value={localRecord.healthcheck_settings?.acceptable_codes || "200, 304"}
+            onChange={handleLocalInputChange}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Crontab</Form.Label>
+          <Form.Control
+            type="text"
+            name="crontab"
+            placeholder="*/1 * * * *"
+            value={localRecord.healthcheck_settings?.crontab || "*/1 * * * *"}
+            onChange={handleLocalInputChange}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Número de reintentos</Form.Label>
+          <Form.Control
+            type="number"
+            name="max_retries"
+            placeholder="3"
+            value={localRecord.healthcheck_settings?.max_retries || 3}
+            onChange={handleLocalInputChange}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Path</Form.Label>
+          <Form.Control
+            type="text"
+            name="path"
+            placeholder="/"
+            value={localRecord.healthcheck_settings?.path || "/"}
+            onChange={handleLocalInputChange}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Port</Form.Label>
+          <Form.Control
+            type="number"
+            name="port"
+            placeholder="80"
+            value={localRecord.healthcheck_settings?.port || 80}
+            onChange={handleLocalInputChange}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Timeout (ms)</Form.Label>
+          <Form.Control
+            type="number"
+            name="timeout"
+            placeholder="5000"
+            value={localRecord.healthcheck_settings?.timeout || 5000}
+            onChange={handleLocalInputChange}
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Tipo de request</Form.Label>
+          <Form.Select
+            name="type"
+            value={localRecord.healthcheck_settings?.type || "http"}
+            onChange={handleLocalInputChange}
+          >
+            <option value="http">HTTP</option>
+            <option value="tcp">TCP</option>
+          </Form.Select>
+        </Form.Group>
+
         </Form>
       </Modal.Body>
       <Modal.Footer>

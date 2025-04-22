@@ -24,6 +24,7 @@ from geopy.distance import geodesic
 
 domain_ref = db.reference("/domains")
 ip_to_country_ref = db.reference("/ip_to_country")
+healthcheckers_ref = db.reference("/healthcheckers")
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -266,16 +267,9 @@ def exists():
                         closest_hc = None
                         closest_distance = float("inf")
                         try:
-                            for health_checker, results in ip_data["ips"][0][
-                                "healthcheck_results"
-                            ].items():
-                                distance = geodesic(
-                                    ip_location,
-                                    (
-                                        results["location"]["latitude"],
-                                        results["location"]["longitude"],
-                                    ),
-                                ).km
+                            healthcheckers = healthcheckers_ref.get()
+                            for health_checker, checker_info in healthcheckers.items():
+                                distance = geodesic(ip_location, (checker_info["latitude"], checker_info["longitude"])).km
                                 if distance < closest_distance:
                                     closest_distance = distance
                                     closest_hc = health_checker
