@@ -11,6 +11,11 @@ import time
 import argparse
 from crontab import CronTab 
 
+# Código basado en: 
+# https://firebase.google.com/docs/reference/admin/python
+# https://cronitor.io/guides/python-cron-jobs
+# https://docs.python.org/3/library/subprocess.html
+
 print("=" * 50)
 print("DEBUG - ENVIRONMENT VARIABLES:")
 print(f"CHECKER_ID: {os.environ.get('CHECKER_ID', 'NOT SET')}")
