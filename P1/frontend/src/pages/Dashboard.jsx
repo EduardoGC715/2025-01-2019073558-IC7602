@@ -7,15 +7,17 @@ import {
   XCircle,
   AlertTriangle,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import SystemStatusCard from "../components/SystemStatusCard";
-import DatabaseModal from "../components/DatabaseModal";
 import DNSRecordsTable from "../components/DNSRecordsTable";
 import DNSRegisterCard from "../components/DNSRegisterCard";
 import EditRecordModal from "../components/EditRecordModal";
 import { dnsApi , databaseApi} from "../services/api";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+
   // Estados para los datos y modales
   const [dnsRecords, setDnsRecords] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -74,8 +76,6 @@ const Dashboard = () => {
 
   const handleCloseAddModal = () => setShowAddModal(false);
   const handleShowAddModal = () => setShowAddModal(true);
-  const handleCloseDatabaseModal = () => setShowDatabaseModal(false);
-  const handleShowDatabaseModal = () => setShowDatabaseModal(true);
 
   // Cambios en el formulario
   const handleInputChange = (e) => {
@@ -243,7 +243,7 @@ const Dashboard = () => {
           <Button
             variant="secondary"
             className="d-flex align-items-center"
-            onClick={handleShowDatabaseModal}
+            onClick={() => navigate("/ip-to-country")}
           >
             <Database size={18} className="me-1" />
             Gestionar IP to Country
@@ -270,14 +270,6 @@ const Dashboard = () => {
         handleInputChange={handleInputChange}
         handleAddRecord={handleAddRecord}
       />
-
-      {/* Modal para Gestionar IP to Country */}
-      <div className="container mt-4">
-        <DatabaseModal
-          show={showDatabaseModal}
-          handleClose={handleCloseDatabaseModal}
-        />
-      </div>
 
       {/* Modal de Edición */}
       <EditRecordModal
