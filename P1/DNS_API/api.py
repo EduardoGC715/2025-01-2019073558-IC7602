@@ -53,6 +53,64 @@ def retry_with_backoff(fn, backoff_in_seconds=1):
 def ip_to_int(ip):
     return int(ipaddress.ip_address(ip))
 
+def make_conflict_obj(key: str, rec: dict) -> dict:
+    return {
+        "id":               key,
+        "start_ip":         rec["start_ip"],
+        "end_ip":           rec["end_ip"],
+        "continent_code":   rec["continent_code"],
+        "continent_name":   rec["continent_name"],
+        "country_iso_code": rec["country_iso_code"],
+        "country_name":     rec["country_name"],
+    }
+
+
+def get_previous_conflict(start_int: int, exclude_key: str = None):
+    limit = 2 if exclude_key else 1
+    snap = (
+        ip_to_country_ref
+          .order_by_key()
+          .end_at(str(start_int))
+          .limit_to_last(limit)
+          .get()
+    ) or {}
+
+    items = list(snap.items())
+    if exclude_key:
+        items = [item for item in items if item[0] != exclude_key]
+    if not items:
+        return None, None
+
+    prev_key, prev_rec = items[-1]
+    prev_end_int = ip_to_int(prev_rec["end_ip"])
+    if start_int <= prev_end_int:
+        return prev_key, prev_rec
+
+    return None, None
+
+
+def get_next_conflict(start_int: int, end_int: int, exclude_key: str = None):
+    limit = 2 if exclude_key else 1
+    snap = (
+        ip_to_country_ref
+          .order_by_key()
+          .start_at(str(start_int))
+          .limit_to_first(limit)
+          .get()
+    ) or {}
+
+    items = list(snap.items())
+    if exclude_key:
+        items = [item for item in items if item[0] != exclude_key]
+    if not items:
+        return None, None
+
+    next_key, next_rec = items[0]
+    next_start_int = int(next_key)
+    if end_int >= next_start_int:
+        return next_key, next_rec
+
+    return None, None
 
 @app.route("/")
 def home():
@@ -526,6 +584,176 @@ def manage_domain():
             return jsonify({"message": "Domain deleted", "status": "success"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+@app.route("/api/ip-to-country", methods=["GET"])
+def get_country_from_ip():
+    ip_str = request.args.get("ip")
+    if not ip_str:
+        return jsonify({"error": "IP address is required"}), 400
+    try:
+        ip_int = ip_to_int(ip_str)
+
+        # Buscar el registro con la clave (start_ip_int) más cercana hacia abajo
+        snapshot = (
+            ip_to_country_ref.order_by_key()
+            .end_at(str(ip_int))
+            .limit_to_last(1)
+            .get()
+        )
+
+        if snapshot:
+            for key, record in snapshot.items():
+                record_start = int(key)
+                record_end = ip_to_int(record["end_ip"])
+
+                if record_start <= ip_int <= record_end:
+                    return jsonify({
+                        "ip": ip_str,
+                        "matched_range": f"{record['start_ip']} - {record['end_ip']}",
+                        "country_iso_code": record["country_iso_code"],
+                        "country_name": record["country_name"],
+                        "continent_code": record["continent_code"],
+                        "continent_name": record["continent_name"]
+                    }), 200
+
+        return jsonify({"error": "No matching record found for this IP"}), 404
+
+    except Exception as e:
+        logger.exception("Error buscando país por IP")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ip-to-country", methods=["POST","PUT","DELETE"])
+def manage_ip_to_country():
+    data = request.get_json() or {}
+    logger.debug(data)
+    # ─── Deletion ───────────────────────────────────────────────────────
+    if request.method == "DELETE":
+        record_id = data.get("id")
+
+        if record_id is None:
+            return jsonify({"error":"Missing 'id' for deletion"}), 400
+        
+        key = str(int(record_id))
+        ref = ip_to_country_ref.child(key)
+
+        if not ref.get():
+            return jsonify({"error":f"No record {record_id}"}), 404
+        
+        ref.delete()
+        return jsonify({"message":f"Deleted record {record_id}"}), 200
+
+    # ─── Validate IP  ──────────────────────────
+    start_ip = data.get("start_ip")
+    end_ip   = data.get("end_ip")
+    if start_ip is None or end_ip is None:
+        return jsonify({"error": "Both 'start_ip' and 'end_ip' are required"}), 400
+
+    try:
+        start_int = ip_to_int(start_ip)
+        end_int   = ip_to_int(end_ip)
+    except ValueError:
+        return jsonify({"error": "Invalid IP address format"}), 400
+
+    if start_int >= end_int:
+        return jsonify({"error": "'start_ip' must be before 'end_ip'"}), 400
+
+    new_key = str(start_int)
+    required = ["continent_code","continent_name","country_iso_code","country_name"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({"error":"Missing required fields","missing":missing}), 400
+
+    if request.method == "POST":
+        pk, prec = get_previous_conflict(start_int)
+        if pk:
+            return jsonify({"error":"Overlap with previous record", "conflict": make_conflict_obj(pk, prec)}), 409
+
+        nk, nrec = get_next_conflict(start_int, end_int)
+        if nk:
+            return jsonify({"error":"Overlap with next record", "conflict": make_conflict_obj(nk, nrec)}), 409
+
+        ref = ip_to_country_ref.child(new_key)
+
+        if ref.get():
+            return jsonify({"error":f"Record already exists at {start_ip}"}), 409
+
+        payload = {
+            "start_ip":         start_ip,
+            "end_ip":           end_ip,
+            **{k: data[k] for k in required}
+        }
+
+        ref.set(payload)
+        logger.debug(payload)
+        record = { "id": start_int, **payload }
+
+        return jsonify({
+            "message": f"Created record at {start_ip}",
+            "record":  record
+        }), 201
+    
+    if request.method == "PUT":
+        orig_id = data.get("original_start_ip")
+        
+        old_key = str(int(orig_id))
+        old_ref = ip_to_country_ref.child(old_key)
+        
+        if not old_ref.get():
+            return jsonify({"error":f"No record to update at {orig_id}"}), 404
+
+        pk, prec = get_previous_conflict(start_int, exclude_key=old_key)
+        if pk:
+            return jsonify({"error":"Overlap with previous record","conflict": make_conflict_obj(pk, prec)}), 409
+
+        nk, nrec = get_next_conflict(start_int, end_int, exclude_key=old_key)
+        if nk:
+            return jsonify({"error":"Overlap with next record","conflict": make_conflict_obj(nk, nrec)}), 409
+
+        payload = {
+            "start_ip": start_ip,
+            "end_ip":   end_ip,
+            **{k: data[k] for k in required}
+        }
+        logger.debug(payload)
+
+        if new_key != old_key:
+            ip_to_country_ref.child(new_key).set(payload)
+            old_ref.delete()
+            msg = f"Renamed record {old_key} → {new_key}"
+        else:
+            old_ref.update(payload)
+            msg = f"Updated record {new_key}"
+        
+        record = { "id": start_int, **payload }
+
+        return jsonify({
+            "message": msg,
+            "record":  record
+        }), 200
+
+    return jsonify({"error":"Unsupported method"}), 405
+
+@app.route("/api/ip-to-country/all", methods=["GET"])
+def get_all_ip_to_country_records():
+    try:
+        snapshot = ip_to_country_ref.get()
+
+        if not snapshot:
+            return jsonify([]), 200  
+
+        result = [
+            { "id": int(start_key), **record }
+            for start_key, record in snapshot.items()
+        ]
+
+        result.sort(key=lambda r: r["id"])
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.exception("Error fetching all IPToCountry records")
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
