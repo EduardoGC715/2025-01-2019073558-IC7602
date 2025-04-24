@@ -140,6 +140,22 @@ export const dnsApi = {
         message: error.response?.data?.error || 'Error al eliminar el registro'
       };
     }
+  },
+
+  editDNSRecord: async (recordData) => {
+    try {
+      const response = await api.put('/domains', recordData);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error al actualizar el registro:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al actualizar el registro'
+      };
+    }
   }
 };
 

@@ -23,7 +23,16 @@ const DNSRegisterCard = ({
     directions: [],
     counter: "",
     weightedDirections: [],
-    geoDirections: []
+    geoDirections: [],
+    healthcheck_settings: {
+      acceptable_codes: "200, 304",
+      crontab: "*/1 * * * *",
+      max_retries: 3,
+      path: "/",
+      port: 80,
+      timeout: 5000,
+      type: "http"
+    }
   });
 
   // Sincronizar con props
@@ -35,7 +44,16 @@ const DNSRegisterCard = ({
       directions: newRecord.directions || [],
       counter: newRecord.counter ?? "",
       weightedDirections: newRecord.weightedDirections || [],
-      geoDirections: newRecord.geoDirections || []
+      geoDirections: newRecord.geoDirections || [],
+      healthcheck_settings: newRecord.healthcheck_settings || {
+        acceptable_codes: "200, 304",
+        crontab: "*/1 * * * *",
+        max_retries: 3,
+        path: "/",
+        port: 80,
+        timeout: 5000,
+        type: "http"
+      }
     });
   }, [newRecord]);
 
@@ -48,11 +66,23 @@ const DNSRegisterCard = ({
       console.log("Dominio no válido");
     }
 
-    setLocalRecord(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    handleInputChange(e);
+    // Check if the input is a healthcheck setting
+    if (name.startsWith('healthcheck_')) {
+      const settingName = name.replace('healthcheck_', '');
+      setLocalRecord(prev => ({
+        ...prev,
+        healthcheck_settings: {
+          ...prev.healthcheck_settings,
+          [settingName]: value
+        }
+      }));
+    } else {
+      setLocalRecord(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      handleInputChange(e);
+    }
   };
 
   const handleAddRecord = async () => {
@@ -61,8 +91,25 @@ const DNSRegisterCard = ({
       let recordData = {
         domain: localRecord.domain,
         type: localRecord.type,
-        status: true // Todos los registros nuevos inician como activos
+        status: true, // Todos los registros nuevos inician como activos
+        healthcheck_settings: {
+          acceptable_codes: localRecord.healthcheck_settings.acceptable_codes,
+          crontab: localRecord.healthcheck_settings.crontab,
+          max_retries: parseInt(localRecord.healthcheck_settings.max_retries),
+          path: localRecord.healthcheck_settings.path,
+          port: parseInt(localRecord.healthcheck_settings.port),
+          timeout: parseInt(localRecord.healthcheck_settings.timeout),
+          type: localRecord.healthcheck_settings.type
+        }
       };
+
+      // Validar que todos los campos de healthcheck estén presentes
+      const requiredHealthcheckFields = ['acceptable_codes', 'crontab', 'max_retries', 'path', 'port', 'timeout', 'type'];
+      const missingFields = requiredHealthcheckFields.filter(field => !recordData.healthcheck_settings[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Faltan campos requeridos de healthcheck: ${missingFields.join(', ')}`);
+      }
 
       // Estructurar los datos según el tipo de registro
       switch (localRecord.type) {
@@ -117,7 +164,6 @@ const DNSRegisterCard = ({
 
       if (result.success) {
         window.location.reload();
-
       } else {
         alert(`Error al crear el registro: ${result.message}`);
       }
@@ -303,9 +349,9 @@ const DNSRegisterCard = ({
           <Form.Label>Códigos aceptados</Form.Label>
           <Form.Control
             type="text"
-            name="acceptable_codes"
+            name="healthcheck_acceptable_codes"
             placeholder="200, 304"
-            value={localRecord.healthcheck_settings?.acceptable_codes || "200, 304"}
+            value={localRecord.healthcheck_settings.acceptable_codes}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -314,9 +360,9 @@ const DNSRegisterCard = ({
           <Form.Label>Crontab</Form.Label>
           <Form.Control
             type="text"
-            name="crontab"
+            name="healthcheck_crontab"
             placeholder="*/1 * * * *"
-            value={localRecord.healthcheck_settings?.crontab || "*/1 * * * *"}
+            value={localRecord.healthcheck_settings.crontab}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -325,9 +371,9 @@ const DNSRegisterCard = ({
           <Form.Label>Número de reintentos</Form.Label>
           <Form.Control
             type="number"
-            name="max_retries"
+            name="healthcheck_max_retries"
             placeholder="3"
-            value={localRecord.healthcheck_settings?.max_retries || 3}
+            value={localRecord.healthcheck_settings.max_retries}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -336,9 +382,9 @@ const DNSRegisterCard = ({
           <Form.Label>Path</Form.Label>
           <Form.Control
             type="text"
-            name="path"
+            name="healthcheck_path"
             placeholder="/"
-            value={localRecord.healthcheck_settings?.path || "/"}
+            value={localRecord.healthcheck_settings.path}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -347,9 +393,9 @@ const DNSRegisterCard = ({
           <Form.Label>Port</Form.Label>
           <Form.Control
             type="number"
-            name="port"
+            name="healthcheck_port"
             placeholder="80"
-            value={localRecord.healthcheck_settings?.port || 80}
+            value={localRecord.healthcheck_settings.port}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -358,9 +404,9 @@ const DNSRegisterCard = ({
           <Form.Label>Timeout (ms)</Form.Label>
           <Form.Control
             type="number"
-            name="timeout"
+            name="healthcheck_timeout"
             placeholder="5000"
-            value={localRecord.healthcheck_settings?.timeout || 5000}
+            value={localRecord.healthcheck_settings.timeout}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -368,9 +414,18 @@ const DNSRegisterCard = ({
         <Form.Group className="mb-3">
           <Form.Label>Tipo de request</Form.Label>
           <Form.Select
-            name="type"
-            value={localRecord.healthcheck_settings?.type || "http"}
-            onChange={handleLocalInputChange}
+            name="healthcheck_type"
+            value={localRecord.healthcheck_settings.type}
+            onChange={(e) => {
+              const { value } = e.target;
+              setLocalRecord(prev => ({
+                ...prev,
+                healthcheck_settings: {
+                  ...prev.healthcheck_settings,
+                  type: value
+                }
+              }));
+            }}
           >
             <option value="http">HTTP</option>
             <option value="tcp">TCP</option>
