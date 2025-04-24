@@ -11,6 +11,6 @@ COPY src ./src
 
 RUN npm run build
 
-EXPOSE 3000
+EXPOSE 80
 
-CMD ["npm", "run", "start"]
+CMD ["npx", "serve", "-s", "build", "-l", "80"]

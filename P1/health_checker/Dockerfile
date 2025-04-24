@@ -75,7 +75,7 @@ RUN echo '#!/bin/bash\n\
     chmod 0644 /etc/cron.d/health-scan\n\
     crontab /etc/cron.d/health-scan\n\
     touch /var/log/cron.log\n\
-    cron\n\
+    cron -f &\n\
     # Run once immediately to set up initial jobs\n\
     python3 /app/update_firebase.py --scan\n\
     tail -f /var/log/cron.log\n' > /app/startup.sh

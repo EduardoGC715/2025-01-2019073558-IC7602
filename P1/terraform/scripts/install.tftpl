@@ -33,6 +33,8 @@ EOF
 cd /home/ubuntu
 docker compose up -d
 
+docker pull dandiego235/dns-health-checker:latest
+
 %{ for checker in checkers ~}
 docker run -d --name checker-${checker.id} \
   -e CHECKER_ID="${checker.id}" \
@@ -40,7 +42,7 @@ docker run -d --name checker-${checker.id} \
   -e CHECKER_LON="${checker.lon}" \
   -e CHECKER_COUNTRY="${checker.country}" \
   -e CHECKER_CONTINENT="${checker.continent}" \
-  health-checker
+  dandiego235/dns-health-checker:latest
 
 %{ endfor ~}
 # https://developer.hashicorp.com/terraform/language/functions/templatefile
