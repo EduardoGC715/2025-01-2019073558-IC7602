@@ -422,6 +422,9 @@ def get_all_domains():
                                 "type": routing_policy,
                                 "direction": ip.get("address", "N/A"),
                                 "status": ip.get("health", "unknown"),
+                                "healthcheck_settings": ip.get(
+                                    "healthcheck_settings", {}
+                                ),
                             }
                         )
                         id_counter += 1
@@ -439,6 +442,7 @@ def get_all_domains():
                             "type": routing_policy,
                             "direction": "",
                             "status": [],
+                            "healthcheck_settings": {},
                         }
                         id_counter += 1
 
@@ -450,6 +454,11 @@ def get_all_domains():
                         domain_map[domain_name]["status"] = ",".join(
                             [str(ip.get("health", "unknown")) for ip in ips]
                         )
+                        # Tomamos los healthcheck settings del primer IP (deberían ser iguales para todos)
+                        if ips and len(ips) > 0:
+                            domain_map[domain_name]["healthcheck_settings"] = ips[
+                                0
+                            ].get("healthcheck_settings", {})
 
                     # Para weight: formato "ip1:peso1,ip2:peso2"
                     elif routing_policy == "weight":
@@ -462,12 +471,24 @@ def get_all_domains():
                         domain_map[domain_name]["status"] = ",".join(
                             [str(ip.get("health", "unknown")) for ip in ips]
                         )
+                        # Tomamos los healthcheck settings del primer IP
+                        if ips and len(ips) > 0:
+                            domain_map[domain_name]["healthcheck_settings"] = ips[
+                                0
+                            ].get("healthcheck_settings", {})
 
                     # Para geo: formato "ip1:país1,ip2:país2"
                     elif routing_policy == "geo":
                         geo_ips = www_info.get("ips", {})
                         geo_entries = []
                         statuses = []
+                        # Tomamos los healthcheck settings del primer IP
+                        first_ip = next(iter(geo_ips.values())) if geo_ips else None
+                        if first_ip:
+                            domain_map[domain_name]["healthcheck_settings"] = (
+                                first_ip.get("healthcheck_settings", {})
+                            )
+
                         for country, ip in geo_ips.items():
                             geo_entries.append(f"{ip.get('address', 'N/A')}:{country}")
                             statuses.append(ip.get("health", "unknown"))
@@ -524,7 +545,7 @@ def create_Domain(ref, domain, data):
         "path",
         "port",
         "timeout",
-        "tipoRequest",
+        "type",
     ]
     if not all(field in healthcheck_settings for field in required_healthcheck_fields):
         return (

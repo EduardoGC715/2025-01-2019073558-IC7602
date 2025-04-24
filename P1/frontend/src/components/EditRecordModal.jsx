@@ -180,11 +180,10 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
           path: editedRecord.healthcheck_settings.path,
           port: parseInt(editedRecord.healthcheck_settings.port),
           timeout: parseInt(editedRecord.healthcheck_settings.timeout),
-          tipoRequest: editedRecord.healthcheck_settings.type
+          type: editedRecord.healthcheck_settings.type
         }
       };
-
-      // Estructurar los datos según el tipo de registro
+  
       switch (editedRecord.type) {
         case 'single':
           recordData = {
@@ -192,45 +191,46 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
             direction: editedRecord.direction
           };
           break;
-
+  
         case 'multi':
           recordData = {
             ...recordData,
-            direction: editedRecord.directions,
+            direction: editedRecord.directions.join(","),
             counter: editedRecord.counter
           };
           break;
-
+  
         case 'weight':
           recordData = {
             ...recordData,
-            direction: editedRecord.weightedDirections.map(wd => wd.ip),
-            weight: editedRecord.weightedDirections.map(wd => wd.weight.toString())
+            direction: editedRecord.weightedDirections
+              .map(wd => `${wd.ip}:${wd.weight}`)
+              .join(',')
           };
           break;
-
+  
         case 'geo':
-          const geoDirectionsObj = {};
-          editedRecord.geoDirections.forEach(gd => {
-            geoDirectionsObj[gd.country] = gd.ip;
-          });
-          
           recordData = {
             ...recordData,
-            direction: geoDirectionsObj
+            direction: editedRecord.geoDirections
+              .map(gd => `${gd.ip}:${gd.country}`)
+              .join(',')
           };
           break;
-
+  
         case 'round-trip':
           recordData = {
             ...recordData,
-            direction: editedRecord.directions
+            direction: editedRecord.directions.join(",")
           };
           break;
+  
+        default:
+          throw new Error('Tipo de registro no válido');
       }
-
+  
       const result = await dnsApi.editDNSRecord(recordData);
-
+  
       if (result.success) {
         handleClose();
         window.location.reload();

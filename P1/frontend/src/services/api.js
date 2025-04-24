@@ -23,9 +23,7 @@ export const dnsApi = {
     try {
       const response = await api.get('/all-domains');
       if (response.status === 200) {
-        console.log(response.data[0])
-        console.log(response.data[1])
-        console.log(response.data)
+
         return response.data; // [{ id, domain, type, direction, status }]
       } else {
         console.warn('Respuesta inesperada al obtener dominios:', response.status);
@@ -114,7 +112,7 @@ export const dnsApi = {
       return {
         success: response.status === 201,
         data: response.data,
-        message: 'Registro creado exitosamente'
+        message: response.data.message || 'Registro creado exitosamente'
       };
     } catch (error) {
       return {
@@ -145,12 +143,20 @@ export const dnsApi = {
   editDNSRecord: async (recordData) => {
     try {
       const response = await api.put('/domains', recordData);
-      return {
-        success: true,
-        data: response.data
-      };
+      
+      if (response.status === 201) {
+        return {
+          success: true,
+          data: response.data,
+          message: 'Registro actualizado exitosamente'
+        };
+      } else {
+        return {
+          success: false,
+          message: response.data?.error || 'Error al actualizar el registro'
+        };
+      }
     } catch (error) {
-      console.error('Error al actualizar el registro:', error);
       return {
         success: false,
         message: error.response?.data?.error || 'Error al actualizar el registro'

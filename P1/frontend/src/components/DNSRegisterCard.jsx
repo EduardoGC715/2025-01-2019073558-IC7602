@@ -87,11 +87,10 @@ const DNSRegisterCard = ({
 
   const handleAddRecord = async () => {
     try {
-      // Objeto base para todos los tipos
       let recordData = {
         domain: localRecord.domain,
         type: localRecord.type,
-        status: true, // Todos los registros nuevos inician como activos
+        status: true,
         healthcheck_settings: {
           acceptable_codes: localRecord.healthcheck_settings.acceptable_codes,
           crontab: localRecord.healthcheck_settings.crontab,
@@ -102,16 +101,14 @@ const DNSRegisterCard = ({
           type: localRecord.healthcheck_settings.type
         }
       };
-
-      // Validar que todos los campos de healthcheck estén presentes
+  
       const requiredHealthcheckFields = ['acceptable_codes', 'crontab', 'max_retries', 'path', 'port', 'timeout', 'type'];
       const missingFields = requiredHealthcheckFields.filter(field => !recordData.healthcheck_settings[field]);
-      
+  
       if (missingFields.length > 0) {
         throw new Error(`Faltan campos requeridos de healthcheck: ${missingFields.join(', ')}`);
       }
-
-      // Estructurar los datos según el tipo de registro
+  
       switch (localRecord.type) {
         case 'single':
           recordData = {
@@ -119,54 +116,52 @@ const DNSRegisterCard = ({
             direction: localRecord.direction
           };
           break;
-
+  
         case 'multi':
           recordData = {
             ...recordData,
-            direction: localRecord.directions, 
+            direction: localRecord.directions.join(","),
             counter: localRecord.counter
           };
           break;
-
+  
         case 'weight':
           recordData = {
             ...recordData,
-            direction: localRecord.weightedDirections.map(wd => wd.ip),
-            weight: localRecord.weightedDirections.map(wd => wd.weight.toString())
+            direction: localRecord.weightedDirections
+              .map(wd => `${wd.ip}:${wd.weight}`)
+              .join(',')
           };
           break;
-
+  
         case 'geo':
-          const geoDirectionsObj = {};
-          localRecord.geoDirections.forEach(gd => {
-            geoDirectionsObj[gd.country] = gd.ip;
-          });
-          
           recordData = {
             ...recordData,
-            direction: geoDirectionsObj
+            direction: localRecord.geoDirections
+              .map(gd => `${gd.ip}:${gd.country}`)
+              .join(',')
           };
           break;
-
+  
         case 'round-trip':
           recordData = {
             ...recordData,
-            direction: localRecord.directions // Array de direcciones
+            direction: localRecord.directions.join(",")
           };
           break;
-
+  
         default:
           throw new Error('Tipo de registro no válido');
       }
-
-      // Llamar a la API para crear el registro
+  
       const result = await dnsApi.createDNSRecord(recordData);
-
+  
       if (result.success) {
         window.location.reload();
       } else {
-        alert(`Error al crear el registro: ${result.message}`);
+        alert(`Error al crear el registro: ${result.message || 'Error desconocido'}`);
       }
+  
     } catch (error) {
       console.error('Error al crear el registro:', error);
       alert('Error al crear el registro DNS');
@@ -416,16 +411,7 @@ const DNSRegisterCard = ({
           <Form.Select
             name="healthcheck_type"
             value={localRecord.healthcheck_settings.type}
-            onChange={(e) => {
-              const { value } = e.target;
-              setLocalRecord(prev => ({
-                ...prev,
-                healthcheck_settings: {
-                  ...prev.healthcheck_settings,
-                  type: value
-                }
-              }));
-            }}
+            onChange={handleLocalInputChange}
           >
             <option value="http">HTTP</option>
             <option value="tcp">TCP</option>
