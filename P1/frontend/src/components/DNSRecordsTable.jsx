@@ -1,8 +1,8 @@
 import React from 'react';
 import { Row, Col, Card, Table, Button } from 'react-bootstrap';
-import { RotateCw, Edit2 } from "lucide-react";
+import { RotateCw, Edit2, Trash2 } from "lucide-react";
 
-const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStatus, onEditRecord }) => {
+const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStatus, onEditRecord, onDeleteRecord }) => {
   // Permite devolver los registros en base al tipo donde se ordenan para la tabla
   const renderDirections = (record) => {
     if (record.type === "multi" || record.type === "round-trip") {
@@ -81,7 +81,7 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
                     <th>Tipo</th>
                     <th>Dirección</th>
                     <th>Estado</th>
-                    <th>Acciones</th>
+                    <th style={{ width: '120px' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -93,7 +93,7 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
                       <td className="direction-cell">{renderDirections(record)}</td>
                       <td>{renderStatusBadge(record.status)}</td>
                       <td>
-                        <div className="d-flex gap-2">
+                        <div className="d-flex gap-2 justify-content-center">
                           <Button
                             variant="outline-primary"
                             size="sm"
@@ -107,6 +107,13 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
                             onClick={() => onEditRecord(record)}
                           >
                             <Edit2 size={16} />
+                          </Button>
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => onDeleteRecord(record)}
+                          >
+                            <Trash2 size={16} />
                           </Button>
                         </div>
                       </td>

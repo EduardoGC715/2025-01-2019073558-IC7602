@@ -96,8 +96,7 @@ export const dnsApi = {
       const response = await api.get('/firebase-status');
   
       if (response.status === 200) {
-        return {
-          
+        return {  
           message: true
         };
       }
@@ -106,7 +105,42 @@ export const dnsApi = {
             message: false
           };  
       }
+    },
+  
+  // Actualiza en la base de datos los registros
+  createDNSRecord: async (recordData) => {
+    try {
+      const response = await api.post('/domains', recordData);
+      return {
+        success: response.status === 201,
+        data: response.data,
+        message: 'Registro creado exitosamente'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al crear el registro'
+      };
     }
+  },
+
+  deleteDNSRecord: async (record) => {
+    try {
+      const response = await api.delete('/domains', {
+        data: record
+      });
+      return {
+        success: response.status === 200,
+        message: 'Registro eliminado exitosamente'
+      };
+    } catch (error) {
+      console.error('Error al eliminar el registro DNS:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al eliminar el registro'
+      };
+    }
+  }
 };
 
 

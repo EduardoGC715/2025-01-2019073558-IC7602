@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Form, Button } from "react-bootstrap";
-import { Plus, Trash2 } from "lucide-react";
 
 import SingleConfig from "./configCards/singleConfig";
 import MultiConfig from "./configCards/multiConfig";
 import WeightConfig from "./configCards/weightConfig";
 import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
+import { dnsApi} from "../services/api";
+
 
 const DNSRegisterCard = ({
   show,
   handleClose,
   newRecord,
-  handleInputChange,
-  handleAddRecord
+  handleInputChange
 }) => {
   // Inicializar estado local para manejar el formulario
   const [localRecord, setLocalRecord] = useState({
@@ -55,6 +55,78 @@ const DNSRegisterCard = ({
     handleInputChange(e);
   };
 
+  const handleAddRecord = async () => {
+    try {
+      // Objeto base para todos los tipos
+      let recordData = {
+        domain: localRecord.domain,
+        type: localRecord.type,
+        status: true // Todos los registros nuevos inician como activos
+      };
+
+      // Estructurar los datos según el tipo de registro
+      switch (localRecord.type) {
+        case 'single':
+          recordData = {
+            ...recordData,
+            direction: localRecord.direction
+          };
+          break;
+
+        case 'multi':
+          recordData = {
+            ...recordData,
+            direction: localRecord.directions, 
+            counter: localRecord.counter
+          };
+          break;
+
+        case 'weight':
+          recordData = {
+            ...recordData,
+            direction: localRecord.weightedDirections.map(wd => wd.ip),
+            weight: localRecord.weightedDirections.map(wd => wd.weight.toString())
+          };
+          break;
+
+        case 'geo':
+          const geoDirectionsObj = {};
+          localRecord.geoDirections.forEach(gd => {
+            geoDirectionsObj[gd.country] = gd.ip;
+          });
+          
+          recordData = {
+            ...recordData,
+            direction: geoDirectionsObj
+          };
+          break;
+
+        case 'round-trip':
+          recordData = {
+            ...recordData,
+            direction: localRecord.directions // Array de direcciones
+          };
+          break;
+
+        default:
+          throw new Error('Tipo de registro no válido');
+      }
+
+      // Llamar a la API para crear el registro
+      const result = await dnsApi.createDNSRecord(recordData);
+
+      if (result.success) {
+        window.location.reload();
+
+      } else {
+        alert(`Error al crear el registro: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error al crear el registro:', error);
+      alert('Error al crear el registro DNS');
+    }
+  };
+    
   // Handlers MULTI
   const handleAddDirection = () => {
     const updatedDirections = [...(localRecord.directions || []), ""];
@@ -147,38 +219,6 @@ const DNSRegisterCard = ({
     return domainRegex.test(domain);
   };
 
-  // Función para preparar y enviar el registro con el formato adecuado
-  const handleSaveRecord = () => {
-    // Copia del registro local para modificaciones
-    let recordToSave = { ...localRecord };
-
-    // Procesar direcciones según el tipo de registro
-    if (localRecord.type === "multi") {
-      // Convertir array de direcciones a string separado por comas
-      recordToSave.direction = localRecord.directions.join(", ");
-    } 
-    else if (localRecord.type === "weight") {
-      // Convertir array de objetos {ip, weight} a string con formato "ip:weight, ip:weight"
-      recordToSave.direction = localRecord.weightedDirections
-        .map(item => `${item.ip}:${item.weight}`)
-        .join(", ");
-    } 
-    else if (localRecord.type === "geo") {
-      // Convertir array de objetos {ip, country} a string con formato "ip:country, ip:country"
-      recordToSave.direction = localRecord.geoDirections
-        .map(item => `${item.ip}:${item.country}`)
-        .join(", ");
-    }
-    
-    // Actualizar el estado direction antes de guardar
-    handleInputChange({ target: { name: "direction", value: recordToSave.direction } });
-    
-    // Añadir un pequeño retraso para asegurar que el estado se actualizó
-    setTimeout(() => {
-      handleAddRecord();
-    }, 100);
-  };
-
   return (
     <Modal show={show} onHide={handleClose} size="lg">
       <Modal.Header closeButton>
@@ -247,9 +287,16 @@ const DNSRegisterCard = ({
           )}
 
           {localRecord.type === "round-trip" && (
-            <RoundTripConfig editedRecord={localRecord} handleInputChange={handleLocalInputChange} />
+            <RoundTripConfig
+              editedRecord={localRecord}
+              handleInputChange={handleLocalInputChange}
+              handleAddDirection={handleAddDirection}
+              handleDirectionChange={handleDirectionChange}
+              handleRemoveDirection={handleRemoveDirection}
+            />
           )}
         <hr />
+        
         <h6>Configuración del Healthcheck</h6>
 
         <Form.Group className="mb-3">
@@ -339,9 +386,6 @@ const DNSRegisterCard = ({
         <Button
           variant="primary"
           onClick={() => {
-            console.log(localRecord.domain);
-            console.log(localRecord.weightedDirections);
-            console.log(localRecord.directions);
             handleAddRecord();
           }}
           disabled={
