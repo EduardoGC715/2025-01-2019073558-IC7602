@@ -8,6 +8,7 @@ import datetime
 import sys
 import os
 import time
+import re
 import argparse
 from crontab import CronTab 
 
@@ -471,8 +472,10 @@ def build_health_check_args(check_type, ip, config, domain_path=None):
 
 def scan_and_update_crontab():
     """
-    Scans Firebase for domains and IPs to monitor and updates crontab with 
-    individual health check jobs
+    Scans Firebase for domains and IPs to monitor and updates crontab by:
+    1. Keeping existing jobs for domains/IPs still in Firebase
+    2. Adding new jobs for domains/IPs not currently in crontab
+    3. Only removing jobs for domains/IPs no longer in Firebase
     """
     print("Starting Firebase scan to update crontab...")
 
@@ -497,12 +500,32 @@ def scan_and_update_crontab():
     # Create a crontab for the current user
     cron = CronTab(user=True)
     
-    # Clear existing health check jobs
-    cron.remove_all(comment="health_check")
+    # Get existing health check jobs and store by their identifiers
+    existing_jobs = {}
+    for job in cron.find_comment("health_check"):
+        # Extract domain_path, ip_idx, and ip from command
+        cmd = job.command
+        domain_path_match = re.search(r"--domain-path '([^']+)'", cmd)
+        ip_idx_match = re.search(r"--ip-idx '([^']+)'", cmd)
+        ip_match = re.search(r"--ip '([^']+)'", cmd)
+        
+        if domain_path_match and ip_idx_match and ip_match:
+            domain_path = domain_path_match.group(1)
+            ip_idx = ip_idx_match.group(1)
+            ip = ip_match.group(1)
+            
+            # Create a unique identifier for this job
+            job_id = f"{domain_path}|{ip_idx}|{ip}"
+            existing_jobs[job_id] = job
     
-    job_count = 0
+    print(f"Found {len(existing_jobs)} existing health check jobs")
     
-    # Iterate through the domains and create cron jobs
+    # Set to track jobs that should exist
+    required_jobs = set()
+    new_job_count = 0
+    updated_job_count = 0
+    
+    # Iterate through the domains and create/update cron jobs
     for tld_name, tld_data in all_tlds.items():
         if not isinstance(tld_data, dict):
             continue
@@ -538,7 +561,6 @@ def scan_and_update_crontab():
                         if not check_type:
                             continue
                         
-                        # Create a cron job for this single IP
                         frequency = health_check_config.get("crontab", "*/2 * * * *")
                         
                         # Check if frequency already includes full cron format (5 parts)
@@ -548,16 +570,34 @@ def scan_and_update_crontab():
                         
                         command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx 'ip' --ip '{ip}' --check-type '{check_type}'"
                         
-                        # Create cron job with the appropriate frequency
-                        job = cron.new(command=command, comment="health_check")
-                        try:
-                            job.setall(frequency)  # Set the full cron expression
-                        except Exception as e:
-                            print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
-                            print(f"Using default schedule '*/2 * * * *' instead")
-                            job.setall("*/2 * * * *")
+                        # Create job ID for this entry
+                        job_id = f"{domain_path}|ip|{ip}"
+                        required_jobs.add(job_id)
                         
-                        job_count += 1
+                        # Check if job already exists
+                        if job_id in existing_jobs:
+                            existing_job = existing_jobs[job_id]
+                            old_schedule = str(existing_job.slices)
+                            
+                            # Only update if schedule changed
+                            if old_schedule != frequency:
+                                try:
+                                    existing_job.setall(frequency)
+                                    updated_job_count += 1
+                                    print(f"Updated schedule for {job_id}: {old_schedule} -> {frequency}")
+                                except Exception as e:
+                                    print(f"Error updating cron schedule '{frequency}' for {ip}: {e}")
+                        else:
+                            # Create a new job
+                            job = cron.new(command=command, comment="health_check")
+                            try:
+                                job.setall(frequency)
+                                new_job_count += 1
+                                print(f"Created new job for {job_id} with schedule {frequency}")
+                            except Exception as e:
+                                print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
+                                print(f"Using default schedule '*/2 * * * *' instead")
+                                job.setall("*/2 * * * *")
                 
                 # CASE 2: Multiple IPs in the "ips" field
                 elif "ips" in subdomain_data:
@@ -586,8 +626,7 @@ def scan_and_update_crontab():
                         if not check_type:
                             continue
                         
-                        # Create a cron job for this specific IP
-                        frequency = health_check_config.get("crontab", "*/2 * * * *")  # Default to every 2 minutes
+                        frequency = health_check_config.get("crontab", "*/2 * * * *")
 
                         # Check if frequency already includes full cron format (5 parts)
                         if " " not in frequency or frequency.count(" ") < 4:
@@ -596,20 +635,46 @@ def scan_and_update_crontab():
 
                         command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx '{ip_idx}' --ip '{ip}' --check-type '{check_type}'"
 
-                        # Create cron job with the appropriate frequency
-                        job = cron.new(command=command, comment="health_check")
-                        try:
-                            job.setall(frequency)  # Set the full cron expression
-                        except Exception as e:
-                            print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
-                            print(f"Using default schedule '*/2 * * * *' instead")
-                            job.setall("*/2 * * * *")
+                        # Create job ID for this entry
+                        job_id = f"{domain_path}|{ip_idx}|{ip}"
+                        required_jobs.add(job_id)
                         
-                        job_count += 1
+                        # Check if job already exists
+                        if job_id in existing_jobs:
+                            existing_job = existing_jobs[job_id]
+                            old_schedule = str(existing_job.slices)
+                            
+                            # Only update if schedule changed
+                            if old_schedule != frequency:
+                                try:
+                                    existing_job.setall(frequency)
+                                    updated_job_count += 1
+                                    print(f"Updated schedule for {job_id}: {old_schedule} -> {frequency}")
+                                except Exception as e:
+                                    print(f"Error updating cron schedule '{frequency}' for {ip}: {e}")
+                        else:
+                            # Create a new job
+                            job = cron.new(command=command, comment="health_check")
+                            try:
+                                job.setall(frequency)
+                                new_job_count += 1
+                                print(f"Created new job for {job_id} with schedule {frequency}")
+                            except Exception as e:
+                                print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
+                                print(f"Using default schedule '*/2 * * * *' instead")
+                                job.setall("*/2 * * * *")
+    
+    # Remove jobs that are no longer needed
+    removal_count = 0
+    for job_id, job in existing_jobs.items():
+        if job_id not in required_jobs:
+            cron.remove(job)
+            removal_count += 1
+            print(f"Removed obsolete job: {job_id}")
     
     # Write the updated crontab
     cron.write()
-    print(f"Crontab updated with {job_count} health check jobs")
+    print(f"Crontab updated: {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs")
 
 def execute_single_check(domain_path, ip_idx, ip, check_type):
     """
