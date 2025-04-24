@@ -13,6 +13,10 @@
 #include <ctype.h>
 #include <stdarg.h>
 
+// Código basado en:
+// https: // www.geeksforgeeks.org/tcp-server-client-implementation-in-c/
+// https: // medium.com/@trish07/simple-steps-to-build-an-http-client-in-c-8e225b5c718c
+
 #define BUFFER_SIZE 4096
 #define DEFAULT_TIMEOUT 5     // 5 seconds default timeout
 #define DEFAULT_MAX_RETRIES 3 // 3 retries by default

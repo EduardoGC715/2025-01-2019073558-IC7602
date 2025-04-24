@@ -116,7 +116,7 @@ export const databaseApi = {
     try {
       const response = await api.get('/ip-to-country/all');
       if (response.status === 200) {
-        return response.data; // Array of { id, start_ip, end_ip, country_name, … }
+        return response.data;
       } else {
         console.warn('Unexpected response from IPToCountry API:', response.status);
         return [];
@@ -192,5 +192,22 @@ export const databaseApi = {
         error: error.response?.data?.error || error.message
       };
     }
-  }  
+  },  
+  checkCountry: async (country) => {
+    try {
+      const response = await api.get('/countries', {
+        params: { country_code: country }
+      });
+
+      if (response.status === 200) {
+        return response.data.exists; // true o false
+      } else {
+        console.warn('Unexpected status:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error fetching country:', error);
+      return false;
+    }
+  }
 }; 

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Form, Button, Card } from "react-bootstrap";
 import { Plus, Trash2 } from "lucide-react";
+import { databaseApi } from "../services/api";
 
 import SingleConfig from "./configCards/singleConfig";
 import MultiConfig from "./configCards/multiConfig";
 import WeightConfig from "./configCards/weightConfig";
 import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
+
 
 const EditRecordModal = ({ show, handleClose, record, onSave }) => {
   const [editedRecord, setEditedRecord] = useState({
@@ -138,7 +140,23 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     return domainRegex.test(domain);
   };
 
-  const handleSave = () => {
+  const checkWeights = (weightedAddresses) => {
+    let sum = 0;
+    for (let i = 0; i < weightedAddresses.length; i++) {
+      const address = weightedAddresses[i];
+      if (address.weight === "" || address.ip === "") {
+        return true; // Si hay un campo vacío, no es válido
+      }
+      const numWeight = Number(address.weight);
+      if (isNaN(numWeight) || numWeight < 0) {
+        return true; // Si no es un número o es negativo, no es válido
+      }
+      sum += numWeight;
+    }
+    return sum !== 1; // Si todo es válido, retorna false
+  };
+
+  const handleSave = async () => {
     let updatedDirection = editedRecord.direction;
 
     if (editedRecord.type === "multi") {
@@ -148,6 +166,25 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         .map(item => `${item.ip}:${item.weight}`)
         .join(", ");
     } else if (editedRecord.type === "geo") {
+      for (let i = 0; i < editedRecord.geoDirections.length; i++) {
+        const item = editedRecord.geoDirections[i];
+        if (item.ip === "" || item.country === "") {
+          alert("Por favor, completa todos los campos de las direcciones geográficas.");
+          return;
+        }
+        try {
+          const countryExists = await databaseApi.checkCountry(item.country);
+          if (!countryExists) {
+            alert(`El país "${item.country}" no es válido.`);
+            return;
+          }
+        } catch (error) {
+          console.error("Error al verificar el país:", error);
+          alert("Ocurrió un error al verificar el país. Inténtalo de nuevo.");
+          return;
+        }
+      }
+
       updatedDirection = editedRecord.geoDirections
         .map(item => `${item.ip}:${item.country}`)
         .join(", ");
@@ -252,11 +289,12 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
             editedRecord.type === "multi"
               ? editedRecord.directions.length === 0
               : editedRecord.type === "weight"
-                ? !editedRecord.weightedDirections || editedRecord.weightedDirections.length === 0
+                ? !editedRecord.weightedDirections ||
+                  editedRecord.weightedDirections.length === 0 || checkWeights(editedRecord.weightedDirections)
                 : editedRecord.type === "geo"
                   ? !editedRecord.geoDirections || editedRecord.geoDirections.length === 0
                   : !editedRecord.direction
-          )
+          )          
         }
       >
           Guardar Cambios

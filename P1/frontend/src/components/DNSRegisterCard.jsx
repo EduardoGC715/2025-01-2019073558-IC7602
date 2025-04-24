@@ -147,6 +147,22 @@ const DNSRegisterCard = ({
     return domainRegex.test(domain);
   };
 
+  const checkWeights = (weightedAddresses) => {
+    let sum = 0;
+    for (let i = 0; i < weightedAddresses.length; i++) {
+      const address = weightedAddresses[i];
+      if (address.weight === "" || address.ip === "") {
+        return true; // Si hay un campo vacío, no es válido
+      }
+      const numWeight = Number(address.weight);
+      if (isNaN(numWeight) || numWeight < 0) {
+        return true; // Si no es un número o es negativo, no es válido
+      }
+      sum += numWeight;
+    }
+    return sum !== 1; // Si todo es válido, retorna false
+  };
+
   // Función para preparar y enviar el registro con el formato adecuado
   const handleSaveRecord = () => {
     // Copia del registro local para modificaciones
@@ -349,7 +365,7 @@ const DNSRegisterCard = ({
             (localRecord.type === "single" && !localRecord.direction) ||
             (localRecord.type === "multi" && (!localRecord.directions || localRecord.directions.length === 0)) ||
             (localRecord.type === "weight" && (!localRecord.weightedDirections || localRecord.weightedDirections.length === 0 || 
-                localRecord.weightedDirections.some(dir => !dir.ip || !dir.weight))) ||
+                localRecord.weightedDirections.some(dir => !dir.ip || !dir.weight) || checkWeights(localRecord.weightedDirections)))  ||
             (localRecord.type === "geo" && (!localRecord.geoDirections || localRecord.geoDirections.length === 0 || 
                 localRecord.geoDirections.some(dir => !dir.ip || !dir.country)))
           }

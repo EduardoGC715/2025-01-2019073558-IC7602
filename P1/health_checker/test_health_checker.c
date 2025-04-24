@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <string.h>
 
+// Código basado en:
+// https://libcheck.github.io/check/doc/check_html/check_3.html
+// https://developertesting.rocks/tools/check/
+
 // We need to mock the main function to avoid conflicts
 #define main health_checker_main
 // Include health_checker.c directly to test its functions
