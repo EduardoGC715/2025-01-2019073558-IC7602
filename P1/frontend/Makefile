@@ -3,6 +3,6 @@
 push:
 	@echo "Pushing to DockerHub"
 ifdef version
-	docker push dafver20/p1-ui:$(version)
+	docker push davfer20/p1-ui:$(version)
 endif
-	docker push dafver20/p1-ui:latest
+	docker push davfer20/p1-ui:latest
