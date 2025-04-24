@@ -23,6 +23,7 @@ import os
 domain_ref = db.reference("/domains")
 ip_to_country_ref = db.reference("/ip_to_country")
 healthcheckers_ref = db.reference("/healthcheckers")
+countries_ref = db.reference("/countries")
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -322,6 +323,20 @@ def exists():
             # encodedBytes = base64.b64encode(bytes).decode("utf-8")
             # logger.debug("Received response (raw bytes) base 64: %s", bytes)
             return "Ese dominio no existe", 404
+
+@app.route("/api/countries", methods=["GET"])
+def countries():
+    if request.method == "GET":
+        country_code = request.args.get("country_code")
+
+        if not country_code:
+            return {"exists": False}
+        ref = countries_ref.child(country_code)
+        country = ref.get()
+        if not country:
+            return {"exists": False}
+        return {"exists": True}
+
 
 
 @app.route("/api/status", methods=["GET"])
