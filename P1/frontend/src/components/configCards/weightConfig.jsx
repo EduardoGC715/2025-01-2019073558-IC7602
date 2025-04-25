@@ -33,7 +33,7 @@ const WeightConfig = ({ editedRecord, handleAddWeightedDirection, handleWeighted
           </Button>
         </div>
       ))}
-      <Form.Text className="text-muted">Formato: IP y valor de peso numérico</Form.Text>
+      <Form.Text className="text-muted">Formato: IP y valor de peso numérico que juntos tienen que sumar 1</Form.Text>
     </Card.Body>
   </Card>
 );
