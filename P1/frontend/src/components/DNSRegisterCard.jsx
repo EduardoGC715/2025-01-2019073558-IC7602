@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Form, Button } from "react-bootstrap";
-import { Plus, Trash2 } from "lucide-react";
 
 import SingleConfig from "./configCards/singleConfig";
 import MultiConfig from "./configCards/multiConfig";
 import WeightConfig from "./configCards/weightConfig";
 import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
+import { dnsApi, databaseApi} from "../services/api";
+
 
 const DNSRegisterCard = ({
   show,
   handleClose,
   newRecord,
-  handleInputChange,
-  handleAddRecord
+  handleInputChange
 }) => {
   // Inicializar estado local para manejar el formulario
   const [localRecord, setLocalRecord] = useState({
@@ -23,7 +23,16 @@ const DNSRegisterCard = ({
     directions: [],
     counter: "",
     weightedDirections: [],
-    geoDirections: []
+    geoDirections: [],
+    healthcheck_settings: {
+      acceptable_codes: "200, 304",
+      crontab: "*/1 * * * *",
+      max_retries: 3,
+      path: "/",
+      port: 80,
+      timeout: 5000,
+      type: "http"
+    }
   });
 
   // Sincronizar con props
@@ -35,7 +44,16 @@ const DNSRegisterCard = ({
       directions: newRecord.directions || [],
       counter: newRecord.counter ?? "",
       weightedDirections: newRecord.weightedDirections || [],
-      geoDirections: newRecord.geoDirections || []
+      geoDirections: newRecord.geoDirections || [],
+      healthcheck_settings: newRecord.healthcheck_settings || {
+        acceptable_codes: "200, 304",
+        crontab: "*/1 * * * *",
+        max_retries: 3,
+        path: "/",
+        port: 80,
+        timeout: 5000,
+        type: "http"
+      }
     });
   }, [newRecord]);
 
@@ -48,13 +66,126 @@ const DNSRegisterCard = ({
       console.log("Dominio no válido");
     }
 
-    setLocalRecord(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    handleInputChange(e);
+    // Check if the input is a healthcheck setting
+    if (name.startsWith('healthcheck_')) {
+      const settingName = name.replace('healthcheck_', '');
+      setLocalRecord(prev => ({
+        ...prev,
+        healthcheck_settings: {
+          ...prev.healthcheck_settings,
+          [settingName]: value
+        }
+      }));
+    } else {
+      setLocalRecord(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      handleInputChange(e);
+    }
   };
 
+  const handleAddRecord = async () => {
+    try {
+      let recordData = {
+        domain: localRecord.domain,
+        type: localRecord.type,
+        status: true,
+        healthcheck_settings: {
+          acceptable_codes: localRecord.healthcheck_settings.acceptable_codes,
+          crontab: localRecord.healthcheck_settings.crontab,
+          max_retries: parseInt(localRecord.healthcheck_settings.max_retries),
+          path: localRecord.healthcheck_settings.path,
+          port: parseInt(localRecord.healthcheck_settings.port),
+          timeout: parseInt(localRecord.healthcheck_settings.timeout),
+          type: localRecord.healthcheck_settings.type
+        }
+      };
+  
+      const requiredHealthcheckFields = ['acceptable_codes', 'crontab', 'max_retries', 'path', 'port', 'timeout', 'type'];
+      const missingFields = requiredHealthcheckFields.filter(field => !recordData.healthcheck_settings[field]);
+  
+      if (missingFields.length > 0) {
+        throw new Error(`Faltan campos requeridos de healthcheck: ${missingFields.join(', ')}`);
+      }
+  
+      switch (localRecord.type) {
+        case 'single':
+          recordData = {
+            ...recordData,
+            direction: localRecord.direction
+          };
+          break;
+  
+        case 'multi':
+          recordData = {
+            ...recordData,
+            direction: localRecord.directions.join(","),
+            counter: localRecord.counter
+          };
+          break;
+  
+        case 'weight':
+          recordData = {
+            ...recordData,
+            direction: localRecord.weightedDirections
+              .map(wd => `${wd.ip}:${wd.weight}`)
+              .join(',')
+          };
+          break;
+  
+        case 'geo':
+          for (let i = 0; i < localRecord.geoDirections.length; i++) {
+            const item = localRecord.geoDirections[i];
+            if (item.ip === "" || item.country === "") {
+              alert("Por favor, completa todos los campos de las direcciones geográficas.");
+              return;
+            }
+            try {
+              const countryExists = await databaseApi.checkCountry(item.country);
+              if (!countryExists) {
+                alert(`El país "${item.country}" no es válido.`);
+                return;
+              }
+            } catch (error) {
+              console.error("Error al verificar el país:", error);
+              alert("Ocurrió un error al verificar el país. Inténtalo de nuevo.");
+              return;
+            }
+          }
+          recordData = {
+            ...recordData,
+            direction: localRecord.geoDirections
+              .map(gd => `${gd.ip}:${gd.country}`)
+              .join(',')
+          };
+          break;
+  
+        case 'round-trip':
+          recordData = {
+            ...recordData,
+            direction: localRecord.directions.join(",")
+          };
+          break;
+  
+        default:
+          throw new Error('Tipo de registro no válido');
+      }
+  
+      const result = await dnsApi.createDNSRecord(recordData);
+  
+      if (result.success) {
+        window.location.reload();
+      } else {
+        alert(`Error al crear el registro: ${result.message || 'Error desconocido'}`);
+      }
+  
+    } catch (error) {
+      console.error('Error al crear el registro:', error);
+      alert('Error al crear el registro DNS');
+    }
+  };
+    
   // Handlers MULTI
   const handleAddDirection = () => {
     const updatedDirections = [...(localRecord.directions || []), ""];
@@ -263,18 +394,25 @@ const DNSRegisterCard = ({
           )}
 
           {localRecord.type === "round-trip" && (
-            <RoundTripConfig editedRecord={localRecord} handleInputChange={handleLocalInputChange} />
+            <RoundTripConfig
+              editedRecord={localRecord}
+              handleInputChange={handleLocalInputChange}
+              handleAddDirection={handleAddDirection}
+              handleDirectionChange={handleDirectionChange}
+              handleRemoveDirection={handleRemoveDirection}
+            />
           )}
         <hr />
+        
         <h6>Configuración del Healthcheck</h6>
 
         <Form.Group className="mb-3">
           <Form.Label>Códigos aceptados</Form.Label>
           <Form.Control
             type="text"
-            name="acceptable_codes"
+            name="healthcheck_acceptable_codes"
             placeholder="200, 304"
-            value={localRecord.healthcheck_settings?.acceptable_codes || "200, 304"}
+            value={localRecord.healthcheck_settings.acceptable_codes}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -283,9 +421,9 @@ const DNSRegisterCard = ({
           <Form.Label>Crontab</Form.Label>
           <Form.Control
             type="text"
-            name="crontab"
+            name="healthcheck_crontab"
             placeholder="*/1 * * * *"
-            value={localRecord.healthcheck_settings?.crontab || "*/1 * * * *"}
+            value={localRecord.healthcheck_settings.crontab}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -294,9 +432,9 @@ const DNSRegisterCard = ({
           <Form.Label>Número de reintentos</Form.Label>
           <Form.Control
             type="number"
-            name="max_retries"
+            name="healthcheck_max_retries"
             placeholder="3"
-            value={localRecord.healthcheck_settings?.max_retries || 3}
+            value={localRecord.healthcheck_settings.max_retries}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -305,9 +443,9 @@ const DNSRegisterCard = ({
           <Form.Label>Path</Form.Label>
           <Form.Control
             type="text"
-            name="path"
+            name="healthcheck_path"
             placeholder="/"
-            value={localRecord.healthcheck_settings?.path || "/"}
+            value={localRecord.healthcheck_settings.path}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -316,9 +454,9 @@ const DNSRegisterCard = ({
           <Form.Label>Port</Form.Label>
           <Form.Control
             type="number"
-            name="port"
+            name="healthcheck_port"
             placeholder="80"
-            value={localRecord.healthcheck_settings?.port || 80}
+            value={localRecord.healthcheck_settings.port}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -327,9 +465,9 @@ const DNSRegisterCard = ({
           <Form.Label>Timeout (ms)</Form.Label>
           <Form.Control
             type="number"
-            name="timeout"
+            name="healthcheck_timeout"
             placeholder="5000"
-            value={localRecord.healthcheck_settings?.timeout || 5000}
+            value={localRecord.healthcheck_settings.timeout}
             onChange={handleLocalInputChange}
           />
         </Form.Group>
@@ -337,8 +475,8 @@ const DNSRegisterCard = ({
         <Form.Group className="mb-3">
           <Form.Label>Tipo de request</Form.Label>
           <Form.Select
-            name="type"
-            value={localRecord.healthcheck_settings?.type || "http"}
+            name="healthcheck_type"
+            value={localRecord.healthcheck_settings.type}
             onChange={handleLocalInputChange}
           >
             <option value="http">HTTP</option>
@@ -355,9 +493,6 @@ const DNSRegisterCard = ({
         <Button
           variant="primary"
           onClick={() => {
-            console.log(localRecord.domain);
-            console.log(localRecord.weightedDirections);
-            console.log(localRecord.directions);
             handleAddRecord();
           }}
           disabled={

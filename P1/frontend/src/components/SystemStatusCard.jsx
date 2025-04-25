@@ -8,21 +8,15 @@ const SystemStatusCard = ({ healthStatus, renderHealthIcon }) => {
         <Card>
           <Card.Header>Estado del Sistema</Card.Header>
           <Card.Body>
-            <Row>
+            <Row className="justify-content-center">
               <Col md={4}>
-                <div className="d-flex align-items-center">
-                  {renderHealthIcon(healthStatus.servers)}
-                  <span className="ms-2">Servidores DNS</span>
-                </div>
-              </Col>
-              <Col md={4}>
-                <div className="d-flex align-items-center">
+                <div className="d-flex align-items-center justify-content-center">
                   {renderHealthIcon(healthStatus.database)}
                   <span className="ms-2">Base de Datos</span>
                 </div>
               </Col>
               <Col md={4}>
-                <div className="d-flex align-items-center">
+                <div className="d-flex align-items-center justify-content-center">
                   {renderHealthIcon(healthStatus.api)}
                   <span className="ms-2">API</span>
                 </div>

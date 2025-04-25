@@ -22,9 +22,7 @@ export const dnsApi = {
     try {
       const response = await api.get("/all-domains");
       if (response.status === 200) {
-        console.log(response.data[0]);
-        console.log(response.data[1]);
-        console.log(response.data);
+
         return response.data; // [{ id, domain, type, direction, status }]
       } else {
         console.warn(
@@ -94,19 +92,80 @@ export const dnsApi = {
     }
   },
 
-  checkFirebaseStatus: async () => {
-    const response = await api.get("/firebase-status");
-
-    if (response.status === 200) {
+  checkFirebaseStatus : async () =>
+    {
+      const response = await api.get('/firebase-status');
+  
+      if (response.status === 200) {
+        return {  
+          message: true
+        };
+      }
+        else {
+          return {
+            message: false
+          };  
+      }
+    },
+  
+  // Actualiza en la base de datos los registros
+  createDNSRecord: async (recordData) => {
+    try {
+      const response = await api.post('/domains', recordData);
       return {
-        message: true,
+        success: response.status === 201,
+        data: response.data,
+        message: response.data.message || 'Registro creado exitosamente'
       };
-    } else {
+    } catch (error) {
       return {
-        message: false,
+        success: false,
+        message: error.response?.data?.error || 'Error al crear el registro'
       };
     }
   },
+
+  deleteDNSRecord: async (record) => {
+    try {
+      const response = await api.delete('/domains', {
+        data: record
+      });
+      return {
+        success: response.status === 200,
+        message: 'Registro eliminado exitosamente'
+      };
+    } catch (error) {
+      console.error('Error al eliminar el registro DNS:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al eliminar el registro'
+      };
+    }
+  },
+
+  editDNSRecord: async (recordData) => {
+    try {
+      const response = await api.put('/domains', recordData);
+      
+      if (response.status === 201) {
+        return {
+          success: true,
+          data: response.data,
+          message: 'Registro actualizado exitosamente'
+        };
+      } else {
+        return {
+          success: false,
+          message: response.data?.error || 'Error al actualizar el registro'
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al actualizar el registro'
+      };
+    }
+  }
 };
 
 // IP to Country Database API

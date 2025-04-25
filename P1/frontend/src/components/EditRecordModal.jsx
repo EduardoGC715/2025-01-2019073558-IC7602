@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Form, Button, Card } from "react-bootstrap";
 import { Plus, Trash2 } from "lucide-react";
-import { databaseApi } from "../services/api";
+import { dnsApi, databaseApi } from "../services/api";
 
 import SingleConfig from "./configCards/singleConfig";
 import MultiConfig from "./configCards/multiConfig";
@@ -18,7 +18,16 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     directions: [],
     counter: "",
     weightedDirections: [],
-    geoDirections: []
+    geoDirections: [],
+    healthcheck_settings: {
+      acceptable_codes: "200, 304",
+      crontab: "*/1 * * * *",
+      max_retries: 3,
+      path: "/",
+      port: 80,
+      timeout: 5000,
+      type: "http"
+    }
   });
 
   useEffect(() => {
@@ -30,13 +39,11 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
       if (record.type === "multi") {
         directions = record.direction.split(",").map(d => d.trim());
       } else if (record.type === "weight" && record.direction) {
-        // Convertir de formato "ip:peso,ip:peso" a array de objetos
         weightedDirections = record.direction.split(",").map(item => {
           const [ip, weight] = item.trim().split(":");
           return { ip: ip || "", weight: weight || "" };
         });
       } else if (record.type === "geo" && record.direction) {
-        // Convertir de formato "ip:país,ip:país" a array de objetos
         geoDirections = record.direction.split(",").map(item => {
           const [ip, country] = item.trim().split(":");
           return { ip: ip || "", country: country || "" };
@@ -48,17 +55,38 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         directions,
         weightedDirections,
         geoDirections,
-        direction: ["multi", "weight", "geo"].includes(record.type) ? "" : record.direction
+        direction: ["multi", "weight", "geo"].includes(record.type) ? "" : record.direction,
+        healthcheck_settings: record.healthcheck_settings || {
+          acceptable_codes: "200, 304",
+          crontab: "*/1 * * * *",
+          max_retries: 3,
+          path: "/",
+          port: 80,
+          timeout: 5000,
+          type: "http"
+        }
       });
     }
   }, [record]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setEditedRecord(prev => ({
-      ...prev,
-      [name]: value
-    }));
+
+    if (name.startsWith('healthcheck_')) {
+      const settingName = name.replace('healthcheck_', '');
+      setEditedRecord(prev => ({
+        ...prev,
+        healthcheck_settings: {
+          ...prev.healthcheck_settings,
+          [settingName]: value
+        }
+      }));
+    } else {
+      setEditedRecord(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   // Handlers para direcciones múltiples (tipo "multi")
@@ -155,48 +183,95 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     }
     return sum !== 1; // Si todo es válido, retorna false
   };
-
   const handleSave = async () => {
-    let updatedDirection = editedRecord.direction;
-
-    if (editedRecord.type === "multi") {
-      updatedDirection = editedRecord.directions.join(", ");
-    } else if (editedRecord.type === "weight") {
-      updatedDirection = editedRecord.weightedDirections
-        .map(item => `${item.ip}:${item.weight}`)
-        .join(", ");
-    } else if (editedRecord.type === "geo") {
-      for (let i = 0; i < editedRecord.geoDirections.length; i++) {
-        const item = editedRecord.geoDirections[i];
-        if (item.ip === "" || item.country === "") {
-          alert("Por favor, completa todos los campos de las direcciones geográficas.");
-          return;
+    try {
+      let recordData = {
+        domain: editedRecord.domain,
+        type: editedRecord.type,
+        status: true,
+        healthcheck_settings: {
+          acceptable_codes: editedRecord.healthcheck_settings.acceptable_codes,
+          crontab: editedRecord.healthcheck_settings.crontab,
+          max_retries: parseInt(editedRecord.healthcheck_settings.max_retries),
+          path: editedRecord.healthcheck_settings.path,
+          port: parseInt(editedRecord.healthcheck_settings.port),
+          timeout: parseInt(editedRecord.healthcheck_settings.timeout),
+          type: editedRecord.healthcheck_settings.type
         }
-        try {
-          const countryExists = await databaseApi.checkCountry(item.country);
-          if (!countryExists) {
-            alert(`El país "${item.country}" no es válido.`);
-            return;
+      };
+  
+      switch (editedRecord.type) {
+        case 'single':
+          recordData = {
+            ...recordData,
+            direction: editedRecord.direction
+          };
+          break;
+  
+        case 'multi':
+          recordData = {
+            ...recordData,
+            direction: editedRecord.directions.join(","),
+            counter: editedRecord.counter
+          };
+          break;
+  
+        case 'weight':
+          recordData = {
+            ...recordData,
+            direction: editedRecord.weightedDirections
+              .map(wd => `${wd.ip}:${wd.weight}`)
+              .join(',')
+          };
+          break;
+  
+        case 'geo':
+          for (let i = 0; i < editedRecord.geoDirections.length; i++) {
+            const item = editedRecord.geoDirections[i];
+            if (item.ip === "" || item.country === "") {
+              alert("Por favor, completa todos los campos de las direcciones geográficas.");
+              return;
+            }
+            try {
+              const countryExists = await databaseApi.checkCountry(item.country);
+              if (!countryExists) {
+                alert(`El país "${item.country}" no es válido.`);
+                return;
+              }
+            } catch (error) {
+              console.error("Error al verificar el país:", error);
+              alert("Ocurrió un error al verificar el país. Inténtalo de nuevo.");
+              return;
+            }
           }
-        } catch (error) {
-          console.error("Error al verificar el país:", error);
-          alert("Ocurrió un error al verificar el país. Inténtalo de nuevo.");
-          return;
-        }
+          recordData = {
+            ...recordData,
+            direction: editedRecord.geoDirections
+              .map(gd => `${gd.ip}:${gd.country}`)
+              .join(',')
+          };
+          break;
+  
+        case 'round-trip':
+          recordData = {
+            ...recordData,
+            direction: editedRecord.directions.join(",")
+          };
+          break;
+  
+        default:
+          throw new Error('Tipo de registro no válido');
       }
-
-      updatedDirection = editedRecord.geoDirections
-        .map(item => `${item.ip}:${item.country}`)
-        .join(", ");
+  
+      const result = await dnsApi.editDNSRecord(recordData);
+  
+      if (result.success) {
+        handleClose();
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error al actualizar el registro:', error);
     }
-
-    const updatedRecord = {
-      ...editedRecord,
-      direction: updatedDirection
-    };
-
-    onSave(updatedRecord);
-    handleClose();
   };
 
   return (
@@ -275,6 +350,96 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
               handleInputChange={handleInputChange}
             />
           )}
+
+          <hr />
+          <h6>Configuración del Healthcheck</h6>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Códigos aceptados</Form.Label>
+            <Form.Control
+              type="text"
+              name="healthcheck_acceptable_codes"
+              placeholder="200, 304"
+              value={editedRecord.healthcheck_settings.acceptable_codes}
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Crontab</Form.Label>
+            <Form.Control
+              type="text"
+              name="healthcheck_crontab"
+              placeholder="*/1 * * * *"
+              value={editedRecord.healthcheck_settings.crontab}
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Número de reintentos</Form.Label>
+            <Form.Control
+              type="number"
+              name="healthcheck_max_retries"
+              placeholder="3"
+              value={editedRecord.healthcheck_settings.max_retries}
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Path</Form.Label>
+            <Form.Control
+              type="text"
+              name="healthcheck_path"
+              placeholder="/"
+              value={editedRecord.healthcheck_settings.path}
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Port</Form.Label>
+            <Form.Control
+              type="number"
+              name="healthcheck_port"
+              placeholder="80"
+              value={editedRecord.healthcheck_settings.port}
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Timeout (ms)</Form.Label>
+            <Form.Control
+              type="number"
+              name="healthcheck_timeout"
+              placeholder="5000"
+              value={editedRecord.healthcheck_settings.timeout}
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Tipo de request</Form.Label>
+            <Form.Select
+              name="healthcheck_type"
+              value={editedRecord.healthcheck_settings.type}
+              onChange={(e) => {
+                const { value } = e.target;
+                setEditedRecord(prev => ({
+                  ...prev,
+                  healthcheck_settings: {
+                    ...prev.healthcheck_settings,
+                    type: value
+                  }
+                }));
+              }}
+            >
+              <option value="http">HTTP</option>
+              <option value="tcp">TCP</option>
+            </Form.Select>
+          </Form.Group>
         </Form>
       </Modal.Body>
       <Modal.Footer>

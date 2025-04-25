@@ -740,9 +740,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize Firebase
-    initialize_firebase()
-    
     if args.scan:
         # Scanner mode - update crontab with health check jobs
         scan_and_update_crontab()
@@ -751,6 +748,7 @@ def main():
         execute_single_check(args.domain_path, args.ip_idx, args.ip, args.check_type)
     else:
         # Default behavior (backward compatibility) - scan all domains and run checks
+        initialize_firebase()
         fetch_domains_and_run_health_checks()
 
 if __name__ == "__main__":
