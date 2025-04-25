@@ -23,33 +23,37 @@
 #define DEFAULT_HTTP_OK "200" // Default acceptable HTTP status code
 FILE *log_file = NULL;
 const char *LOG_FILENAME = "health_checker.log";
-#define ENABLE_LOGGING 0 // Set to 1 to enable logging, 0 to disable
 
-void log_message(const char *format)
+#ifdef TEST_MODE
+#define ENABLE_LOGGING 1
+#else
+#define ENABLE_LOGGING 0
+#endif
+
+void log_message(const char *format, ...)
 {
-    if ENABLE_LOGGING
+    if (ENABLE_LOGGING == 0 || log_file == NULL)
     {
-        // Get current time
-        time_t now = time(NULL);
-        char timestamp[26];
-        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+        return; // Skip logging if disabled or no log file
+    }
 
-        // Format the message with variable arguments
-        va_list args;
-        va_start(args, format);
-        char message[2048];
-        vsnprintf(message, sizeof(message), format, args);
-        va_end(args);
+    // Rest of your logging implementation
+    time_t now = time(NULL);
+    char timestamp[26];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
-        // Print to console
-        printf("%s %s\n", timestamp, message);
+    va_list args;
+    va_start(args, format);
+    char message[2048];
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
 
-        // Write to log file if open
-        if (log_file)
-        {
-            fprintf(log_file, "%s %s\n", timestamp, message);
-            fflush(log_file); // Ensure it's written immediately
-        }
+    printf("%s %s\n", timestamp, message);
+
+    if (log_file)
+    {
+        fprintf(log_file, "%s %s\n", timestamp, message);
+        fflush(log_file);
     }
 }
 

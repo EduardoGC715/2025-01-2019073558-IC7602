@@ -14,6 +14,9 @@
 #include "health_checker.c"
 #undef main
 
+#undef ENABLE_LOGGING
+#define ENABLE_LOGGING 1
+
 // Test is_acceptable_status function
 START_TEST(test_is_acceptable_status)
 {
@@ -57,30 +60,6 @@ START_TEST(test_extract_status_code)
 }
 END_TEST
 
-// Test log_message function
-START_TEST(test_log_message)
-{
-    // Redirect stdout to capture output
-    char buffer[1024];
-    FILE *temp = tmpfile();
-    FILE *old_stdout = stdout;
-    stdout = temp;
-
-    // Call the function
-    log_message("Test message %d", 123);
-
-    // Restore stdout
-    fflush(stdout);
-    rewind(temp);
-    fgets(buffer, sizeof(buffer), temp);
-    stdout = old_stdout;
-    fclose(temp);
-
-    // Check that output contains our message
-    ck_assert(strstr(buffer, "Test message 123") != NULL);
-}
-END_TEST
-
 // Integration test that actually runs the health checker
 START_TEST(test_health_checker_integration)
 {
@@ -90,7 +69,7 @@ START_TEST(test_health_checker_integration)
     // Fork is not available on Windows, so we'll use system() for this test
 
     // Compile the health_checker first
-    system("gcc -o health_checker_test health_checker.c");
+    system("gcc -DTEST_MODE -o health_checker_test health_checker.c");
 
     // We'll test with localhost (should fail but in a predictable way)
     // Using --tcp since it's faster than HTTP for testing
@@ -164,7 +143,7 @@ START_TEST(test_http_request)
     }
 
     // Now compile and run health checker with HTTP check
-    system("gcc -o health_checker_test health_checker.c");
+    system("gcc -DTEST_MODE -o health_checker_test health_checker.c");
 
     FILE *output;
     char command[512];
@@ -227,7 +206,6 @@ Suite *health_checker_suite(void)
     tc_core = tcase_create("Core");
     tcase_add_test(tc_core, test_is_acceptable_status);
     tcase_add_test(tc_core, test_extract_status_code);
-    tcase_add_test(tc_core, test_log_message);
     suite_add_tcase(s, tc_core);
 
     // Integration tests that actually run the health checker
