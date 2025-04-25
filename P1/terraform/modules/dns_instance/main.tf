@@ -1,8 +1,8 @@
 # Security Group for Private Instances
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group
 resource "aws_security_group" "dns_instance_sg" {
-    vpc_id = var.vpc_id
-  name = "dns_instance_sg"
+  vpc_id = var.vpc_id
+  name   = "dns_instance_sg"
 
   tags = {
     Name = "DNS Instance Security Group"
