@@ -13,7 +13,8 @@ import SystemStatusCard from "../components/SystemStatusCard";
 import DNSRecordsTable from "../components/DNSRecordsTable";
 import DNSRegisterCard from "../components/DNSRegisterCard";
 import EditRecordModal from "../components/EditRecordModal";
-import { dnsApi , databaseApi} from "../services/api";
+import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
+import { dnsApi } from "../services/api";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState(null);
 
   const [healthStatus, setHealthStatus] = useState({
     servers: "error",
@@ -147,9 +150,7 @@ const Dashboard = () => {
       setDnsRecords(updatedRecords); 
   
       const healthCheck = await dnsApi.checkHealth(domain, direction);
-  
-      console.log("Resultado del checkHealth:", healthCheck);
-  
+    
       // Actualiza el estado del registro con el resultado del check
       const finalRecords = updatedRecords.map(record =>
         record.id === recordId
@@ -180,6 +181,38 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteClick = (record) => {
+    setRecordToDelete(record);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const record = {
+        domain: recordToDelete.domain
+      };
+  
+      console.log(record)
+      const result = await dnsApi.deleteDNSRecord(record);
+  
+      if (result.success) {
+        window.location.reload();
+      } else {
+        alert(`Error al eliminar el registro`);
+      }
+    } catch (error) {
+      alert('Error al eliminar el registro DNS');
+    } finally {
+      setShowDeleteModal(false);
+      setRecordToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setRecordToDelete(null);
+  };
+  
   const updateApiHealthStatus = async () => {
     const result = await dnsApi.checkApiStatus();
   
@@ -259,6 +292,7 @@ const Dashboard = () => {
           renderStatusBadge={renderStatusBadge}
           onRefreshStatus={handleRefreshStatus}
           onEditRecord={handleEditRecord}
+          onDeleteRecord={handleDeleteClick}
         />
       </div>
 
@@ -268,7 +302,6 @@ const Dashboard = () => {
         handleClose={handleCloseAddModal}
         newRecord={newRecord}
         handleInputChange={handleInputChange}
-        handleAddRecord={handleAddRecord}
       />
 
       {/* Modal de Edición */}
@@ -277,6 +310,14 @@ const Dashboard = () => {
         handleClose={handleCloseEditModal}
         record={selectedRecord}
         onSave={handleSaveEdit}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        domain={recordToDelete?.domain}
       />
     </Container>
   );

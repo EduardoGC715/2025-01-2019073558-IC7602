@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Sin docker
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+const API_BASE_URL = 'https://127.0.0.1:5000/api';
 
 // Con docker
 // const API_BASE_URL = `http://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
@@ -23,9 +23,7 @@ export const dnsApi = {
     try {
       const response = await api.get('/all-domains');
       if (response.status === 200) {
-        console.log(response.data[0])
-        console.log(response.data[1])
-        console.log(response.data)
+
         return response.data; // [{ id, domain, type, direction, status }]
       } else {
         console.warn('Respuesta inesperada al obtener dominios:', response.status);
@@ -96,8 +94,7 @@ export const dnsApi = {
       const response = await api.get('/firebase-status');
   
       if (response.status === 200) {
-        return {
-          
+        return {  
           message: true
         };
       }
@@ -106,7 +103,66 @@ export const dnsApi = {
             message: false
           };  
       }
+    },
+  
+  // Actualiza en la base de datos los registros
+  createDNSRecord: async (recordData) => {
+    try {
+      const response = await api.post('/domains', recordData);
+      return {
+        success: response.status === 201,
+        data: response.data,
+        message: response.data.message || 'Registro creado exitosamente'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al crear el registro'
+      };
     }
+  },
+
+  deleteDNSRecord: async (record) => {
+    try {
+      const response = await api.delete('/domains', {
+        data: record
+      });
+      return {
+        success: response.status === 200,
+        message: 'Registro eliminado exitosamente'
+      };
+    } catch (error) {
+      console.error('Error al eliminar el registro DNS:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al eliminar el registro'
+      };
+    }
+  },
+
+  editDNSRecord: async (recordData) => {
+    try {
+      const response = await api.put('/domains', recordData);
+      
+      if (response.status === 201) {
+        return {
+          success: true,
+          data: response.data,
+          message: 'Registro actualizado exitosamente'
+        };
+      } else {
+        return {
+          success: false,
+          message: response.data?.error || 'Error al actualizar el registro'
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.error || 'Error al actualizar el registro'
+      };
+    }
+  }
 };
 
 

@@ -266,7 +266,13 @@ def exists():
                         try:
                             healthcheckers = healthcheckers_ref.get()
                             for health_checker, checker_info in healthcheckers.items():
-                                distance = geodesic(ip_location, (checker_info["latitude"], checker_info["longitude"])).km
+                                distance = geodesic(
+                                    ip_location,
+                                    (
+                                        checker_info["latitude"],
+                                        checker_info["longitude"],
+                                    ),
+                                ).km
                                 if distance < closest_distance:
                                     closest_distance = distance
                                     closest_hc = health_checker
@@ -393,6 +399,9 @@ def get_all_domains():
                                 "type": routing_policy,
                                 "direction": ip.get("address", "N/A"),
                                 "status": ip.get("health", "unknown"),
+                                "healthcheck_settings": ip.get(
+                                    "healthcheck_settings", {}
+                                ),
                             }
                         )
                         id_counter += 1
@@ -410,6 +419,7 @@ def get_all_domains():
                             "type": routing_policy,
                             "direction": "",
                             "status": [],
+                            "healthcheck_settings": {},
                         }
                         id_counter += 1
 
@@ -421,6 +431,11 @@ def get_all_domains():
                         domain_map[domain_name]["status"] = ",".join(
                             [str(ip.get("health", "unknown")) for ip in ips]
                         )
+                        # Tomamos los healthcheck settings del primer IP (deberían ser iguales para todos)
+                        if ips and len(ips) > 0:
+                            domain_map[domain_name]["healthcheck_settings"] = ips[
+                                0
+                            ].get("healthcheck_settings", {})
 
                     # Para weight: formato "ip1:peso1,ip2:peso2"
                     elif routing_policy == "weight":
@@ -433,12 +448,24 @@ def get_all_domains():
                         domain_map[domain_name]["status"] = ",".join(
                             [str(ip.get("health", "unknown")) for ip in ips]
                         )
+                        # Tomamos los healthcheck settings del primer IP
+                        if ips and len(ips) > 0:
+                            domain_map[domain_name]["healthcheck_settings"] = ips[
+                                0
+                            ].get("healthcheck_settings", {})
 
                     # Para geo: formato "ip1:país1,ip2:país2"
                     elif routing_policy == "geo":
                         geo_ips = www_info.get("ips", {})
                         geo_entries = []
                         statuses = []
+                        # Tomamos los healthcheck settings del primer IP
+                        first_ip = next(iter(geo_ips.values())) if geo_ips else None
+                        if first_ip:
+                            domain_map[domain_name]["healthcheck_settings"] = (
+                                first_ip.get("healthcheck_settings", {})
+                            )
+
                         for country, ip in geo_ips.items():
                             geo_entries.append(f"{ip.get('address', 'N/A')}:{country}")
                             statuses.append(ip.get("health", "unknown"))
@@ -482,65 +509,109 @@ def create_Domain(ref, domain, data):
     status_flag = data.get("status")
     counter_value = data.get("counter")
     weights = data.get("weight")
+    healthcheck_settings = data.get("healthcheck_settings", {})
 
     if not all([domain_type, direction is not None, status_flag is not None]):
         return jsonify({"error": "Missing one or more required fields"}), 400
+
+    # Validate healthcheck settings
+    required_healthcheck_fields = [
+        "acceptable_codes",
+        "crontab",
+        "max_retries",
+        "path",
+        "port",
+        "timeout",
+        "type",
+    ]
+    if not all(field in healthcheck_settings for field in required_healthcheck_fields):
+        return (
+            jsonify({"error": "Missing one or more required healthcheck settings"}),
+            400,
+        )
+
+    try:
+        # Convert numeric fields to integers
+        healthcheck_settings["max_retries"] = int(healthcheck_settings["max_retries"])
+        healthcheck_settings["port"] = int(healthcheck_settings["port"])
+        healthcheck_settings["timeout"] = int(healthcheck_settings["timeout"])
+    except ValueError:
+        return jsonify({"error": "Invalid numeric values in healthcheck settings"}), 400
 
     ip_data = {"routing_policy": domain_type}
 
     # Se van creando los dominios según sus tipos
     if domain_type == "single":
-        ip_data["ip"] = {"address": direction, "health": status_flag}
+        ip_data["ip"] = {
+            "address": direction,
+            "health": status_flag,
+            "healthcheck_settings": healthcheck_settings,
+        }
 
     elif domain_type in ["multi", "round-trip"]:
-        if not isinstance(direction, list):
+        if not isinstance(direction, str):
             return jsonify(
                 {
-                    "error": f"For '{domain_type}' type, 'direction' must be a list of IPs"
+                    "error": f"For '{domain_type}' type, 'direction' must be a comma-separated string of IPs"
                 },
                 400,
             )
-        ip_data["ips"] = [{"address": ip, "health": status_flag} for ip in direction]
+        ip_list = [ip.strip() for ip in direction.split(",")]
+        ip_data["ips"] = [
+            {
+                "address": ip,
+                "health": status_flag,
+                "healthcheck_settings": healthcheck_settings,
+            }
+            for ip in ip_list
+        ]
         if domain_type == "multi":
-            ip_data["counter"] = counter_value  # Solo multi tiene contador
+            ip_data["counter"] = counter_value or 0  # Solo multi tiene contador
 
     elif domain_type == "weight":
-        if not isinstance(direction, list) or not isinstance(weights, list):
+        if not isinstance(direction, str):
             return jsonify(
                 {
-                    "error": "For 'weight' type, both 'direction' and 'weight' must be lists"
+                    "error": "For 'weight' type, 'direction' must be a comma-separated string of IP:weight pairs"
                 },
-                400,
-            )
-        if len(direction) != len(weights):
-            return jsonify(
-                {"error": "'direction' and 'weight' lists must be of the same length"},
                 400,
             )
         try:
-            ip_data["ips"] = [
-                {
-                    "address": ip,
-                    "health": status_flag,
-                    "weight": int(weights[i]),
-                }
-                for i, ip in enumerate(direction)
-            ]
+            weighted_pairs = direction.split(",")
+            ip_data["ips"] = []
+            for pair in weighted_pairs:
+                ip, weight = pair.strip().split(":")
+                ip_data["ips"].append(
+                    {
+                        "address": ip.strip(),
+                        "health": status_flag,
+                        "weight": int(weight.strip()),
+                        "healthcheck_settings": healthcheck_settings,
+                    }
+                )
         except ValueError:
-            return jsonify({"error": "'weight' values must be integers"}), 400
+            return jsonify({"error": "Invalid format for weighted IPs"}), 400
 
     elif domain_type == "geo":
-        if not isinstance(direction, dict):
+        if not isinstance(direction, str):
             return jsonify(
                 {
-                    "error": "For 'geo' type, 'direction' must be a dictionary of country codes to IPs"
+                    "error": "For 'geo' type, 'direction' must be a comma-separated string of IP:country pairs"
                 },
                 400,
             )
-        ip_data["ips"] = {
-            country: {"address": ip, "health": status_flag}
-            for country, ip in direction.items()
-        }
+        try:
+            geo_pairs = direction.split(",")
+            ip_data["ips"] = {}
+            for pair in geo_pairs:
+                ip, country = pair.strip().split(":")
+                ip_data["ips"][country.strip()] = {
+                    "address": ip.strip(),
+                    "health": status_flag,
+                    "healthcheck_settings": healthcheck_settings,
+                }
+        except ValueError:
+            return jsonify({"error": "Invalid format for geo IPs"}), 400
 
     try:
         ref.set(ip_data)
