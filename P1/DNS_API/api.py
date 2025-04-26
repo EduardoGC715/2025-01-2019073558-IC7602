@@ -35,23 +35,6 @@ app = Flask(__name__)
 # enable cors
 CORS(app, supports_credentials=True)
 
-
-# Retry with backoff implementado con base en https://keestalkstech.com/2021/03/python-utility-function-retry-with-exponential-backoff/#without-typings.
-def retry_with_backoff(fn, backoff_in_seconds=1):
-    x = 0
-    while True:
-        logger.info(x)
-        try:
-            return fn()
-        except:
-            # va subiendo de 1, 2, 4, ... hasta esperar 256 segundos entre intentos. Se queda esperando hasta que pueda conectar,
-            # porque de lo contrario, no podría trabajar bien.
-            sleep = backoff_in_seconds * 2**x + random.uniform(0, 1)
-            time.sleep(sleep)
-            if x < 8:
-                x += 1
-
-
 def ip_to_int(ip):
     return int(ipaddress.ip_address(ip))
 
@@ -202,6 +185,7 @@ def exists():
                                 ip_data["counter"] += 1
                                 retries += 1
                                 ip_response = "Unhealthy"
+                                time.sleep(0.5)
                     case "weight":
                         weights = [ip["weight"] for ip in ip_data["ips"]]
                         indices = list(range(len(weights)))
@@ -215,6 +199,7 @@ def exists():
                             else:
                                 retries += 1
                                 ip_response = "Unhealthy"
+                                time.sleep(0.5)
                     case "geo":
                         if not ip_address:
                             return jsonify({"error": "No se dio un IP address"}), 400
@@ -252,6 +237,7 @@ def exists():
                                 else:
                                     retries += 1
                                     ip_response = "Unhealthy"
+                                    time.sleep(0.5)
                     case "round-trip":
                         geo_request = requests.get(
                             f"http://ip-api.com/json/{ip_address}"
@@ -307,6 +293,7 @@ def exists():
                                     ip_response = "Unhealthy"
                             if ip_response == "Unhealthy":
                                 retries += 1
+                                time.sleep(0.5)
                             else:
                                 break
                     case _:
@@ -507,7 +494,7 @@ def create_Domain(ref, domain, data):
     domain_type = data.get("type")
     direction = data.get("direction")
     status_flag = data.get("status")
-    counter_value = data.get("counter")
+    counter_value = data.get("counter", 0)
     weights = data.get("weight")
     healthcheck_settings = data.get("healthcheck_settings", {})
 
@@ -710,7 +697,7 @@ def get_country_from_ip():
             return jsonify({"error": "No matching record found for this IP"}), 404
 
     except Exception as e:
-        logger.exception("Error buscando país por IP")
+        logger.debug("Error buscando país por IP", e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -756,36 +743,42 @@ def manage_ip_to_country():
         return jsonify({"error":"Missing required fields","missing":missing}), 400
 
     if request.method == "POST":
-        pk, prec = get_previous_conflict(start_int)
-        if pk:
-            return jsonify({"error":"Overlap with previous record", "conflict": make_conflict_obj(pk, prec)}), 409
+        try:
+            pk, prec = get_previous_conflict(start_int)
+            if pk:
+                return jsonify({"error":"Overlap with previous record", "conflict": make_conflict_obj(pk, prec)}), 409
 
-        nk, nrec = get_next_conflict(start_int, end_int)
-        if nk:
-            return jsonify({"error":"Overlap with next record", "conflict": make_conflict_obj(nk, nrec)}), 409
+            nk, nrec = get_next_conflict(start_int, end_int)
+            if nk:
+                return jsonify({"error":"Overlap with next record", "conflict": make_conflict_obj(nk, nrec)}), 409
 
-        ref = ip_to_country_ref.child(new_key)
+            ref = ip_to_country_ref.child(new_key)
 
-        if ref.get():
-            return jsonify({"error":f"Record already exists at {start_ip}"}), 409
+            if ref.get():
+                return jsonify({"error":f"Record already exists at {start_ip}"}), 409
 
-        payload = {
-            "start_ip":         start_ip,
-            "end_ip":           end_ip,
-            **{k: data[k] for k in required}
-        }
+            payload = {
+                "start_ip":         start_ip,
+                "end_ip":           end_ip,
+                **{k: data[k] for k in required}
+            }
 
-        ref.set(payload)
-        logger.debug(payload)
-        record = { "id": start_int, **payload }
+            ref.set(payload)
+            logger.debug(payload)
+            record = { "id": start_int, **payload }
 
-        return jsonify({
-            "message": f"Created record at {start_ip}",
-            "record":  record
-        }), 201
+            return jsonify({
+                "message": f"Created record at {start_ip}",
+                "record":  record
+            }), 201
+        except Exception as e:
+            logger.debug("Error creando el registro", e)
+            return jsonify({"error": str(e)}), 500
     
     if request.method == "PUT":
         orig_id = data.get("original_start_ip")
+        if orig_id is None:
+            return jsonify({"error":"Falta el 'original_start_ip'"}), 400
         
         old_key = str(int(orig_id))
         old_ref = ip_to_country_ref.child(old_key)
@@ -822,9 +815,7 @@ def manage_ip_to_country():
             "message": msg,
             "record":  record
         }), 200
-
-    return jsonify({"error":"Unsupported method"}), 405
-
+    
 @app.route("/api/ip-to-country/all", methods=["GET"])
 def get_all_ip_to_country_records():
     try:
