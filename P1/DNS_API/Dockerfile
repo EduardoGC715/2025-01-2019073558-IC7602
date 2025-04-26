@@ -14,5 +14,4 @@ COPY 127.0.0.1-key.pem .
 COPY 127.0.0.1.pem .
 
 EXPOSE 5000
-
-CMD [ "python", "-u", "./api.py" ]
+CMD [ "gunicorn", "-b", "0.0.0.0:5000", "--certfile=127.0.0.1.pem", "--keyfile=127.0.0.1-key.pem", "api:app" ]

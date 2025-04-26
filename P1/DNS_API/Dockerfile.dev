@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api.py .
 COPY logs ./logs
 COPY dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json .
+COPY 127.0.0.1-key.pem .
+COPY 127.0.0.1.pem .
 
 EXPOSE 5000
 

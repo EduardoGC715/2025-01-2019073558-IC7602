@@ -19,8 +19,6 @@ services:
     tty: true
     ports:
       - "5000:5000"
-    networks:
-      - shared-network
 
 networks:
   shared-network:
