@@ -11,12 +11,9 @@ import time
 import random
 import re
 import argparse
-import threading
-import atexit
-from concurrent.futures import ThreadPoolExecutor
-from crontab import CronTab 
+from crontab import CronTab
 
-# Código basado en: 
+# Código basado en:
 # https://firebase.google.com/docs/reference/admin/python
 # https://cronitor.io/guides/python-cron-jobs
 # https://docs.python.org/3/library/subprocess.html
@@ -24,82 +21,10 @@ from crontab import CronTab
 # Global rate limiting settings
 MAX_CONCURRENT_CHECKS = 1  # Adjust based on your system capacity
 
-class FileSemaphore:
-    """Cross-process semaphore implementation using file locks"""
-    def __init__(self, max_count=5, lock_dir='/tmp/health_checker_locks'):
-        self.max_count = max_count
-        self.lock_dir = lock_dir
-        # Create lock directory if it doesn't exist
-        os.makedirs(self.lock_dir, exist_ok=True)
-        # Clean up any stale locks from crashed processes
-        self._cleanup_stale_locks()
-    
-    def _cleanup_stale_locks(self):
-        """Remove lock files older than 10 minutes"""
-        try:
-            now = time.time()
-            for lock_file in os.listdir(self.lock_dir):
-                lock_path = os.path.join(self.lock_dir, lock_file)
-                if os.path.isfile(lock_path):
-                    # Check if the file is older than 10 minutes
-                    if now - os.path.getmtime(lock_path) > 600:
-                        os.remove(lock_path)
-                        print(f"Removed stale lock file: {lock_path}")
-        except Exception as e:
-            print(f"Error cleaning up stale locks: {e}")
-    
-    def acquire(self, timeout=30):
-        """Acquire a semaphore slot"""
-        start_time = time.time()
-        
-        while time.time() - start_time < timeout:
-            # Count existing lock files
-            try:
-                lock_files = [f for f in os.listdir(self.lock_dir) if f.startswith('lock_')]
-                if len(lock_files) < self.max_count:
-                    # We can acquire a lock
-                    lock_id = f"lock_{os.getpid()}_{int(time.time()*1000)}"
-                    lock_path = os.path.join(self.lock_dir, lock_id)
-                    
-                    # Create a lock file atomically
-                    try:
-                        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                        os.write(fd, str(os.getpid()).encode())
-                        os.close(fd)
-                        # Register cleanup on process exit
-                        atexit.register(lambda: self._remove_lock(lock_path))
-                        return lock_path
-                    except FileExistsError:
-                        # Another process created this lock simultaneously
-                        pass
-                
-                # Wait a bit before retrying
-                time.sleep(random.uniform(0.2, 0.5))
-            except Exception as e:
-                print(f"Error acquiring semaphore: {e}")
-                time.sleep(1)
-        
-        # Timed out waiting for semaphore
-        print("Timed out waiting for semaphore slot")
-        return None
-    
-    def release(self, lock_path):
-        """Release the semaphore"""
-        self._remove_lock(lock_path)
-    
-    def _remove_lock(self, lock_path):
-        """Remove a lock file"""
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except Exception as e:
-            print(f"Error removing lock file {lock_path}: {e}")
-
-global_semaphore = FileSemaphore(max_count=MAX_CONCURRENT_CHECKS)
 
 def run_health_check(check_type, *args):
     """Run the C health checker with specified check type and arguments
-    
+
     Args:
         check_type (str): Type of health check ('tcp' or 'http')
         *args: Arguments for the health check command.
@@ -107,27 +32,27 @@ def run_health_check(check_type, *args):
     try:
         # Build command based on check type
         command = ["./health_checker"]  # For Linux/WSL
-        
+
         if check_type == "tcp":
             if len(args) < 2:
                 raise ValueError("TCP check requires hostname and port")
-            
+
             # Basic required arguments
             command.extend(["--tcp", args[0], args[1]])
-            
+
             # Optional timeout and retries
             if len(args) > 2 and args[2]:
                 command.append(args[2])  # timeout
             if len(args) > 3 and args[3]:
                 command.append(args[3])  # max retries
-                
+
         elif check_type == "http":
             if len(args) < 3:
                 raise ValueError("HTTP check requires hostname, port, and path")
-            
+
             # Basic required arguments
             command.extend(["--http", args[0], args[1], args[2]])
-            
+
             # Optional timeout, retries, and acceptable status codes
             if len(args) > 3 and args[3]:
                 command.append(args[3])  # timeout
@@ -141,29 +66,24 @@ def run_health_check(check_type, *args):
                 command.append(f"{args[6]}")  # host header
         else:
             raise ValueError(f"Unknown check type: {check_type}")
-        
+
         # Convert all arguments to strings
         command = [str(arg) for arg in command]
-        
+
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{timestamp} Running command: {' '.join(command)}")
-        
+
         # Run the health checker
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+
         stdout = result.stdout.strip() if result.stdout else ""
         stderr = result.stderr.strip() if result.stderr else ""
-        
+
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{timestamp} Command output: {stdout}")
         if stderr:
             print(f"{timestamp} Command error: {stderr}")
-        
+
         # Parse the output to find our JSON result
         for line in stdout.splitlines():
             if "RESULT:" in line:
@@ -176,14 +96,14 @@ def run_health_check(check_type, *args):
                 except json.JSONDecodeError as e:
                     print(f"{timestamp} Error parsing JSON: {e}")
                     print(f"{timestamp} Problematic data: {json_data}")
-                
+
         # If we couldn't find a structured result, create one with the exit code
         return {
             "success": result.returncode == 0,
             "timestamp": timestamp,
             "duration": result.returncode,
         }
-    
+
     except Exception as e:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{timestamp} Exception in run health check function: {str(e)}")
@@ -194,19 +114,20 @@ def run_health_check(check_type, *args):
             "duration": 0,
         }
 
+
 def initialize_firebase():
     """Initialize Firebase connection and register health checker info"""
     # Find the credentials file
     credential_path = "dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json"
-    
+
     # Initialize Firebase
     try:
         cred = credentials.Certificate(credential_path)
-        firebase_admin.initialize_app(cred, {
-            "databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"
-        })
+        firebase_admin.initialize_app(
+            cred, {"databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"}
+        )
         print("Firebase initialized successfully.")
-        
+
         # Register health checker information in a central location
         checker_id = os.environ.get("CHECKER_ID", "default-checker")
         checker_info = {
@@ -214,45 +135,46 @@ def initialize_firebase():
             "longitude": float(os.environ.get("CHECKER_LON", "0.0")),
             "country": os.environ.get("CHECKER_COUNTRY", "Unknown"),
             "continent": os.environ.get("CHECKER_CONTINENT", "Unknown"),
-            "last_active": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "last_active": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        
+
         # Store checker info in a central location
         checker_ref = db.reference(f"/healthcheckers/{checker_id}")
         checker_ref.update(checker_info)
         print(f"Registered health checker: {checker_id} from {checker_info['country']}")
-        
+
     except ValueError:
         # App already initialized, just update the last_active timestamp
         checker_id = os.environ.get("CHECKER_ID", "default-checker")
         checker_ref = db.reference(f"/healthcheckers/{checker_id}")
-        checker_ref.update({
-            "last_active": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
+        checker_ref.update(
+            {"last_active": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        )
         print("Firebase already initialized, updated last_active timestamp.")
     except Exception as e:
         print(f"Error initializing Firebase: {e}")
         sys.exit(1)
 
+
 def update_ip_health_status(domain_path, ip_idx, ip, health_result):
     """Update the health status of a specific IP in Firebase without storing history"""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     # Get health checker information from environment
     checker_id = os.environ.get("CHECKER_ID", "default-checker")
-    
+
     # Get the checker info from Firebase
     checker_ref = db.reference(f"/healthcheckers/{checker_id}")
     checker_info = checker_ref.get() or {}
     
     # Base multiplier depends on geographic distance (simulated)
-    # US-based checkers: 1.0x baseline 
+    # US-based checkers: 1.0x baseline
     # EU-based checkers: 1.2-1.5x baseline
     # Asia-based checkers: 1.5-2.0x baseline
     # Unknown location: Random between 1.0-1.8x
     latency_multiplier = 1.0
     continent = checker_info.get("continent", "").lower()
-    
+
     if "europe" in continent:
         latency_multiplier = random.uniform(1.2, 1.5)
     elif "asia" in continent:
@@ -262,19 +184,21 @@ def update_ip_health_status(domain_path, ip_idx, ip, health_result):
     else:
         # For unknown or other continents
         latency_multiplier = random.uniform(1.0, 1.8)
-    
+
     # Add some randomness to make it realistic (+/- 20%)
     latency_jitter = random.uniform(0.8, 1.2)
     final_multiplier = latency_multiplier * latency_jitter
-    
+
     # Apply the multiplier to duration
     original_duration = 0
     if "duration_ms" in health_result:
         original_duration = health_result["duration_ms"]
         simulated_duration = original_duration * final_multiplier
         health_result["duration_ms"] = simulated_duration
-        print(f"Simulated latency for {checker_id}: {original_duration:.2f}ms → {simulated_duration:.2f}ms (multiplier: {final_multiplier:.2f}x)")
-    
+        print(
+            f"Simulated latency for {checker_id}: {original_duration:.2f}ms → {simulated_duration:.2f}ms (multiplier: {final_multiplier:.2f}x)"
+        )
+
     # Update the health field for the IP using index
     # Check if this is a single IP case or multiple IPs case
     if ip_idx == "ip":
@@ -283,25 +207,27 @@ def update_ip_health_status(domain_path, ip_idx, ip, health_result):
     else:
         # Multiple IPs case - update at the indexed IP level
         ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
-    
+
     # Get the current IP data to determine overall health
     ip_data = ip_ref.get()
-    
+
     # Get all current checker results or initialize empty dict
     current_results = {}
     if ip_data and "healthcheck_results" in ip_data:
         current_results = ip_data["healthcheck_results"]
-    
+
     # Update this checker's result - now just storing ID and basic results
     current_results[checker_id] = {
         "success": health_result["success"],
         "duration_ms": health_result["duration_ms"],
         "timestamp": health_result["timestamp"],
     }
-    
+
     # Calculate overall health (true if any checker reports success)
-    overall_health = any(result.get("success", False) for result in current_results.values())
-    
+    overall_health = any(
+        result.get("success", False) for result in current_results.values()
+    )
+
     # Prepare health data
     health_data = {
         "health": overall_health,
@@ -310,17 +236,19 @@ def update_ip_health_status(domain_path, ip_idx, ip, health_result):
     
     # Update Firebase
     ip_ref.update(health_data)
-    print(f"{timestamp} Updated health status for {ip} (idx: {ip_idx}) in {domain_path} from {checker_info.get('country', 'Unknown')}: {health_result['success']}")
+    print(
+        f"{timestamp} Updated health status for {ip} (idx: {ip_idx}) in {domain_path} from {checker_info.get('country', 'Unknown')}: {health_result['success']}"
+    )
 
 def build_health_check_args(check_type, ip, config, domain_path=None):
     """Build arguments for health check based on check type and configuration
-    
+
     Args:
         check_type (str): Type of health check ('tcp' or 'http')
         ip (str): IP address to check
         config (dict): Health check configuration
         domain_path (str, optional): Path to the domain in Firebase (e.g., 'com/google/www')
-    
+
     Returns:
         list: Arguments for the health check
     """
@@ -329,9 +257,9 @@ def build_health_check_args(check_type, ip, config, domain_path=None):
         port = config.get("port", 80)
         timeout = config.get("timeout", 5)
         max_retries = config.get("max_retries", 3)
-        
+
         return [ip, port, timeout, max_retries]
-        
+
     elif check_type == "http":
         # HTTP check requires: hostname, port, path, [timeout], [max_retries], [acceptable_codes], [host_header]
         port = config.get("port", 80)
@@ -339,42 +267,45 @@ def build_health_check_args(check_type, ip, config, domain_path=None):
         timeout = config.get("timeout", 5)
         max_retries = config.get("max_retries", 3)
         acceptable_codes = config.get("acceptable_codes", "200")
-        
+
         # Check for explicit host_header in config
         host_header = config.get("host_header", "")
-        
+
         # If no host_header specified but we have domain_path, create one from domain path
         if not host_header and domain_path:
             try:
                 # Parse domain path (e.g., "com/example/www")
-                parts = domain_path.split('/')
+                parts = domain_path.split("/")
                 if len(parts) >= 3:
                     tld = parts[0]
                     domain = parts[1]
                     subdomain = parts[2]
-                    
+
                     # If subdomain is "www", use "domain.tld"
                     if subdomain == "www":
                         host_header = f"{domain}.{tld}"
                     # Otherwise use "subdomain.domain.tld"
                     else:
                         host_header = f"{subdomain}.{domain}.{tld}"
-                    print(f"Generated host header: {host_header} from domain path: {domain_path}")
+                    print(
+                        f"Generated host header: {host_header} from domain path: {domain_path}"
+                    )
             except Exception as e:
                 print(f"Error generating host header from domain path: {e}")
-        
+
         args = [ip, port, path, timeout, max_retries, acceptable_codes]
-        
+
         # Add host_header if available
         if host_header:
             args.append(host_header)
             print(f"Using host header: {host_header} for IP: {ip}")
-        
+
         return args
-    
+
     else:
         print(f"Unsupported health check type: {check_type}")
         return None
+
 
 def scan_and_update_crontab():
     """
@@ -391,21 +322,21 @@ def scan_and_update_crontab():
     checker_lon = os.environ.get("CHECKER_LON", "0.0")
     checker_country = os.environ.get("CHECKER_COUNTRY", "Unknown")
     checker_continent = os.environ.get("CHECKER_CONTINENT", "Unknown")
-    
+
     # Initialize Firebase if not already initialized
     initialize_firebase()
-    
+
     # Get all TLDs
     root_ref = db.reference("/domains")
     all_tlds = root_ref.get()
-    
+
     if not all_tlds:
         print("No TLDs found in Firebase.")
         return
-    
+
     # Create a crontab for the current user
     cron = CronTab(user=True)
-    
+
     # Get existing health check jobs and store by their identifiers
     existing_jobs = {}
     for job in cron.find_comment("health_check"):
@@ -414,119 +345,127 @@ def scan_and_update_crontab():
         domain_path_match = re.search(r"--domain-path '([^']+)'", cmd)
         ip_idx_match = re.search(r"--ip-idx '([^']+)'", cmd)
         ip_match = re.search(r"--ip '([^']+)'", cmd)
-        
+
         if domain_path_match and ip_idx_match and ip_match:
             domain_path = domain_path_match.group(1)
             ip_idx = ip_idx_match.group(1)
             ip = ip_match.group(1)
-            
+
             # Create a unique identifier for this job
             job_id = f"{domain_path}|{ip_idx}|{ip}"
             existing_jobs[job_id] = job
-    
+
     print(f"Found {len(existing_jobs)} existing health check jobs")
-    
+
     # Set to track jobs that should exist
     required_jobs = set()
     new_job_count = 0
     updated_job_count = 0
-    
+
     # Iterate through the domains and create/update cron jobs
     for tld_name, tld_data in all_tlds.items():
         if not isinstance(tld_data, dict):
             continue
-            
+
         for domain_name, domain_data in tld_data.items():
             if not isinstance(domain_data, dict):
                 continue
-                
+
             for subdomain, subdomain_data in domain_data.items():
                 domain_path = f"{tld_name}/{domain_name}/{subdomain}"
-                
+
                 if not isinstance(subdomain_data, dict):
                     continue
-                
+
                 # CASE 1: Single IP directly in the subdomain data
                 if "ip" in subdomain_data:
                     ip_data = subdomain_data.get("ip", {})
-                    
+
                     # Check if ip_data is a dictionary and has an address
                     if "address" in ip_data:
                         ip = ip_data.get("address")
                         health_check_config = ip_data.get("healthcheck_settings", {})
-                        
+
                         if not health_check_config:
                             continue
-                        
+
                         check_type = health_check_config.get("type")
                         if not check_type:
                             continue
-                        
+
                         frequency = health_check_config.get("crontab", "*/2 * * * *")
-                        
+
                         # Check if frequency already includes full cron format (5 parts)
                         if " " not in frequency or frequency.count(" ") < 4:
                             # If it's just the minute part or incomplete, add the rest
                             frequency = f"{frequency} * * * *"
-                        
-                        command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx 'ip' --ip '{ip}' --check-type '{check_type}'"
-                        
+
+                        command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
+
                         # Create job ID for this entry
                         job_id = f"{domain_path}|ip|{ip}"
                         required_jobs.add(job_id)
-                        
+
                         # Check if job already exists
                         if job_id in existing_jobs:
                             existing_job = existing_jobs[job_id]
                             old_schedule = str(existing_job.slices)
-                            
+
                             # Only update if schedule changed
                             if old_schedule != frequency:
                                 try:
                                     existing_job.setall(frequency)
                                     updated_job_count += 1
-                                    print(f"Updated schedule for {job_id}: {old_schedule} -> {frequency}")
+                                    print(
+                                        f"Updated schedule for {job_id}: {old_schedule} -> {frequency}"
+                                    )
                                 except Exception as e:
-                                    print(f"Error updating cron schedule '{frequency}' for {ip}: {e}")
+                                    print(
+                                        f"Error updating cron schedule '{frequency}' for {ip}: {e}"
+                                    )
                         else:
                             # Create a new job
                             job = cron.new(command=command, comment="health_check")
                             try:
                                 job.setall(frequency)
                                 new_job_count += 1
-                                print(f"Created new job for {job_id} with schedule {frequency}")
+                                print(
+                                    f"Created new job for {job_id} with schedule {frequency}"
+                                )
                             except Exception as e:
-                                print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
+                                print(
+                                    f"Error setting cron schedule '{frequency}' for {ip}: {e}"
+                                )
                                 print(f"Using default schedule '*/2 * * * *' instead")
                                 job.setall("*/2 * * * *")
-                
+
                 # CASE 2: Multiple IPs in the "ips" field
                 elif "ips" in subdomain_data:
                     ips_data = subdomain_data.get("ips", {})
-                    
+
                     if isinstance(ips_data, dict):
                         items = ips_data.items()
                     elif isinstance(ips_data, list):
                         items = enumerate(ips_data)
                     else:
                         continue
-                    
+
                     for ip_idx, ip_data in items:
                         ip_idx = str(ip_idx)
-                        
+
                         if not isinstance(ip_data, dict) or "address" not in ip_data:
                             continue
-                        
+
                         ip = ip_data.get("address")
                         health_check_config = ip_data.get("healthcheck_settings", {})
-                        
+
                         if not health_check_config:
                             continue
-                        
+
                         check_type = health_check_config.get("type")
                         if not check_type:
                             continue
-                        
+
                         frequency = health_check_config.get("crontab", "*/2 * * * *")
 
                         # Check if frequency already includes full cron format (5 parts)
@@ -534,37 +473,45 @@ def scan_and_update_crontab():
                             # If it's just the minute part or incomplete, add the rest
                             frequency = f"{frequency} * * * *"
 
-                        command = f"cd {os.getcwd()} && CHECKER_ID='{checker_id}' CHECKER_LAT='{checker_lat}' CHECKER_LON='{checker_lon}' CHECKER_COUNTRY='{checker_country}' CHECKER_CONTINENT='{checker_continent}' python3 update_firebase.py --execute --domain-path '{domain_path}' --ip-idx '{ip_idx}' --ip '{ip}' --check-type '{check_type}'"
+                        command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx={ip_idx}&ip={ip}&check_type={check_type}'"
 
                         # Create job ID for this entry
                         job_id = f"{domain_path}|{ip_idx}|{ip}"
                         required_jobs.add(job_id)
-                        
+
                         # Check if job already exists
                         if job_id in existing_jobs:
                             existing_job = existing_jobs[job_id]
                             old_schedule = str(existing_job.slices)
-                            
+
                             # Only update if schedule changed
                             if old_schedule != frequency:
                                 try:
                                     existing_job.setall(frequency)
                                     updated_job_count += 1
-                                    print(f"Updated schedule for {job_id}: {old_schedule} -> {frequency}")
+                                    print(
+                                        f"Updated schedule for {job_id}: {old_schedule} -> {frequency}"
+                                    )
                                 except Exception as e:
-                                    print(f"Error updating cron schedule '{frequency}' for {ip}: {e}")
+                                    print(
+                                        f"Error updating cron schedule '{frequency}' for {ip}: {e}"
+                                    )
                         else:
                             # Create a new job
                             job = cron.new(command=command, comment="health_check")
                             try:
                                 job.setall(frequency)
                                 new_job_count += 1
-                                print(f"Created new job for {job_id} with schedule {frequency}")
+                                print(
+                                    f"Created new job for {job_id} with schedule {frequency}"
+                                )
                             except Exception as e:
-                                print(f"Error setting cron schedule '{frequency}' for {ip}: {e}")
+                                print(
+                                    f"Error setting cron schedule '{frequency}' for {ip}: {e}"
+                                )
                                 print(f"Using default schedule '*/2 * * * *' instead")
                                 job.setall("*/2 * * * *")
-    
+
     # Remove jobs that are no longer needed
     removal_count = 0
     for job_id, job in existing_jobs.items():
@@ -572,97 +519,101 @@ def scan_and_update_crontab():
             cron.remove(job)
             removal_count += 1
             print(f"Removed obsolete job: {job_id}")
-    
+
     # Write the updated crontab
     cron.write()
-    print(f"Crontab updated: {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs")
+    print(
+        f"Crontab updated: {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs"
+    )
+
 
 def execute_single_check(domain_path, ip_idx, ip, check_type):
     """
     Executes a health check for a single IP and updates Firebase with the result
-    using a semaphore to limit concurrent executions.
-    
+
     Args:
         domain_path (str): Path to the domain in Firebase (e.g., 'com/google/www')
         ip_idx (str): The index of the IP in Firebase or "ip" for single IP case
         ip (str): The IP address
         check_type (str): Type of health check ('tcp' or 'http')
     """
-    # Try to acquire semaphore with timeout
-    lock_path = global_semaphore.acquire(timeout=30)
-    if not lock_path:
-        print(f"Too many concurrent checks running, skipping check for {ip}")
+    print(f"Executing health check for {ip} ({domain_path}, idx: {ip_idx})")
+
+    # Initialize Firebase if not already initialized
+    initialize_firebase()
+
+    # Handle both single IP and multiple IPs cases
+    if ip_idx == "ip":
+        # Single IP case
+        ip_ref = db.reference(f"/domains/{domain_path}/ip")
+    else:
+        # Multiple IPs case
+        ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
+
+    print(f"Fetching data from: {ip_ref.path}")
+    ip_data = ip_ref.get()
+
+    if not ip_data:
+        print(f"No data found for IP {ip} at path {ip_ref.path}")
         return
-    
-    # Add randomization to spread out the load on Firebase
-    jitter = random.uniform(0.1, 1.0)
-    time.sleep(jitter)
-    
-    try:
-        print(f"Executing health check for {ip} ({domain_path}, idx: {ip_idx})")
-        
-        # Initialize Firebase if not already initialized
-        initialize_firebase()
-        
-        # Handle both single IP and multiple IPs cases
-        if ip_idx == "ip":
-            # Single IP case
-            ip_ref = db.reference(f"/domains/{domain_path}/ip")
-        else:
-            # Multiple IPs case
-            ip_ref = db.reference(f"/domains/{domain_path}/ips/{ip_idx}")
-        
-        print(f"Fetching data from: {ip_ref.path}")
-        ip_data = ip_ref.get()
-        
-        if not ip_data:
-            print(f"No data found for IP {ip} at path {ip_ref.path}")
-            return
-        
-        health_check_config = ip_data.get("healthcheck_settings", {})
-        
-        if not health_check_config:
-            print(f"No health check configuration for IP {ip}")
-            return
-        
-        # Build health check arguments
-        check_args = build_health_check_args(check_type, ip, health_check_config, domain_path)
-        
-        if check_args:
-            # Run the health check directly, no need for another semaphore since we're already limited
-            health_result = run_health_check(check_type, *check_args)
-            print(f"Health check result for {ip}: {health_result}")
-            
-            # Update the health status in Firebase
-            update_ip_health_status(domain_path, ip_idx, ip, health_result)
-            print(f"Health status updated in Firebase path: {ip_ref.path}")
-        else:
-            print(f"Invalid health check configuration for {ip}")
-    except Exception as e:
-        print(f"Error in execute_single_check for {ip}: {e}")
-    finally:
-        # Always release the semaphore
-        global_semaphore.release(lock_path)
+
+    health_check_config = ip_data.get("healthcheck_settings", {})
+
+    if not health_check_config:
+        print(f"No health check configuration for IP {ip}")
+        return
+
+    # Build health check arguments
+    check_args = build_health_check_args(
+        check_type, ip, health_check_config, domain_path
+    )
+
+    if check_args:
+        # Run the health check
+        health_result = run_health_check(check_type, *check_args)
+        print(f"Health check result for {ip}: {health_result}")
+
+        # Update the health status in Firebase
+        update_ip_health_status(domain_path, ip_idx, ip, health_result)
+        print(f"Health status updated in Firebase path: {ip_ref.path}")
+    else:
+        print(f"Invalid health check configuration for {ip}")
+
 
 def main():
     """Main function with command-line argument parsing for dual mode operation"""
     
     parser = argparse.ArgumentParser(description="Firebase Health Checker")
-    parser.add_argument("--scan", action="store_true", help="Scan Firebase and update crontab")
-    parser.add_argument("--execute", action="store_true", help="Execute a single health check")
-    parser.add_argument("--domain-path", help="Domain path for single check (e.g., 'com/google/www')")
+    parser.add_argument(
+        "--scan", action="store_true", help="Scan Firebase and update crontab"
+    )
+    parser.add_argument(
+        "--execute", action="store_true", help="Execute a single health check"
+    )
+    parser.add_argument(
+        "--domain-path", help="Domain path for single check (e.g., 'com/google/www')"
+    )
     parser.add_argument("--ip-idx", help="IP index for single check")
     parser.add_argument("--ip", help="IP address for single check")
-    parser.add_argument("--check-type", help="Check type (tcp or http) for single check")
-    
+    parser.add_argument(
+        "--check-type", help="Check type (tcp or http) for single check"
+    )
+
     args = parser.parse_args()
-    
+
     if args.scan:
         # Scanner mode - update crontab with health check jobs
         scan_and_update_crontab()
-    elif args.execute and args.domain_path and args.ip_idx and args.ip and args.check_type:
+    elif (
+        args.execute
+        and args.domain_path
+        and args.ip_idx
+        and args.ip
+        and args.check_type
+    ):
         # Execute a single health check
         execute_single_check(args.domain_path, args.ip_idx, args.ip, args.check_type)
+
 
 if __name__ == "__main__":
     main()
