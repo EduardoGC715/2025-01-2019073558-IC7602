@@ -14,9 +14,6 @@
 #include "health_checker.c"
 #undef main
 
-#undef ENABLE_LOGGING
-#define ENABLE_LOGGING 1
-
 // Test is_acceptable_status function
 START_TEST(test_is_acceptable_status)
 {

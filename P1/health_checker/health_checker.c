@@ -32,28 +32,25 @@ const char *LOG_FILENAME = "health_checker.log";
 
 void log_message(const char *format, ...)
 {
-    if (ENABLE_LOGGING == 0 || log_file == NULL)
+    if (ENABLE_LOGGING == 1 || log_file == NULL)
     {
-        return; // Skip logging if disabled or no log file
-    }
+        time_t now = time(NULL);
+        char timestamp[26];
+        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
-    // Rest of your logging implementation
-    time_t now = time(NULL);
-    char timestamp[26];
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+        va_list args;
+        va_start(args, format);
+        char message[2048];
+        vsnprintf(message, sizeof(message), format, args);
+        va_end(args);
 
-    va_list args;
-    va_start(args, format);
-    char message[2048];
-    vsnprintf(message, sizeof(message), format, args);
-    va_end(args);
+        printf("%s %s\n", timestamp, message);
 
-    printf("%s %s\n", timestamp, message);
-
-    if (log_file)
-    {
-        fprintf(log_file, "%s %s\n", timestamp, message);
-        fflush(log_file);
+        if (log_file)
+        {
+            fprintf(log_file, "%s %s\n", timestamp, message);
+            fflush(log_file);
+        }
     }
 }
 
@@ -139,15 +136,6 @@ void extract_status_code(const char *response, char *status_code_buf)
     }
 }
 
-// Sets socket to non-blocking mode for timeout functionality
-int set_nonblock(int sockfd)
-{
-    int flags = fcntl(sockfd, F_GETFL, 0);
-    if (flags == -1)
-        return -1;
-    return fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-}
-
 // Waits for socket to be ready with timeout
 int wait_for_socket(int sockfd, int for_write, int timeout_secs)
 {
@@ -166,7 +154,6 @@ int wait_for_socket(int sockfd, int for_write, int timeout_secs)
 }
 
 check_result_t tcp_check(const char *hostname, const char *port, int timeout_secs, int max_retries)
-// Establishes a TCP connection to a specified host and port with timeout and retries
 {
     struct addrinfo hints, *res, *p;
     int sockfd, retry_count = 0;
@@ -200,18 +187,21 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
             if (sockfd == -1)
                 continue;
 
-            // Set non-blocking for timeout support
-            if (set_nonblock(sockfd) < 0)
+            // Set socket timeout for connect operation
+            struct timeval tv;
+            tv.tv_sec = timeout_secs;
+            tv.tv_usec = 0;
+            if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0 ||
+                setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
             {
                 close(sockfd);
                 continue;
             }
 
-            // Attempt to connect
-            int connect_result = connect(sockfd, p->ai_addr, p->ai_addrlen);
-            if (connect_result == 0)
+            // Using blocking connect with timeout set via SO_SNDTIMEO
+            if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0)
             {
-                // Connection completed immediately
+                // Connection completed successfully
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 result.success = 1;
                 result.duration_ms = ((end.tv_sec - start.tv_sec) * 1000.0) +
@@ -220,53 +210,12 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
                 close(sockfd);
                 return result;
             }
-
-            if (connect_result < 0 && errno != EINPROGRESS)
+            else
             {
+                // Connect failed
                 close(sockfd);
                 continue;
             }
-
-            // Connection in progress, wait for it with timeout
-            int select_result = wait_for_socket(sockfd, 1, timeout_secs);
-
-            if (select_result == 0)
-            {
-                // Timeout occurred
-                close(sockfd);
-                break; // Try next address or retry
-            }
-            else if (select_result < 0)
-            {
-                // Error occurred
-                close(sockfd);
-                continue;
-            }
-
-            // Check if connection was successful
-            int so_error;
-            socklen_t len = sizeof(so_error);
-            getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &so_error, &len);
-
-            if (so_error == 0)
-            {
-                // Connection successful
-                // Set back to blocking mode
-                int flags = fcntl(sockfd, F_GETFL, 0);
-                fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
-
-                // End timing
-                clock_gettime(CLOCK_MONOTONIC, &end);
-                result.success = 1;
-                result.duration_ms = ((end.tv_sec - start.tv_sec) * 1000.0) +
-                                     ((end.tv_nsec - start.tv_nsec) / 1000000.0);
-
-                freeaddrinfo(res);
-                close(sockfd);
-                return result;
-            }
-
-            close(sockfd);
         }
 
         retry_count++;
@@ -320,18 +269,22 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
-        // Set non-blocking and connect with timeout
-        if (set_nonblock(sockfd) < 0)
+        // Set socket timeouts for connect, send and receive
+        struct timeval tv;
+        tv.tv_sec = timeout_secs;
+        tv.tv_usec = 0;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0 ||
+            setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
         {
-            log_message("Failed to set non-blocking mode");
+            log_message("Failed to set socket timeouts");
             close(sockfd);
             freeaddrinfo(res);
             retry_count++;
             continue;
         }
 
-        int connect_result = connect(sockfd, res->ai_addr, res->ai_addrlen);
-        if (connect_result < 0 && errno != EINPROGRESS)
+        // Use blocking connect with timeout set via socket options
+        if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0)
         {
             log_message("connect failed: %s", strerror(errno));
             close(sockfd);
@@ -340,44 +293,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
-        // Wait for connection to be established
-        if (connect_result < 0)
-        { // Would block, wait with select
-            int select_result = wait_for_socket(sockfd, 1, timeout_secs);
-            if (select_result <= 0)
-            {
-                log_message("Connection timed out or failed");
-                close(sockfd);
-                freeaddrinfo(res);
-                retry_count++;
-                continue;
-            }
-
-            // Check if connection was successful
-            int so_error;
-            socklen_t len = sizeof(so_error);
-            getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &so_error, &len);
-
-            if (so_error != 0)
-            {
-                log_message("Connection failed after select: %s", strerror(so_error));
-                close(sockfd);
-                freeaddrinfo(res);
-                retry_count++;
-                continue;
-            }
-        }
-
-        // Set back to blocking mode for simpler I/O
-        int flags = fcntl(sockfd, F_GETFL, 0);
-        fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
-
-        // Set socket read timeout
-        struct timeval tv;
-        tv.tv_sec = timeout_secs;
-        tv.tv_usec = 0;
-        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
-
+        // Prepare HTTP request
         char request[1024];
         const char *effective_host = host_header && strlen(host_header) > 0 ? host_header : hostname;
 
@@ -385,8 +301,17 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
                  "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nUser-Agent: HealthChecker/1.0\r\n\r\n",
                  path, effective_host);
 
-        send(sockfd, request, strlen(request), 0);
+        // Send HTTP request
+        if (send(sockfd, request, strlen(request), 0) < 0)
+        {
+            log_message("Failed to send HTTP request: %s", strerror(errno));
+            close(sockfd);
+            freeaddrinfo(res);
+            retry_count++;
+            continue;
+        }
 
+        // Receive HTTP response
         char buffer[BUFFER_SIZE];
         int bytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
 
@@ -436,17 +361,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
     return result; // All attempts failed
 }
 
-void print_usage(const char *program_name)
-{
-    fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "  For TCP check: %s --tcp <hostname> <port> [timeout] [max_retries]\n", program_name);
-    fprintf(stderr, "  For HTTP check: %s --http <hostname> <port> <path> [timeout] [max_retries] [acceptable_status_codes]\n", program_name);
-    fprintf(stderr, "  Default timeout: %d seconds\n", DEFAULT_TIMEOUT);
-    fprintf(stderr, "  Default max retries: %d attempts\n", DEFAULT_MAX_RETRIES);
-    fprintf(stderr, "  Default acceptable HTTP status code: %s\n", DEFAULT_HTTP_OK);
-    fprintf(stderr, "  For multiple status codes, use comma-separated list, e.g., \"200,201,302\"\n");
-}
-
 int main(int argc, char *argv[])
 {
     // Initialize log file
@@ -458,7 +372,6 @@ int main(int argc, char *argv[])
 
     if (argc < 4)
     {
-        print_usage(argv[0]);
         return 1;
     }
 
@@ -475,7 +388,6 @@ int main(int argc, char *argv[])
     {
         if (argc < 4)
         {
-            print_usage(argv[0]);
             return 1;
         }
 
@@ -510,17 +422,12 @@ int main(int argc, char *argv[])
         }
 
         // Output machine-readable result
-        log_message("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
-                    success ? "true" : "false", duration_ms);
+        printf("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
+               success ? "true" : "false", duration_ms);
         fflush(stdout);
     }
     else if (strcmp(check_type, "--http") == 0)
     {
-        if (argc < 5)
-        {
-            print_usage(argv[0]);
-            return 1;
-        }
 
         const char *hostname = argv[2];
         const char *port = argv[3];
@@ -553,13 +460,12 @@ int main(int argc, char *argv[])
         strncpy(status_code, result.status_code, sizeof(status_code));
 
         // Output machine-readable result
-        log_message("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
-                    success ? "true" : "false", duration_ms);
+        printf("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
+               success ? "true" : "false", duration_ms);
         fflush(stdout);
     }
     else
     {
-        print_usage(argv[0]);
         return 1;
     }
 
