@@ -22,7 +22,7 @@ from crontab import CronTab
 # https://docs.python.org/3/library/subprocess.html
 
 # Global rate limiting settings
-MAX_CONCURRENT_CHECKS = 3  # Adjust based on your system capacity
+MAX_CONCURRENT_CHECKS = 1  # Adjust based on your system capacity
 
 class FileSemaphore:
     """Cross-process semaphore implementation using file locks"""
