@@ -18,9 +18,6 @@ from crontab import CronTab
 # https://cronitor.io/guides/python-cron-jobs
 # https://docs.python.org/3/library/subprocess.html
 
-# Global rate limiting settings
-MAX_CONCURRENT_CHECKS = 1  # Adjust based on your system capacity
-
 
 def run_health_check(check_type, *args):
     """Run the C health checker with specified check type and arguments
@@ -166,7 +163,7 @@ def update_ip_health_status(domain_path, ip_idx, ip, health_result):
     # Get the checker info from Firebase
     checker_ref = db.reference(f"/healthcheckers/{checker_id}")
     checker_info = checker_ref.get() or {}
-    
+
     # Base multiplier depends on geographic distance (simulated)
     # US-based checkers: 1.0x baseline
     # EU-based checkers: 1.2-1.5x baseline
@@ -229,16 +226,14 @@ def update_ip_health_status(domain_path, ip_idx, ip, health_result):
     )
 
     # Prepare health data
-    health_data = {
-        "health": overall_health,
-        "healthcheck_results": current_results
-    }
-    
+    health_data = {"health": overall_health, "healthcheck_results": current_results}
+
     # Update Firebase
     ip_ref.update(health_data)
     print(
         f"{timestamp} Updated health status for {ip} (idx: {ip_idx}) in {domain_path} from {checker_info.get('country', 'Unknown')}: {health_result['success']}"
     )
+
 
 def build_health_check_args(check_type, ip, config, domain_path=None):
     """Build arguments for health check based on check type and configuration
@@ -539,9 +534,6 @@ def execute_single_check(domain_path, ip_idx, ip, check_type):
     """
     print(f"Executing health check for {ip} ({domain_path}, idx: {ip_idx})")
 
-    # Initialize Firebase if not already initialized
-    initialize_firebase()
-
     # Handle both single IP and multiple IPs cases
     if ip_idx == "ip":
         # Single IP case
@@ -582,7 +574,7 @@ def execute_single_check(domain_path, ip_idx, ip, check_type):
 
 def main():
     """Main function with command-line argument parsing for dual mode operation"""
-    
+
     parser = argparse.ArgumentParser(description="Firebase Health Checker")
     parser.add_argument(
         "--scan", action="store_true", help="Scan Firebase and update crontab"
