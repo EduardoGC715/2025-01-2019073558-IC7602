@@ -127,9 +127,9 @@ def set_dns():
             try:
                 port = int(port)
                 dns_server = (server, port)
-                return jsonify({"message": "DNS server updated successfully"}), 200
+                return jsonify({"message": "Servidor DNS actualizado"}), 200
             except ValueError:
-                return jsonify({"error": "Invalid port number"}), 400
+                return jsonify({"error": "Puerto inválido"}), 400
 
 
 @app.route("/api/dns_resolver", methods=["POST"])
@@ -139,11 +139,11 @@ def dns_resolver():
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
 
-        # Create a UDP socket
+        # Crea un socket UDP para enviar la consulta DNS
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
-            data, _ = s.recvfrom(512)  # 512 bytes max in standard DNS over UDP
-            print("Received response (raw bytes):", data)
+            data, _ = s.recvfrom(512)
+            logger.debug("Recibida la respuesta DNS:", data)
         codified_data = base64.b64encode(data).decode("utf-8")
         return codified_data
 
@@ -155,9 +155,9 @@ def exists():
         ip_address = request.args.get("ip")  # Para usarlo más abajo si aplica
 
         if not domain:
-            return jsonify({"error": "No domain provided"}), 400
+            return jsonify({"error": "No se brindó un dominio"}), 400
 
-        # Flip the domain: google.com -> com/google
+        # Se invierte el dominio para buscarlo en la base de datos
         flipped_path = "/".join(reversed(domain.strip().split(".")))
         ref = domain_ref.child(flipped_path)
         ip_data = ref.get()
@@ -306,15 +306,6 @@ def exists():
             logger.debug(ip_response)
             return str(ip_to_int(ip_response)), 200
         else:
-            # logger.debug(f"Here1: {ip_response}")
-            # # Create a DNS query message for the domain 'example.com' and record type 'A'
-            # query = dns.message.make_query(domain, dns.rdatatype.A)
-            # logger.debug(query.to_text())
-            # response = dns.query.udp(query, dns_server[0])
-            # logger.debug(response.to_text())
-            # bytes = response.to_wire()
-            # encodedBytes = base64.b64encode(bytes).decode("utf-8")
-            # logger.debug("Received response (raw bytes) base 64: %s", bytes)
             return "Ese dominio no existe", 404
 
 @app.route("/api/countries", methods=["GET"])
@@ -337,7 +328,7 @@ def get_api_status():
     try:
         return jsonify([]), 200
     except Exception as e:
-        print("Error con el API backend", e)
+        logger.debug("Error con el API backend", e)
         return jsonify({"error": "No se pudo obtener la información"}), 500
 
 
@@ -394,7 +385,7 @@ def get_all_domains():
                         id_counter += 1
                     else:
                         logger.warning(
-                            f"No IP found for domain {domain_name} with routing policy {routing_policy}"
+                            f"No se encontró un IP para el dominio {domain_name} con el routing policy {routing_policy}"
                         )
 
                 elif routing_policy in ["multi", "weight", "geo", "round-trip"]:
@@ -476,17 +467,11 @@ def get_all_domains():
         traceback.print_exc()
         return jsonify({"error": "No se pudo obtener la información"}), 500
 
-
-# Convierte google.com en com/google.
-def flip_domain(domain):
-    return "/".join(reversed(domain.strip().split(".")))
-
-
 # Valida que exista dominio
 def validate_domain(data):
     domain = data.get("domain")
     if not domain:
-        return None, jsonify({"error": "No domain provided"}), 400
+        return None, jsonify({"error": "No se brindó un dominio"}), 400
     return domain, None, None
 
 
@@ -499,7 +484,7 @@ def create_Domain(ref, domain, data):
     healthcheck_settings = data.get("healthcheck_settings", {})
 
     if not all([domain_type, direction is not None, status_flag is not None]):
-        return jsonify({"error": "Missing one or more required fields"}), 400
+        return jsonify({"error": "Faltan campos"}), 400
 
     # Validate healthcheck settings
     required_healthcheck_fields = [
@@ -513,7 +498,7 @@ def create_Domain(ref, domain, data):
     ]
     if not all(field in healthcheck_settings for field in required_healthcheck_fields):
         return (
-            jsonify({"error": "Missing one or more required healthcheck settings"}),
+            jsonify({"error": "Falta la configuración del healthcheck"}),
             400,
         )
 
@@ -523,7 +508,7 @@ def create_Domain(ref, domain, data):
         healthcheck_settings["port"] = int(healthcheck_settings["port"])
         healthcheck_settings["timeout"] = int(healthcheck_settings["timeout"])
     except ValueError:
-        return jsonify({"error": "Invalid numeric values in healthcheck settings"}), 400
+        return jsonify({"error": "Valores numéricos inválidos en la configuración del healthcheck"}), 400
 
     ip_data = {"routing_policy": domain_type}
 
@@ -539,7 +524,7 @@ def create_Domain(ref, domain, data):
         if not isinstance(direction, str):
             return jsonify(
                 {
-                    "error": f"For '{domain_type}' type, 'direction' must be a comma-separated string of IPs"
+                    "error": f"Para el tipo de dominio '{domain_type}', 'direction' tiene que ser un string de IPs separados por comas"
                 },
                 400,
             )
@@ -559,7 +544,7 @@ def create_Domain(ref, domain, data):
         if not isinstance(direction, str):
             return jsonify(
                 {
-                    "error": "For 'weight' type, 'direction' must be a comma-separated string of IP:weight pairs"
+                    "error": "Para el tipo weight, 'direction' tiene que ser un string de pares de IP: weight separados por comas"
                 },
                 400,
             )
@@ -577,13 +562,13 @@ def create_Domain(ref, domain, data):
                     }
                 )
         except ValueError:
-            return jsonify({"error": "Invalid format for weighted IPs"}), 400
+            return jsonify({"error": "Formato inválido para IPs con peso."}), 400
 
     elif domain_type == "geo":
         if not isinstance(direction, str):
             return jsonify(
                 {
-                    "error": "For 'geo' type, 'direction' must be a comma-separated string of IP:country pairs"
+                    "error": "Para el tipo 'geo', 'direction' tiene que ser un string de pares de IP: country separados por comas"
                 },
                 400,
             )
@@ -598,14 +583,14 @@ def create_Domain(ref, domain, data):
                     "healthcheck_settings": healthcheck_settings,
                 }
         except ValueError:
-            return jsonify({"error": "Invalid format for geo IPs"}), 400
+            return jsonify({"error": "Formato inválido para IPs de geo"}), 400
 
     try:
         ref.set(ip_data)
         return (
             jsonify(
                 {
-                    "message": f"Domain {domain} created successfully with {domain_type} routing policy",
+                    "message": f"El dominio {domain} creado exitosamente con el routing policy {domain_type}",
                     "status": "created",
                 }
             ),
@@ -620,7 +605,7 @@ def create_Domain(ref, domain, data):
 def manage_domain():
     data = request.get_json()
     if not data:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+        return jsonify({"error": "Cuerpo del JSON inválido o faltante"}), 400
 
     # Se valida el dominio enviado en el JSON
     domain, error_response, status = validate_domain(data)
@@ -631,7 +616,7 @@ def manage_domain():
     domain_parts = domain.strip().split(".")
     # Se valida que el dominio tenga al menos dos partes ("example.com")
     if len(domain_parts) < 2:
-        return jsonify({"error": "Invalid domain format"}), 400
+        return jsonify({"error": "Formato de dominio inválido"}), 400
 
     # construye la ruta invertida
     # "example.com" se guarda como "com/example/www"
@@ -649,7 +634,7 @@ def manage_domain():
         try:
             ref.delete()
         except Exception as e:
-            logger.warning(f"Warning deleting domain before re-creating: {str(e)}")
+            logger.warning(f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}")
 
         return create_Domain(ref, domain, data)
 
@@ -657,7 +642,7 @@ def manage_domain():
     elif request.method == "DELETE":
         try:
             ref.delete()
-            return jsonify({"message": "Domain deleted", "status": "success"}), 200
+            return jsonify({"message": "Dominio eliminado", "status": "success"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -665,7 +650,7 @@ def manage_domain():
 def get_country_from_ip():
     ip_str = request.args.get("ip")
     if not ip_str:
-        return jsonify({"error": "IP address is required"}), 400
+        return jsonify({"error": "La dirección IP address es requerida"}), 400
     try:
         ip_int = ip_to_int(ip_str)
 
@@ -694,7 +679,7 @@ def get_country_from_ip():
                         "end_ip":           record["end_ip"]
                     }), 200
 
-            return jsonify({"error": "No matching record found for this IP"}), 404
+            return jsonify({"error": "No hay un registro para este IP"}), 404
 
     except Exception as e:
         logger.debug("Error buscando país por IP", e)
@@ -705,57 +690,57 @@ def get_country_from_ip():
 def manage_ip_to_country():
     data = request.get_json() or {}
     logger.debug(data)
-    # ─── Deletion ───────────────────────────────────────────────────────
+
     if request.method == "DELETE":
         record_id = data.get("id")
 
         if record_id is None:
-            return jsonify({"error":"Missing 'id' for deletion"}), 400
+            return jsonify({"error":"Falta el 'id' para la eliminación"}), 400
         
         key = str(int(record_id))
         ref = ip_to_country_ref.child(key)
 
         if not ref.get():
-            return jsonify({"error":f"No record {record_id}"}), 404
+            return jsonify({"error":f"No hay un registro {record_id}"}), 404
         
         ref.delete()
-        return jsonify({"message":f"Deleted record {record_id}"}), 200
+        return jsonify({"message":f"Eliminado el registro {record_id}"}), 200
 
-    # ─── Validate IP  ──────────────────────────
+
     start_ip = data.get("start_ip")
     end_ip   = data.get("end_ip")
     if start_ip is None or end_ip is None:
-        return jsonify({"error": "Both 'start_ip' and 'end_ip' are required"}), 400
+        return jsonify({"error": "Se necesitan 'start_ip' y 'end_ip'"}), 400
 
     try:
         start_int = ip_to_int(start_ip)
         end_int   = ip_to_int(end_ip)
     except ValueError:
-        return jsonify({"error": "Invalid IP address format"}), 400
+        return jsonify({"error": "Formato de IP inválido"}), 400
 
     if start_int >= end_int:
-        return jsonify({"error": "'start_ip' must be before 'end_ip'"}), 400
+        return jsonify({"error": "'start_ip' debe estar antes de 'end_ip'"}), 400
 
     new_key = str(start_int)
     required = ["continent_code","continent_name","country_iso_code","country_name"]
     missing = [f for f in required if f not in data]
     if missing:
-        return jsonify({"error":"Missing required fields","missing":missing}), 400
+        return jsonify({"error":"Faltan campos","missing":missing}), 400
 
     if request.method == "POST":
         try:
             pk, prec = get_previous_conflict(start_int)
             if pk:
-                return jsonify({"error":"Overlap with previous record", "conflict": make_conflict_obj(pk, prec)}), 409
+                return jsonify({"error":"Hay traslape con el registro anterior.", "conflict": make_conflict_obj(pk, prec)}), 409
 
             nk, nrec = get_next_conflict(start_int, end_int)
             if nk:
-                return jsonify({"error":"Overlap with next record", "conflict": make_conflict_obj(nk, nrec)}), 409
+                return jsonify({"error":"Hay traslape con el registro siguiente.", "conflict": make_conflict_obj(nk, nrec)}), 409
 
             ref = ip_to_country_ref.child(new_key)
 
             if ref.get():
-                return jsonify({"error":f"Record already exists at {start_ip}"}), 409
+                return jsonify({"error":f"El registro ya existe en {start_ip}"}), 409
 
             payload = {
                 "start_ip":         start_ip,
@@ -768,7 +753,7 @@ def manage_ip_to_country():
             record = { "id": start_int, **payload }
 
             return jsonify({
-                "message": f"Created record at {start_ip}",
+                "message": f"Registro creado en {start_ip}",
                 "record":  record
             }), 201
         except Exception as e:
@@ -784,15 +769,15 @@ def manage_ip_to_country():
         old_ref = ip_to_country_ref.child(old_key)
         
         if not old_ref.get():
-            return jsonify({"error":f"No record to update at {orig_id}"}), 404
+            return jsonify({"error":f"No hay un registro para actualizer en {orig_id}"}), 404
 
         pk, prec = get_previous_conflict(start_int, exclude_key=old_key)
         if pk:
-            return jsonify({"error":"Overlap with previous record","conflict": make_conflict_obj(pk, prec)}), 409
+            return jsonify({"error":"Hay traslape con el registro anterior.","conflict": make_conflict_obj(pk, prec)}), 409
 
         nk, nrec = get_next_conflict(start_int, end_int, exclude_key=old_key)
         if nk:
-            return jsonify({"error":"Overlap with next record","conflict": make_conflict_obj(nk, nrec)}), 409
+            return jsonify({"error":"Hay traslape con el registro siguiente.","conflict": make_conflict_obj(nk, nrec)}), 409
 
         payload = {
             "start_ip": start_ip,
@@ -804,10 +789,10 @@ def manage_ip_to_country():
         if new_key != old_key:
             ip_to_country_ref.child(new_key).set(payload)
             old_ref.delete()
-            msg = f"Renamed record {old_key} → {new_key}"
+            msg = f"Renombrado registro {old_key} → {new_key}"
         else:
             old_ref.update(payload)
-            msg = f"Updated record {new_key}"
+            msg = f"Actualizado registro {new_key}"
         
         record = { "id": start_int, **payload }
 
@@ -834,7 +819,7 @@ def get_all_ip_to_country_records():
         return jsonify(result), 200
 
     except Exception as e:
-        logger.exception("Error fetching all IPToCountry records")
+        logger.exception("Error al obtener todos los registros de IPToCountry")
         return jsonify({"error": str(e)}), 500
 
 

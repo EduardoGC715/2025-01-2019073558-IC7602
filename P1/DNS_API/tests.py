@@ -44,9 +44,9 @@ class TestDNSAPI(unittest.TestCase):
         self.app_context.push()
 
     def tearDown(self):
-        # Pop the application context
+        # Pop el contexto de la aplicación
         self.app_context.pop()
-        # Clean up after tests
+        # Limpiar después de las pruebas
         if os.path.exists(CRED_PATH):
             os.remove(CRED_PATH)
 
@@ -54,39 +54,22 @@ class TestDNSAPI(unittest.TestCase):
         result = api.ip_to_int("1.0.1.0")
         self.assertEqual(result, 16777472)
 
-    def test_flip_domain(self):
-        # Test with a valid domain
-        self.assertEqual(api.flip_domain("example.com"), "com/example")
-        
-        # Test with a subdomain
-        self.assertEqual(api.flip_domain("www.example.com"), "com/example/www")
-        
-        # Test with an empty string
-        self.assertEqual(api.flip_domain(""), "")
-
     def test_validate_domain(self):
-        # Test with valid input
+        # Prueba con un dominio válido
         data = {"domain": "example.com"}
         domain, error_response, status = api.validate_domain(data)
         self.assertEqual(domain, "example.com")
         self.assertIsNone(error_response)
         self.assertIsNone(status)
 
-        # Test with missing domain key
+        # Prueba con una llave faltante
         data = {}
         domain, error_response, status = api.validate_domain(data)
         self.assertIsNone(domain)
         self.assertIsNotNone(error_response)
         self.assertEqual(status, 400)
 
-    def tearDown(self):
-        # Limpiar después de las pruebas
-        if os.path.exists(CRED_PATH):
-            os.remove(CRED_PATH)
-
-    # Tests for /api/status
     def test_status_endpoint_success(self):
-        """Test successful status endpoint response"""
         response = self.app.get("/api/status")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, [])
@@ -103,10 +86,8 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertIn("error", response.json)
 
-    # Tests for /api/all-domains
     @patch("api.domain_ref")
     def test_all_domains_empty(self, mock_domain_ref):
-        """Test all-domains endpoint with no domains"""
         mock_domain_ref.get.return_value = None
         response = self.app.get("/api/all-domains")
         self.assertEqual(response.status_code, 200)
@@ -114,7 +95,6 @@ class TestDNSAPI(unittest.TestCase):
 
     @patch("api.domain_ref")
     def test_all_domains_with_single_policy(self, mock_domain_ref):
-        """Test all-domains endpoint with a single routing policy domain"""
         mock_data = {
             "com": {
                 "example": {
@@ -133,23 +113,19 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(response.json[0]["type"], "single")
         self.assertEqual(response.json[0]["direction"], "192.168.1.1")
 
-    # Tests for /api/exists
     def test_exists_no_domain(self):
-        """Test exists endpoint with no domain parameter"""
         response = self.app.get("/api/exists")
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json)
 
     @patch("api.domain_ref")
     def test_exists_domain_not_found(self, mock_domain_ref):
-        """Test exists endpoint with non-existent domain"""
         mock_domain_ref.child().get.return_value = None
         response = self.app.get("/api/exists?domain=nonexistent.com")
         self.assertEqual(response.status_code, 404)
 
     @patch("api.domain_ref")
     def test_exists_single_policy(self, mock_domain_ref):
-        """Test exists endpoint with single routing policy"""
         mock_data = {
             "routing_policy": "single",
             "ip": {"address": "192.168.1.1", "health": "healthy"},
@@ -162,8 +138,6 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.decode(), "3232235777")
 
-
-    # ─── Test create_Domain ────────────────────────────────────────────────────────
     @patch("api.db.reference")
     def test_create_Domain(self, mock_ref):
         data = {
@@ -183,19 +157,17 @@ class TestDNSAPI(unittest.TestCase):
         mock_ref.get.return_value = data
         response, status_code = api.create_Domain(mock_ref, "example.com", data)
         self.assertEqual(status_code, 201)
-        self.assertIn("created successfully", response.json["message"])
+        self.assertIn("creado exitosamente", response.json["message"])
 
-    # ─── Test /api/set_dns_server ──────────────────────────────────────────────────
     def test_set_dns_server(self):
         response = self.app.post("/api/set_dns_server?server=8.8.4.4&port=53")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("DNS server updated successfully", response.json["message"])
+        self.assertIn("Servidor DNS actualizado", response.json["message"])
 
         response = self.app.post("/api/set_dns_server?server=8.8.4.4&port=invalid")
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid port number", response.json["error"])
+        self.assertIn("Puerto inválido", response.json["error"])
 
-    # ─── Test /api/dns_resolver ────────────────────────────────────────────────────
     @patch("api.socket.socket")
     def test_dns_resolver(self, mock_socket):
         mock_socket_instance = MagicMock()
@@ -212,7 +184,6 @@ class TestDNSAPI(unittest.TestCase):
             base64.b64encode(b"response_data").decode("utf-8"),
         )
 
-    # ─── Test /api/ip-to-country ───────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     def test_get_country_from_ip(self, mock_ip_to_country):
         mock_data = {
@@ -253,7 +224,6 @@ class TestDNSAPI(unittest.TestCase):
         result = api.make_conflict_obj(key, record)
         self.assertEqual(result, expected_result)
 
-    # ─── Test get_previous_conflict ────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     def test_get_previous_conflict(self, mock_ref):
         mock_ref.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = {
@@ -272,7 +242,6 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(record["start_ip"], "1.0.0.0")
         self.assertEqual(record["end_ip"], "1.0.0.255")
 
-    # ─── Test get_next_conflict ────────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     def test_get_next_conflict(self, mock_ref):
         mock_ref.order_by_key.return_value.start_at.return_value.limit_to_first.return_value.get.return_value = {
@@ -292,7 +261,6 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(record["start_ip"], "1.0.0.0")
         self.assertEqual(record["end_ip"], "1.0.0.255")
 
-    # ─── Test countries ────────────────────────────────────────────────────────────
     @patch("api.countries_ref")
     def test_countries_exists(self, mock_ref):
         mock_ref.child.return_value.get.return_value = {"exists": True}
@@ -312,7 +280,6 @@ class TestDNSAPI(unittest.TestCase):
         response = self.app.get("/api/countries?country_code=US").json
         self.assertEqual(response["exists"], False)
 
-    # ─── Test POST Method ──────────────────────────────────────────────────────────
     @patch("api.domain_ref")
     @patch("api.create_Domain")
     def test_manage_domain_post(self, mock_create_domain, mock_domain_ref):
@@ -336,7 +303,6 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         mock_create_domain.assert_called_once()
 
-    # ─── Test PUT Method ───────────────────────────────────────────────────────────
     @patch("api.domain_ref")
     @patch("api.create_Domain")
     def test_manage_domain_put(self, mock_create_domain, mock_domain_ref):
@@ -364,7 +330,6 @@ class TestDNSAPI(unittest.TestCase):
         mock_ref.delete.assert_called_once()
         mock_create_domain.assert_called_once()
 
-    # ─── Test DELETE Method ────────────────────────────────────────────────────────
     @patch("api.domain_ref")
     def test_manage_domain_delete(self, mock_domain_ref):
         mock_ref = MagicMock()
@@ -373,29 +338,25 @@ class TestDNSAPI(unittest.TestCase):
         data = {"domain": "example.com"}
         response = self.app.delete("/api/domains", json=data)
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Domain deleted", response.json["message"])
+        self.assertIn("Dominio eliminado", response.json["message"])
         mock_ref.delete.assert_called_once()
 
-    # ─── Test Invalid JSON Body ────────────────────────────────────────────────────
     def test_manage_domain_invalid_json(self):
         response = self.app.post("/api/domains", json={})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid or missing JSON body", response.json["error"])
+        self.assertIn("Cuerpo del JSON inválido o faltante", response.json["error"])
 
-    # ─── Test Invalid Domain Format ────────────────────────────────────────────────
     def test_manage_domain_invalid_domain_format(self):
         data = {"domain": "invalid"}
         response = self.app.post("/api/domains", json=data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid domain format", response.json["error"])
+        self.assertIn("Formato de dominio inválido", response.json["error"])
 
-    # ─── Test Missing IP Address ───────────────────────────────────────────────────
     def test_get_country_from_ip_missing_ip(self):
         response = self.app.get("/api/ip-to-country")
         self.assertEqual(response.status_code, 400)
-        self.assertIn("IP address is required", response.json["error"])
+        self.assertIn("La dirección IP address es requerida", response.json["error"])
 
-    # ─── Test No Matching Record ───────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     def test_get_country_from_ip_no_match(self, mock_ip_to_country_ref):
         mock_data = {
@@ -412,9 +373,8 @@ class TestDNSAPI(unittest.TestCase):
         mock_ip_to_country_ref.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = mock_data
         response = self.app.get("/api/ip-to-country?ip=128.0.1.50")
         self.assertEqual(response.status_code, 404)
-        self.assertIn("No matching record found for this IP", response.json["error"])
+        self.assertIn("No hay un registro para este IP", response.json["error"])
 
-    # ─── Test Matching Record ──────────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     def test_get_country_from_ip_match(self, mock_ip_to_country_ref):
         mock_data = {
@@ -438,7 +398,6 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(response.json["start_ip"], "1.0.1.0")
         self.assertEqual(response.json["end_ip"], "1.0.3.255")
 
-    # ─── Test DELETE Method ────────────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     def test_delete_record_success(self, mock_ref):
         mock_child = MagicMock()
@@ -447,7 +406,7 @@ class TestDNSAPI(unittest.TestCase):
 
         response = self.app.delete("/api/ip-to-country", json={"id": "16777216"})
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Deleted record 16777216", response.json["message"])
+        self.assertIn("Eliminado el registro 16777216", response.json["message"])
         mock_child.delete.assert_called_once()
 
     @patch("api.ip_to_country_ref")
@@ -458,14 +417,13 @@ class TestDNSAPI(unittest.TestCase):
 
         response = self.app.delete("/api/ip-to-country", json={"id": "16777216"})
         self.assertEqual(response.status_code, 404)
-        self.assertIn("No record 16777216", response.json["error"])
+        self.assertIn("No hay un registro 16777216", response.json["error"])
 
     def test_delete_record_missing_id(self):
         response = self.app.delete("/api/ip-to-country", json={})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Missing 'id' for deletion", response.json["error"])
+        self.assertIn("Falta el 'id' para la eliminación", response.json["error"])
 
-    # ─── Test POST Method ──────────────────────────────────────────────────────────
     @patch("api.ip_to_country_ref")
     @patch("api.get_previous_conflict")
     @patch("api.get_next_conflict")
@@ -486,7 +444,7 @@ class TestDNSAPI(unittest.TestCase):
         }
         response = self.app.post("/api/ip-to-country", json=data)
         self.assertEqual(response.status_code, 201)
-        self.assertIn("Created record at 1.0.0.0", response.json["message"])
+        self.assertIn("Registro creado en 1.0.0.0", response.json["message"])
         mock_child.set.assert_called_once()
 
 
@@ -494,9 +452,8 @@ class TestDNSAPI(unittest.TestCase):
         data = {"start_ip": "1.0.0.0"}
         response = self.app.post("/api/ip-to-country", json=data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Both 'start_ip' and 'end_ip' are required", response.json["error"])
+        self.assertIn("Se necesitan 'start_ip' y 'end_ip'", response.json["error"])
 
-    # ─── Test Unsupported Method ──────────────────────────────────────────────────
     def test_unsupported_method(self):
         response = self.app.patch("/api/ip-to-country", json={})
         self.assertEqual(response.status_code, 405)
