@@ -271,20 +271,11 @@ def build_health_check_args(check_type, ip, config, domain_path=None):
             try:
                 # Parse domain path (e.g., "com/example/www")
                 parts = domain_path.split("/")
-                if len(parts) >= 3:
-                    tld = parts[0]
-                    domain = parts[1]
-                    subdomain = parts[2]
-
-                    # If subdomain is "www", use "domain.tld"
-                    if subdomain == "www":
-                        host_header = f"{domain}.{tld}"
-                    # Otherwise use "subdomain.domain.tld"
-                    else:
-                        host_header = f"{subdomain}.{domain}.{tld}"
-                    print(
-                        f"Generated host header: {host_header} from domain path: {domain_path}"
-                    )
+                parts.reverse()  # Reverse to get tld, domain, subdomain, ...
+                host_header = ".".join(parts)  # Join to form host header
+                print(
+                    f"Generated host header: {host_header} from domain path: {domain_path}"
+                )
             except Exception as e:
                 print(f"Error generating host header from domain path: {e}")
 
