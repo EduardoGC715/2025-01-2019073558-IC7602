@@ -9,8 +9,6 @@ RUN npm install
 COPY public ./public
 COPY src ./src
 
-RUN npm run build
-
 EXPOSE 80
 
-CMD ["npx", "serve", "-s", "build", "-l", "80"]
+CMD ["sh", "-c", "npm run build && npx serve -s build -l 80"]
