@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include "b64/cencode.h"
 #include "b64/cdecode.h"
+#include "interceptor.h"
 
 #define DOMAIN_EXISTS 200
 #define DOMAIN_NOT_EXISTS 404
@@ -19,65 +20,10 @@
 // Referencias para threads:
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
 
-typedef struct {
-    int socket_fd; // Socket file descriptor
-    struct sockaddr_in client_addr;
-    socklen_t addr_len; // Longitud de struct de direccion
-    char *request; // Puntero al request DNS
-    int request_size; // Tamaño de DNS request
-    const char * dns_api; // DNS API URL
-    const char * dns_api_port; // DNS API port
-} dns_thread_args;
-
 // Parsing de header basado en RFC-1035, sección 4.1.1.
 // RFC-2535, sección 6.1
 // https://gist.github.com/fffaraz/9d9170b57791c28ccda9255b48315168
 // https://www.ibm.com/docs/en/zos/2.4.0?topic=lf-ntohs-translate-unsigned-short-integer-into-host-byte-order
-
-// Struct para el header DNS
-typedef struct {
-    uint16_t id; // Transaction ID
-    unsigned char qr :1; // Query/Response flag
-    unsigned char opcode :4; // Operation code
-    unsigned char aa :1; // Authoritative answer
-    unsigned char tc :1; // Truncated
-    unsigned char rd :1; // Recursion desired
-    unsigned char ra :1; // Recursion available
-    unsigned char z :1; // Reserved for future use
-    unsigned char ad :1; // Authentic data
-    unsigned char cd :1; // Checking disabled
-    unsigned char rcode :4; // Response code
-    uint16_t qdcount; // Number of questions
-    uint16_t ancount; // Number of answers
-    uint16_t nscount; // Number of authority records
-    uint16_t arcount; // Number of additional records
-} dns_header;
-
-// Struct para la request DNS
-typedef struct {
-    dns_header * header;
-    char * qname; // Query name
-    uint16_t qtype; // Query type
-    uint16_t qclass; // Query class
-} dns_request;
-
-// Struct para un resource record DNS
-// Basado en RFC-1035, sección 4.1.3
-typedef struct {
-    char * name;
-    uint16_t type; // Query type
-    uint16_t class; // Query class
-    uint32_t ttl; // Time to live
-    uint16_t rdlength; // Length of the RDATA field
-    char * rdata; // Resource data
-} dns_resource;
-
-// Struct para la respuesta DNS
-typedef struct {
-    dns_header * header;
-    char * question;
-    dns_resource * answer; // Answer resource
-} dns_response;
 
 // Función para parsear el header DNS
 // Basado en RFC-1035, sección 4.1.1
@@ -178,12 +124,6 @@ char * encode_b64(const char * data, int request_size, int *actual_length) {
     return encoded_data;
 }
 
-// Estructura para almacenar los datos decodificados de base64
-typedef struct {
-    char * data;
-    int length;
-} base64_decoded_data;
-
 // Decodificar base64 usando la biblioteca libb64
 base64_decoded_data * decode_b64(const char * data, int length) {
     int decoded_length = (length / 4) * 3;
@@ -234,13 +174,6 @@ char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoi
 // Almacenar la respuesta de la request HTTPS en memoria.
 // Basado en:
 // https://curl.se/libcurl/c/getinmemory.html
-
-// Struct para almacenar la respuesta de la request HTTPS
-typedef struct {
-    char *memory;
-    size_t size;
-    long status_code;
-} memory_struct;
 
 // Callback para escribir la respuesta en memoria
 static size_t write_callback(void * contents, size_t size, size_t nmemb, void * userp) {
@@ -395,8 +328,18 @@ void query_dns_resolver(
     
     // Enviar la request HTTPS al DNS resolver
     char * url = build_dns_url(dns_api, dns_api_port, "/api/dns_resolver", NULL, NULL);
+    if (!url) {
+        printf("Failed to build DNS API URL\n");
+        free(encoded_data);
+        return;
+    }
     memory_struct * response = send_https_request(url, encoded_data, encoded_length);
-
+    if (!response) {
+        printf("Failed to send HTTPS request\n");
+        free(encoded_data);
+        free(url);
+        return;
+    }
     if (response->status_code == 200) {
         // Decodificar la respuesta base64
         base64_decoded_data * decoded_data = decode_b64(response->memory, response->size);
@@ -452,8 +395,23 @@ void * process_dns_request(void * arg) {
     }
     char * client_ip = inet_ntoa(client_addr.sin_addr); // Client IP address
     char * url = build_dns_url(dns_api, dns_api_port, "/api/exists", client_ip, req->qname);
+    if (!url) {
+        printf("Failed to build DNS API URL\n");
+        free(request);
+        free(args);
+        free_dns_request(req);
+        return NULL;
+    }
     printf("Sending HTTP Request to %s\n", url);
     memory_struct * response = send_https_request(url, NULL, 0);
+    if (!response) {
+        printf("Failed to send HTTPS request to %s\n", url);
+        free(url);
+        free(request);
+        free(args);
+        free_dns_request(req);
+        return NULL;
+    }
     if (response->status_code == DOMAIN_EXISTS) {
         char *endptr;
         unsigned int ip = strtoul(response->memory, &endptr, 10);
@@ -503,10 +461,8 @@ void * process_dns_request(void * arg) {
         free(args);
         return NULL;
     } else {
-        printf("Invalid response from DNS API\n");
+        printf("Invalid response from DNS API, status code: %ld\n", response->status_code);
     }
-
-
     free(response->memory);
     free(response);
     free(url);
@@ -521,6 +477,8 @@ void * process_dns_request(void * arg) {
 // https://www.youtube.com/watch?v=5PPfy-nUWIM
 // Para env variables:
 // https://www.gnu.org/software/libc/manual/html_node/Environment-Access.html#:~:text=The%20value%20of%20an%20environment,accidentally%20use%20untrusted%20environment%20variables.
+
+#ifndef UNIT_TEST
 int main() {
     const char *dns_api = getenv("DNS_API");
     const char *dns_api_port = getenv("DNS_API_PORT");
@@ -579,3 +537,4 @@ int main() {
     printf("DNS Interceptor stopped.\n");
     return 0;
 }
+#endif //UNIT_TEST
