@@ -1,18 +1,17 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Sin docker
-const API_BASE_URL = 'https://127.0.0.1:5000/api';
+// const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
 // Con docker
-// const API_BASE_URL = `http://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
-
+const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
+console.log("API_BASE_URL:", API_BASE_URL); // para verificar
 // console.log(API_BASE_URL); // para verificar
-
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -21,16 +20,19 @@ export const dnsApi = {
   // Get all DNS records
   getAllRecords: async () => {
     try {
-      const response = await api.get('/all-domains');
+      const response = await api.get("/all-domains");
       if (response.status === 200) {
 
         return response.data; // [{ id, domain, type, direction, status }]
       } else {
-        console.warn('Respuesta inesperada al obtener dominios:', response.status);
+        console.warn(
+          "Respuesta inesperada al obtener dominios:",
+          response.status
+        );
         return [];
       }
     } catch (error) {
-      console.error('Error al cargar dominios:', error);
+      console.error("Error al cargar dominios:", error);
       return [];
     }
   },
@@ -39,53 +41,54 @@ export const dnsApi = {
     try {
       // Asegura que el dominio empiece con "www."
       const fullDomain = domain.startsWith("www.") ? domain : `www.${domain}`;
-  
-      const response = await api.get('/exists', {
+
+      const response = await api.get("/exists", {
         params: {
           domain: fullDomain,
-          ip: direction
-        }
+          ip: direction,
+        },
       });
-  
+
       if (response.status === 200) {
         return {
           health: true,
-          message: `Dirección obtenida: ${response.data}`
+          message: `Dirección obtenida: ${response.data}`,
         };
       } else if (response.status === 500) {
         return {
           health: false,
-          message: 'Estado de salud: Error 500'
+          message: "Estado de salud: Error 500",
         };
       } else {
         return {
           health: false,
-          message: `Error HTTP: ${response.status}`
+          message: `Error HTTP: ${response.status}`,
         };
       }
     } catch (error) {
-      console.error('Error checking DNS health:', error);
-  
+      console.error("Error checking DNS health:", error);
+
       return {
         health: false,
-        message: error.response?.data?.error || error.message || 'Error al verificar el estado'
+        message:
+          error.response?.data?.error ||
+          error.message ||
+          "Error al verificar el estado",
       };
     }
   },
 
-  checkApiStatus : async () =>
-  {
-    const response = await api.get('/status');
+  checkApiStatus: async () => {
+    const response = await api.get("/status");
 
     if (response.status === 200) {
       return {
-        message: true
+        message: true,
       };
-    }
-      else {
-        return {
-          message: false
-        };  
+    } else {
+      return {
+        message: false,
+      };
     }
   },
 
@@ -165,105 +168,115 @@ export const dnsApi = {
   }
 };
 
-
 // IP to Country Database API
 export const databaseApi = {
   getAllIPToCountryRecords: async () => {
     try {
-      const response = await api.get('/ip-to-country/all');
+      const response = await api.get("/ip-to-country/all");
       if (response.status === 200) {
         return response.data;
       } else {
-        console.warn('Unexpected response from IPToCountry API:', response.status);
+        console.warn(
+          "Unexpected response from IPToCountry API:",
+          response.status
+        );
         return [];
       }
     } catch (error) {
-      console.error('Error fetching IPToCountry records:', error);
+      console.error("Error fetching IPToCountry records:", error);
       return [];
     }
   },
   getCountryByIp: async (ip) => {
     try {
-      const response = await api.get('/ip-to-country', {
-        params: { ip }
+      const response = await api.get("/ip-to-country", {
+        params: { ip },
       });
 
       if (response.status === 200) {
-        return response.data; 
+        return response.data;
       } else {
-        console.warn('Unexpected status:', response.status);
+        console.warn("Unexpected status:", response.status);
         return null;
       }
     } catch (error) {
-      console.error('Error fetching country for IP:', error);
+      console.error("Error fetching country for IP:", error);
       return null;
     }
   },
   createIPToCountryRecord: async (rec) => {
     try {
-      const response = await api.post('/ip-to-country', rec);
+      const response = await api.post("/ip-to-country", rec);
       if (response.status === 201) {
-        return response.data;    
+        return response.data;
       } else {
         // handle 4xx/5xx with conflict
         return {
-          error:    response.data.error   || 'Unknown error',
-          conflict: response.data.conflict || null
+          error: response.data.error || "Unknown error",
+          conflict: response.data.conflict || null,
         };
       }
     } catch (error) {
       const data = error.response?.data || {};
-      console.error('[createIPToCountry] failed:', data);
+      console.error("[createIPToCountry] failed:", data);
       return {
-        error:    data.error    || error.message,
-        conflict: data.conflict || null
+        error: data.error || error.message,
+        conflict: data.conflict || null,
       };
     }
   },
   updateIPToCountryRecord: async (rec) => {
     try {
-      const { data } = await api.put('/ip-to-country', rec);
+      const { data } = await api.put("/ip-to-country", rec);
       if (data.record) return data;
       throw new Error(data.error);
     } catch (error) {
       const data = error.response?.data || {};
-      console.error('[updateIPToCountryRecord] failed:', data);
+      console.error("[updateIPToCountryRecord] failed:", data);
       return {
-        error:    data.error    || error.message,
+        error: data.error || error.message,
         conflict: data.conflict || null,
-        trace:    data.trace    || null
+        trace: data.trace || null,
       };
     }
   },
   deleteIPToCountryRecord: async (id) => {
     try {
-      const response = await api.delete('/ip-to-country', {
-        data: { id }
+      const response = await api.delete("/ip-to-country", {
+        data: { id },
       });
       return response.data;
     } catch (error) {
-      console.error('[deleteIPToCountryRecord] id:', id, 'response:', error.response?.data);
-      console.error('[deleteIPToCountryRecord] response.data:', error.response?.data);
+      console.error(
+        "[deleteIPToCountryRecord] id:",
+        id,
+        "response:",
+        error.response?.data
+      );
+      console.error(
+        "[deleteIPToCountryRecord] response.data:",
+        error.response?.data
+      );
       return {
-        error: error.response?.data?.error || error.message
+        error: error.response?.data?.error || error.message,
       };
     }
-  },  
+  },
   checkCountry: async (country) => {
     try {
-      const response = await api.get('/countries', {
-        params: { country_code: country }
+      const response = await api.get("/countries", {
+        params: { country_code: country },
       });
 
       if (response.status === 200) {
         return response.data.exists; // true o false
       } else {
-        console.warn('Unexpected status:', response.status);
+        console.warn("Unexpected status:", response.status);
         return false;
       }
     } catch (error) {
-      console.error('Error fetching country:', error);
+      console.error("Error fetching country:", error);
       return false;
     }
-  }
-}; 
+  },
+};

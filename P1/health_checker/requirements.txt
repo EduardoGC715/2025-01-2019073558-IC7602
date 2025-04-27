@@ -1,0 +1,5 @@
+gunicorn
+flask
+requests
+firebase-admin
+python-crontab

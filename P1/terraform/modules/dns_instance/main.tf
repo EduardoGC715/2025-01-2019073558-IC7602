@@ -1,8 +1,8 @@
 # Security Group for Private Instances
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group
 resource "aws_security_group" "dns_instance_sg" {
-    vpc_id = var.vpc_id
-  name = "dns_instance_sg"
+  vpc_id = var.vpc_id
+  name   = "dns_instance_sg"
 
   tags = {
     Name = "DNS Instance Security Group"
@@ -30,14 +30,6 @@ resource "aws_vpc_security_group_ingress_rule" "allow_http_dns_instance" {
   cidr_ipv4         = "0.0.0.0/0"
   from_port         = 80
   to_port           = 80
-  ip_protocol       = "tcp"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "allow_https_dns_instance" {
-  security_group_id = aws_security_group.dns_instance_sg.id
-  cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 443
-  to_port           = 443
   ip_protocol       = "tcp"
 }
 

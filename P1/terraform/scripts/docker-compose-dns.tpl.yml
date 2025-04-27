@@ -2,24 +2,24 @@ services:
   interceptor:
     image: "dandiego235/dns-interceptor:latest"
     ports:
-      - "6000:53/udp"
+      - "53:53/udp"
     container_name: dns_interceptor
     networks:
       - shared-network
     environment:
       DNS_API: dns_api
-      DNS_API_PORT: "5000"
+      DNS_API_PORT: "${dns_api_port}"
     restart: unless-stopped
   api:
     image: "dandiego235/dns-api:latest"
     ports:
-      - "5000:5000"
+      - "${dns_api_port}:5000"
     container_name: dns_api
     networks:
       - shared-network
     environment:
-      - DNS_SERVER="8.8.8.8"
-      - DNS_PORT="53"
+      - DNS_SERVER=${dns_server_host}
+      - DNS_PORT=${dns_server_port}
     restart: unless-stopped
 networks:
   shared-network:

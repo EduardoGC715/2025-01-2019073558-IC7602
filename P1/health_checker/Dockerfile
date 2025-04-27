@@ -29,14 +29,20 @@ RUN apt-get update && apt-get install -y \
     check \
     && rm -rf /var/lib/apt/lists/*
 
+COPY requirements.txt ./
+
 # Install Python requests library
-RUN pip3 install requests firebase-admin python-crontab
+RUN pip3 install -r requirements.txt
 
 # Create working directory
 WORKDIR /app
 
+# Copy the Flask app files
+COPY flask_app.py ./
+
 # Copy source code and test files
 COPY health_checker.c test_health_checker.c ./
+
 
 # Compile and run tests - build will fail if tests don't pass
 RUN mkdir -p /test-logs
@@ -69,8 +75,9 @@ RUN echo '#!/bin/bash\n\
     echo "CHECKER_COUNTRY=$CHECKER_COUNTRY"\n\
     echo "CHECKER_LAT=$CHECKER_LAT CHECKER_LON=$CHECKER_LON"\n\
     echo "CHECKER_CONTINENT=$CHECKER_CONTINENT"\n\
-    echo "Starting health checker: $CHECKER_ID from $CHECKER_COUNTRY ($CHECKER_LAT, $CHECKER_LON)"\n\
-    # Create the cron job with environment variables included\n\
+    echo "Starting Gunicorn API for flask_app..."\n\
+    gunicorn -w 4 -b 0.0.0.0:5000 flask_app:app &\n\
+    echo "Setting up cron job for update_firebase.py..."\n\
     echo "*/5 * * * * cd /app && CHECKER_ID=\"$CHECKER_ID\" CHECKER_LAT=\"$CHECKER_LAT\" CHECKER_LON=\"$CHECKER_LON\" CHECKER_COUNTRY=\"$CHECKER_COUNTRY\" CHECKER_CONTINENT=\"$CHECKER_CONTINENT\" python3 update_firebase.py --scan >> /var/log/cron.log 2>&1" > /etc/cron.d/health-scan\n\
     chmod 0644 /etc/cron.d/health-scan\n\
     crontab /etc/cron.d/health-scan\n\
