@@ -623,18 +623,9 @@ def manage_domain():
     ref = domain_ref.child(flipped_path)
 
     # Si es una solicitud POST, se crea el dominio nuevo
-    if request.method == "POST":
+    if request.method == "POST" or  request.method == "PUT":
         return create_Domain(ref, domain, data)
-
-    # Si es una solicitud PUT, primero se elimina el dominio anterior y luego se crea uno nuevo
-    elif request.method == "PUT":
-        try:
-            ref.delete()
-        except Exception as e:
-            logger.warning(f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}")
-
-        return create_Domain(ref, domain, data)
-
+    
     # Si es una solicitud DELETE, se elimina el dominio
     elif request.method == "DELETE":
         try:
