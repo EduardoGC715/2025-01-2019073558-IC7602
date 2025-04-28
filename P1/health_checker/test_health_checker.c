@@ -8,75 +8,65 @@
 // https://libcheck.github.io/check/doc/check_html/check_3.html
 // https://developertesting.rocks/tools/check/
 
-// We need to mock the main function to avoid conflicts
 #define main health_checker_main
-// Include health_checker.c directly to test its functions
 #include "health_checker.c"
 #undef main
 
-// Test is_acceptable_status function
+// Test para verificar si el código de estado HTTP es aceptable
 START_TEST(test_is_acceptable_status)
 {
-    // Test with matching status code
+    // Prueba con código de estado aceptable
     char response[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html>...</html>";
     ck_assert_int_eq(is_acceptable_status(response, "200"), true);
 
-    // Test with non-matching status code
+    // Prueba con código de estado no aceptable
     ck_assert_int_eq(is_acceptable_status(response, "404"), false);
 
-    // Test with multiple acceptable status codes
+    // Prueba con múltiples códigos de estado aceptables
     ck_assert_int_eq(is_acceptable_status(response, "404,200,302"), true);
 
-    // Test with whitespace in status codes
+    // Prueba con múltiples códigos de estado no aceptables
     ck_assert_int_eq(is_acceptable_status(response, "404, 200, 302"), true);
 
-    // Test with invalid response
+    // Prueba con código de estado no aceptable en la respuesta
     ck_assert_int_eq(is_acceptable_status("Invalid response", "200"), false);
 }
 END_TEST
 
-// Test extract_status_code function
+// Prueba para extraer el código de estado HTTP de la respuesta
 START_TEST(test_extract_status_code)
 {
     char status_code[4];
 
-    // Test normal HTTP response
+    // Prueba con respuesta válida
     char response1[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html>...</html>";
     extract_status_code(response1, status_code);
     ck_assert_str_eq(status_code, "200");
 
-    // Test different status code
+    // Prueba con respuesta con código de estado diferente
     char response2[] = "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n<html>...</html>";
     extract_status_code(response2, status_code);
     ck_assert_str_eq(status_code, "404");
 
-    // Test invalid response
+    // Prueba con respuesta inválida
     char response3[] = "Invalid response";
     extract_status_code(response3, status_code);
     ck_assert_str_eq(status_code, "???");
 }
 END_TEST
 
-// Integration test that actually runs the health checker
+// Prueba de integración para el health_checker
 START_TEST(test_health_checker_integration)
 {
-    // This test will create a simple child process to run the health checker
-    // and verify it behaves correctly with real parameters
-
-    // Fork is not available on Windows, so we'll use system() for this test
-
-    // Compile the health_checker first
     system("gcc -DTEST_MODE -o health_checker_test health_checker.c");
 
-    // We'll test with localhost (should fail but in a predictable way)
-    // Using --tcp since it's faster than HTTP for testing
+    // Se ejecuta el health_checker_test con parámetros de prueba
     char command[256];
     sprintf(command, "./health_checker_test --tcp localhost 12345 1 1 > test_output.txt 2>&1");
 
-    // Run the health checker
+    // Correr el health checker
     int status = system(command);
 
-    // Read the output
     FILE *output = fopen("test_output.txt", "r");
     ck_assert_ptr_ne(output, NULL);
 
@@ -84,52 +74,46 @@ START_TEST(test_health_checker_integration)
     size_t read_size = fread(output_text, 1, sizeof(output_text) - 1, output);
     fclose(output);
 
-    // Clean up
     remove("health_checker_test");
     remove("test_output.txt");
 
-    // Since we're connecting to a likely closed port, we expect a failure (non-zero status)
+    // Como este es un test de integración, no se puede garantizar que el socket esté disponible
+    // por lo que no se puede verificar el código de retorno
     ck_assert_int_ne(status, 0);
 
-    // Verify output contains expected messages
+    // Verificar que el output contenga el texto esperado
     ck_assert(strstr(output_text, "Checking TCP connection to localhost:12345") != NULL);
 }
 END_TEST
 
-// Test for sending HTTP request to a real server
+// Prueba de integración para la verificación HTTP
 START_TEST(test_http_request)
 {
-    // This is a more comprehensive test that actually attempts an HTTP request
-    // Note: This test depends on external resources and may fail if network is unavailable
 
-    // Create a simple HTTP server using Python if available
+    // Crear un servidor HTTP simple para pruebas
     int server_started = 0;
     int server_pid = 0;
 
-    // We'll attempt to create a simple HTTP server on port 8000
     FILE *python_check = popen("which python3", "r");
     char python_path[256] = {0};
     if (python_check && fgets(python_path, sizeof(python_path), python_check))
     {
-        // Python is available, start simple HTTP server
+
         fclose(python_check);
 
-        // Remove newline from python_path
         python_path[strcspn(python_path, "\n")] = 0;
 
-        // Create a simple index.html
+        // Crear un archivo HTML simple para servir
         FILE *index_html = fopen("index.html", "w");
         if (index_html)
         {
             fprintf(index_html, "<html><body>Test Server</body></html>");
             fclose(index_html);
 
-            // Start Python HTTP server in background
             char cmd[512];
             sprintf(cmd, "%s -m http.server 8000 > /dev/null 2>&1 &", python_path);
             system(cmd);
 
-            // Give server time to start
             sleep(1);
             server_started = 1;
         }
@@ -139,7 +123,7 @@ START_TEST(test_http_request)
         fclose(python_check);
     }
 
-    // Now compile and run health checker with HTTP check
+    // Ahora compilar el health_checker_test
     system("gcc -DTEST_MODE -o health_checker_test health_checker.c");
 
     FILE *output;
@@ -147,19 +131,16 @@ START_TEST(test_http_request)
 
     if (server_started)
     {
-        // If we started a server, test against it
         sprintf(command, "./health_checker_test --http localhost 8000 / 1 1 200");
         output = popen(command, "r");
     }
     else
     {
-        // Otherwise, test against a well-known server that should exist
-        // Use a short timeout to keep test fast
+        // Si no se puede iniciar el servidor, usar un host externo
         sprintf(command, "./health_checker_test --http example.com 80 / 1 1 200,404,302,301");
         output = popen(command, "r");
     }
 
-    // Read the output
     char output_text[4096] = {0};
     size_t read_size = 0;
     if (output)
@@ -168,7 +149,6 @@ START_TEST(test_http_request)
         pclose(output);
     }
 
-    // Clean up
     remove("health_checker_test");
     if (server_started)
     {
@@ -176,10 +156,7 @@ START_TEST(test_http_request)
         remove("index.html");
     }
 
-    // We don't assert the return code, as this is an external connection
-    // that might fail for network reasons outside our control
-
-    // Instead, verify output contains expected HTTP check text
+    // Verificar que el output contenga el texto esperado
     if (server_started)
     {
         ck_assert(strstr(output_text, "Checking HTTP path / on localhost:8000") != NULL);
@@ -191,7 +168,7 @@ START_TEST(test_http_request)
 }
 END_TEST
 
-// Main test suite
+// Suite de pruebas para el health_checker
 Suite *health_checker_suite(void)
 {
     Suite *s;
@@ -199,24 +176,21 @@ Suite *health_checker_suite(void)
 
     s = suite_create("HealthChecker");
 
-    // Core unit tests
     tc_core = tcase_create("Core");
     tcase_add_test(tc_core, test_is_acceptable_status);
     tcase_add_test(tc_core, test_extract_status_code);
     suite_add_tcase(s, tc_core);
 
-    // Integration tests that actually run the health checker
     tc_integration = tcase_create("Integration");
     tcase_add_test(tc_integration, test_health_checker_integration);
     tcase_add_test(tc_integration, test_http_request);
-    // Integration tests may take longer
     tcase_set_timeout(tc_integration, 10);
     suite_add_tcase(s, tc_integration);
 
     return s;
 }
 
-// Test runner
+// Runner
 int main(void)
 {
     int number_failed;
@@ -226,14 +200,11 @@ int main(void)
     s = health_checker_suite();
     sr = srunner_create(s);
 
-    // Set up log file output
     srunner_set_log(sr, "health_checker_unittest.log");
 
-    // Run tests and save results to log file
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
 
-    // Print summary to console
     printf("\nTest results saved to health_checker_unittest.log\n");
     printf("Tests run: %d, Failed: %d\n", srunner_ntests_run(sr), number_failed);
 

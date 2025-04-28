@@ -18,9 +18,9 @@
 // https: // medium.com/@trish07/simple-steps-to-build-an-http-client-in-c-8e225b5c718c
 
 #define BUFFER_SIZE 4096
-#define DEFAULT_TIMEOUT 5     // 5 seconds default timeout
-#define DEFAULT_MAX_RETRIES 3 // 3 retries by default
-#define DEFAULT_HTTP_OK "200" // Default acceptable HTTP status code
+#define DEFAULT_TIMEOUT 5
+#define DEFAULT_MAX_RETRIES 3
+#define DEFAULT_HTTP_OK "200"
 FILE *log_file = NULL;
 const char *LOG_FILENAME = "health_checker.log";
 
@@ -54,22 +54,21 @@ void log_message(const char *format, ...)
     }
 }
 
-// Structure to hold check results
+// Estructura para almacenar el resultado de la verificación
 typedef struct
 {
     int success;
     double duration_ms;
-    char status_code[4]; // For HTTP responses
+    char status_code[4];
 } check_result_t;
 
-// Function to check if a status code is in the list of acceptable codes
+// Funcion para verificar si el código de estado HTTP es aceptable
 bool is_acceptable_status(const char *response, const char *acceptable_codes)
 {
     char *codes_copy = strdup(acceptable_codes);
     char *token, *save_ptr;
     bool result = false;
 
-    // Extract HTTP status code from response
     char *status_line = strstr(response, "HTTP/");
     if (!status_line)
     {
@@ -77,7 +76,6 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
         return false;
     }
 
-    // Find the status code (after "HTTP/X.X ")
     char *status_start = strchr(status_line, ' ');
     if (!status_start)
     {
@@ -85,15 +83,13 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
         return false;
     }
 
-    status_start++; // Skip the space
+    status_start++;
     char status_code[4] = {0};
     strncpy(status_code, status_start, 3);
 
-    // Check if the status code matches any in our acceptable list
     token = strtok_r(codes_copy, ",", &save_ptr);
     while (token)
     {
-        // Trim whitespace
         while (isspace(*token))
             token++;
         char *end = token + strlen(token) - 1;
@@ -112,10 +108,9 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
     return result;
 }
 
-// Extract status code from HTTP response
+// Extraer el código de estado HTTP de la respuesta
 void extract_status_code(const char *response, char *status_code_buf)
 {
-    // Extract the actual status code for reporting
     char *status_line = strstr(response, "HTTP/");
     if (status_line)
     {
@@ -136,7 +131,6 @@ void extract_status_code(const char *response, char *status_code_buf)
     }
 }
 
-// Waits for socket to be ready with timeout
 int wait_for_socket(int sockfd, int for_write, int timeout_secs)
 {
     fd_set fds;
@@ -154,6 +148,14 @@ int wait_for_socket(int sockfd, int for_write, int timeout_secs)
 }
 
 check_result_t tcp_check(const char *hostname, const char *port, int timeout_secs, int max_retries)
+// Funcion para verificar la disponibilidad de un servidor TCP
+// Pasos:
+// 1. Obtener la dirección IP del servidor utilizando getaddrinfo
+// 2. Crear un socket TCP utilizando socket()
+// 3. Configurar el socket para que tenga un tiempo de espera utilizando setsockopt
+// 4. Intentar conectarse al servidor utilizando connect()
+// 5. Si la conexión es exitosa, medir el tiempo de conexión y devolver el resultado
+// 6. Si la conexión falla, cerrar el socket y volver a intentar hasta el número máximo de reintentos
 {
     struct addrinfo hints, *res, *p;
     int sockfd, retry_count = 0;
@@ -178,7 +180,7 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
             sleep(1);
         }
 
-        // Start timing
+        // Empezar a medir el tiempo para la operación de conexión
         clock_gettime(CLOCK_MONOTONIC, &start);
 
         for (p = res; p != NULL; p = p->ai_next)
@@ -187,7 +189,6 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
             if (sockfd == -1)
                 continue;
 
-            // Set socket timeout for connect operation
             struct timeval tv;
             tv.tv_sec = timeout_secs;
             tv.tv_usec = 0;
@@ -198,10 +199,8 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
                 continue;
             }
 
-            // Using blocking connect with timeout set via SO_SNDTIMEO
             if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0)
-            {
-                // Connection completed successfully
+            { // Success
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 result.success = 1;
                 result.duration_ms = ((end.tv_sec - start.tv_sec) * 1000.0) +
@@ -210,9 +209,9 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
                 close(sockfd);
                 return result;
             }
-            else
+            else // Fail
             {
-                // Connect failed
+
                 close(sockfd);
                 continue;
             }
@@ -229,6 +228,14 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
 check_result_t http_check(const char *hostname, const char *port, const char *path,
                           int timeout_secs, int max_retries, const char *acceptable_status_codes,
                           const char *host_header)
+// Funcion para verificar la disponibilidad de un servidor HTTP
+// Pasos:
+// 1. Realizar una solicitud HTTP GET al servidor especificado
+// 2. Esperar la respuesta del servidor
+// 3. Extraer el código de estado HTTP de la respuesta
+// 4. Comparar el código de estado con los códigos aceptables
+// 5. Si el código de estado es aceptable, devolver el resultado como exitoso
+// 6. Si el código de estado no es aceptable, devolver el resultado como fallido
 {
     int retry_count = 0;
     check_result_t result = {0, 0.0, ""};
@@ -242,10 +249,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             sleep(1);
         }
 
-        // Start timing for overall HTTP operation
         clock_gettime(CLOCK_MONOTONIC, &start);
 
-        // First establish a TCP connection
         struct addrinfo hints, *res;
         int sockfd;
 
@@ -269,7 +274,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
-        // Set socket timeouts for connect, send and receive
         struct timeval tv;
         tv.tv_sec = timeout_secs;
         tv.tv_usec = 0;
@@ -283,7 +287,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
-        // Use blocking connect with timeout set via socket options
         if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0)
         {
             log_message("connect failed: %s", strerror(errno));
@@ -293,7 +296,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
-        // Prepare HTTP request
         char request[1024];
         const char *effective_host = host_header && strlen(host_header) > 0 ? host_header : hostname;
 
@@ -301,7 +303,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
                  "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nUser-Agent: HealthChecker/1.0\r\n\r\n",
                  path, effective_host);
 
-        // Send HTTP request
         if (send(sockfd, request, strlen(request), 0) < 0)
         {
             log_message("Failed to send HTTP request: %s", strerror(errno));
@@ -311,14 +312,12 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
-        // Receive HTTP response
         char buffer[BUFFER_SIZE];
         int bytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
 
         freeaddrinfo(res);
         close(sockfd);
 
-        // End timing
         clock_gettime(CLOCK_MONOTONIC, &end);
         double duration = ((end.tv_sec - start.tv_sec) * 1000.0) +
                           ((end.tv_nsec - start.tv_nsec) / 1000000.0);
@@ -332,11 +331,9 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
 
         buffer[bytes] = '\0';
 
-        // Extract status code
         extract_status_code(buffer, result.status_code);
-
-        // Check if the HTTP status code is in our list of acceptable codes
         if (is_acceptable_status(buffer, acceptable_status_codes))
+        // Verifica si el código de estado es aceptable
         {
             log_message("HTTP check passed: %s status code (%.2f ms)\n", result.status_code, duration);
             result.success = 1;
@@ -344,10 +341,10 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             return result;
         }
         else
+        // Si el código de estado no es aceptable, imprime el mensaje de error
         {
             log_message("HTTP check failed. Status code: %s. Response first line:\n", result.status_code);
 
-            // Print just the first line of the response
             char *newline = strchr(buffer, '\n');
             if (newline)
                 *newline = '\0';
@@ -358,12 +355,11 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         }
     }
 
-    return result; // All attempts failed
+    return result; // Maximo de reintentos alcanzado
 }
 
 int main(int argc, char *argv[])
 {
-    // Initialize log file
     log_file = fopen(LOG_FILENAME, "a");
     if (!log_file)
     {
@@ -383,7 +379,6 @@ int main(int argc, char *argv[])
     int max_retries = DEFAULT_MAX_RETRIES;
     const char *acceptable_codes = DEFAULT_HTTP_OK;
 
-    // Format result for easy parsing by Python script
     if (strcmp(check_type, "--tcp") == 0)
     {
         if (argc < 4)
@@ -394,7 +389,6 @@ int main(int argc, char *argv[])
         const char *hostname = argv[2];
         const char *port = argv[3];
 
-        // Parse optional timeout and retries
         if (argc > 4)
             timeout = atoi(argv[4]);
         if (argc > 5)
@@ -421,7 +415,6 @@ int main(int argc, char *argv[])
             log_message("TCP connection successful (%.2f ms).\n", duration_ms);
         }
 
-        // Output machine-readable result
         printf("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
                success ? "true" : "false", duration_ms);
         fflush(stdout);
@@ -433,7 +426,6 @@ int main(int argc, char *argv[])
         const char *port = argv[3];
         const char *path = argv[4];
 
-        // Parse optional timeout and retries
         if (argc > 5)
             timeout = atoi(argv[5]);
         if (argc > 6)
@@ -459,7 +451,6 @@ int main(int argc, char *argv[])
         duration_ms = result.duration_ms;
         strncpy(status_code, result.status_code, sizeof(status_code));
 
-        // Output machine-readable result
         printf("RESULT: {\"success\": %s, \"duration_ms\": %.2f}\n",
                success ? "true" : "false", duration_ms);
         fflush(stdout);
@@ -469,7 +460,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Add this before returning
     if (log_file)
     {
         fclose(log_file);
