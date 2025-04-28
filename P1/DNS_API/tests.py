@@ -457,5 +457,3 @@ class TestDNSAPI(unittest.TestCase):
     def test_unsupported_method(self):
         response = self.app.patch("/api/ip-to-country", json={})
         self.assertEqual(response.status_code, 405)
-
-

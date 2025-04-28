@@ -586,7 +586,7 @@ def create_Domain(ref, domain, data):
             return jsonify({"error": "Formato inválido para IPs de geo"}), 400
 
     try:
-        ref.set(ip_data)
+        ref.update(ip_data)
         return (
             jsonify(
                 {
@@ -619,10 +619,7 @@ def manage_domain():
         return jsonify({"error": "Formato de dominio inválido"}), 400
 
     # construye la ruta invertida
-    # "example.com" se guarda como "com/example/www"
-    tld = domain_parts[-1]
-    name = domain_parts[-2]
-    flipped_path = f"{tld}/{name}/www"
+    flipped_path = "/".join(reversed(domain.strip().split(".")))
     ref = domain_ref.child(flipped_path)
 
     # Si es una solicitud POST, se crea el dominio nuevo
