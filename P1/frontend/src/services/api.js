@@ -20,19 +20,16 @@ export const dnsApi = {
   // Get all DNS records
   getAllRecords: async () => {
     try {
-      const response = await api.get("/all-domains");
-      if (response.status === 200) {
-
-        return response.data; // [{ id, domain, type, direction, status }]
+      const { status, data } = await api.get('/all-domains');
+      console.log('getAllRecords response:', { status, data });
+      if (status === 200) {
+        return data;
       } else {
-        console.warn(
-          "Respuesta inesperada al obtener dominios:",
-          response.status
-        );
+        console.warn(`Unexpected status ${status} when fetching domains`);
         return [];
       }
     } catch (error) {
-      console.error("Error al cargar dominios:", error);
+      console.error('Error fetching domains:', error);
       return [];
     }
   },
@@ -48,7 +45,7 @@ export const dnsApi = {
           ip: direction,
         },
       });
-
+    console.log('Response:', response);
       if (response.status === 200) {
         return {
           health: true,
