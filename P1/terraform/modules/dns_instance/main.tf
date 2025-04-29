@@ -64,3 +64,12 @@ resource "aws_instance" "dns_instance" {
     Name = "DNS Instance"
   }
 }
+
+resource "aws_eip" "dns_instance_eip" {
+  instance = aws_instance.dns_instance.id
+  vpc      = true
+
+  tags = {
+    Name = "DNS Instance EIP"
+  }
+}

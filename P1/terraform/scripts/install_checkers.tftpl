@@ -26,11 +26,16 @@ sudo systemctl enable docker
 sudo systemctl start docker
 sudo usermod -aG docker ubuntu
 
-cat <<"EOF" > /home/ubuntu/docker-compose.yml
-${DOCKER_COMPOSE_YML}
-EOF
+docker pull dandiego235/dns-health-checker:latest
 
-cd /home/ubuntu
-docker compose up -d
+%{ for checker in checkers ~}
+docker run -d --name checker-${checker.id} \
+  -e CHECKER_ID="${checker.id}" \
+  -e CHECKER_LAT="${checker.lat}" \
+  -e CHECKER_LON="${checker.lon}" \
+  -e CHECKER_COUNTRY="${checker.country}" \
+  -e CHECKER_CONTINENT="${checker.continent}" \
+  dandiego235/dns-health-checker:latest
 
+%{ endfor ~}
 # https://developer.hashicorp.com/terraform/language/functions/templatefile
