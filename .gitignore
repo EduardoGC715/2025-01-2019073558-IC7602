@@ -8,5 +8,6 @@
 /TC1/audio
 *.vscode
 /P1/DNS_API/dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json
+P1/frontend/src/firebaseConfig.json
 /P1/terraform/.terraform
 /P1/terraform/ssh_keys
