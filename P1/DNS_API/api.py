@@ -116,7 +116,10 @@ def home():
 
 # 8.8.8.8 es el DNS público de Google
 dns_ip = os.environ.get("DNS_SERVER", "8.8.8.8")
-dns_port = os.environ.get("DNS_PORT", "53")
+try:
+    dns_port = int(os.environ.get("DNS_PORT", "53"))
+except:
+    dns_port = 53
 dns_server = (dns_ip, dns_port)
 
 
@@ -328,7 +331,7 @@ def countries():
 @app.route("/api/status", methods=["GET"])
 def get_api_status():
     try:
-        return jsonify([]), 200
+        return jsonify({"DNS_SERVER": dns_ip, "DNS_PORT": dns_port}), 200
     except Exception as e:
         logger.debug("Error con el API backend", e)
         return jsonify({"error": "No se pudo obtener la información"}), 500
@@ -352,113 +355,60 @@ def get_firebase_status():
 @app.route("/api/all-domains", methods=["GET"])
 def get_all_domains():
     try:
-        raw_data = domain_ref.get()
-        if not raw_data:
-            logger.warning("No se encontraron datos en la base de datos")
-            return jsonify([]), 200
-
-        response = []
+        raw_data = domain_ref.get() or {}
+        results = []
         id_counter = 0
-        domain_map = {}
 
-        for tld, domain_block in raw_data.items():
-            for domain, www_data in domain_block.items():
-                www_info = www_data.get("www", {})
-                routing_policy = www_info.get("routing_policy")
-                domain_name = f"{domain}.{tld}"
+        def traverse(node: dict, path: list[str]):
+            nonlocal id_counter
 
-                if routing_policy == "single":
-                    ip = www_info.get("ip")
-                    if ip:
-                        response.append(
-                            {
-                                "id": id_counter,
-                                "domain": domain_name,
-                                "type": routing_policy,
-                                "direction": ip.get("address", "N/A"),
-                                "status": ip.get("health", "unknown"),
-                                "healthcheck_settings": ip.get(
-                                    "healthcheck_settings", {}
-                                ),
-                            }
-                        )
-                        id_counter += 1
+            policy = node.get("routing_policy")
+            if policy and (node.get("ip") or node.get("ips")):
+                id_counter += 1
+                fqdn = ".".join(reversed(path))
+                logger.debug(fqdn)
+                if policy == "single":
+                    addresses = [node["ip"].get("address", "")]
+                elif policy == "weight":
+                    addresses = [
+                        f"{ip.get('address', '')}:{ip.get('weight', 0)}"
+                        for ip in node.get("ips", [])
+                    ]
+                elif policy == "geo":
+                    addresses = [
+                        f"{ip.get('address', '')}:{country}"
+                        for country, ip in node.get("ips", {}).items()
+                    ]
+                else:
+                    raw_ips = node.get("ips", [])
+                    if isinstance(raw_ips, list):
+                        addresses = [ip.get("address", "") for ip in raw_ips]
                     else:
-                        logger.warning(
-                            f"No se encontró un IP para el dominio {domain_name} con el routing policy {routing_policy}"
-                        )
+                        addresses = [ip.get("address", "") for ip in raw_ips.values()]
+                direction = ",".join(addresses)
 
-                elif routing_policy in ["multi", "weight", "geo", "round-trip"]:
-                    if domain_name not in domain_map:
-                        domain_map[domain_name] = {
-                            "id": id_counter,
-                            "domain": domain_name,
-                            "type": routing_policy,
-                            "direction": "",
-                            "status": [],
-                            "healthcheck_settings": {},
-                        }
-                        id_counter += 1
+                record = {
+                    "id": id_counter,
+                    "domain": fqdn,
+                    "type": policy,
+                    "direction": direction,
+                }
 
-                    if routing_policy in ["multi", "round-trip"]:
-                        ips = www_info.get("ips", [])
-                        ip_addresses = [ip.get("address", "N/A") for ip in ips]
-                        domain_map[domain_name]["direction"] = ",".join(ip_addresses)
-                        domain_map[domain_name]["status"] = ",".join(
-                            [str(ip.get("health", "unknown")) for ip in ips]
-                        )
-                        if ips:
-                            domain_map[domain_name]["healthcheck_settings"] = ips[
-                                0
-                            ].get("healthcheck_settings", {})
-                        if routing_policy in ["multi"]:
-                            counter = www_info.get("counter")
-                            if counter is not None:
-                                domain_map[domain_name]["counter"] = counter
+                results.append(record)
 
-                    elif routing_policy == "weight":
-                        ips = www_info.get("ips", [])
-                        weighted_ips = [
-                            f"{ip.get('address', 'N/A')}:{ip.get('weight', '0')}"
-                            for ip in ips
-                        ]
-                        domain_map[domain_name]["direction"] = ",".join(weighted_ips)
-                        domain_map[domain_name]["status"] = ",".join(
-                            [str(ip.get("health", "unknown")) for ip in ips]
-                        )
-                        if ips:
-                            domain_map[domain_name]["healthcheck_settings"] = ips[
-                                0
-                            ].get("healthcheck_settings", {})
+            for key, child in node.items():
+                if isinstance(child, dict):
+                    traverse(child, path + [key])
 
-                    elif routing_policy == "geo":
-                        geo_ips = www_info.get("ips", {})
-                        geo_entries = []
-                        statuses = []
-                        first_ip = next(iter(geo_ips.values())) if geo_ips else None
-                        if first_ip:
-                            domain_map[domain_name]["healthcheck_settings"] = (
-                                first_ip.get("healthcheck_settings", {})
-                            )
-                        for country, ip in geo_ips.items():
-                            geo_entries.append(f"{ip.get('address', 'N/A')}:{country}")
-                            statuses.append(ip.get("health", "unknown"))
-                        domain_map[domain_name]["direction"] = ",".join(geo_entries)
-                        domain_map[domain_name]["status"] = ",".join(map(str, statuses))
+        for tld, domains_block in raw_data.items():
+            logger.debug(tld, domains_block)
+            for domain_name, domain_obj in (domains_block or {}).items():
+                traverse(domain_obj, [tld, domain_name])
 
-        for domain_info in domain_map.values():
-            if isinstance(domain_info["status"], list):
-                domain_info["status"] = ",".join(map(str, domain_info["status"]))
-            response.append(domain_info)
-
-        response.sort(key=lambda x: x["id"])
-        return jsonify(response), 200
+        return jsonify(results), 200
 
     except Exception as e:
-        logger.error(f"Error al obtener los dominios: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error("Error al obtener los dominios:", exc_info=True)
         return jsonify({"error": "No se pudo obtener la información"}), 500
 
 
@@ -588,7 +538,7 @@ def create_Domain(ref, domain, data):
             return jsonify({"error": "Formato inválido para IPs de geo"}), 400
 
     try:
-        ref.set(ip_data)
+        ref.update(ip_data)
         return (
             jsonify(
                 {
@@ -621,25 +571,11 @@ def manage_domain():
         return jsonify({"error": "Formato de dominio inválido"}), 400
 
     # construye la ruta invertida
-    # "example.com" se guarda como "com/example/www"
-    tld = domain_parts[-1]
-    name = domain_parts[-2]
-    flipped_path = f"{tld}/{name}/www"
+    flipped_path = "/".join(reversed(domain.strip().split(".")))
     ref = domain_ref.child(flipped_path)
 
     # Si es una solicitud POST, se crea el dominio nuevo
-    if request.method == "POST":
-        return create_Domain(ref, domain, data)
-
-    # Si es una solicitud PUT, primero se elimina el dominio anterior y luego se crea uno nuevo
-    elif request.method == "PUT":
-        try:
-            ref.delete()
-        except Exception as e:
-            logger.warning(
-                f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}"
-            )
-
+    if request.method == "POST" or request.method == "PUT":
         return create_Domain(ref, domain, data)
 
     # Si es una solicitud DELETE, se elimina el dominio
@@ -864,4 +800,4 @@ def get_all_ip_to_country_records():
 
 if __name__ == "__main__":
     # Uso de HTTPS sacado de https://blog.miguelgrinberg.com/post/running-your-flask-application-over-https
-    app.run(host="0.0.0.0", ssl_context=("127.0.0.1.pem", "127.0.0.1-key.pem"))
+    app.run(host="0.0.0.0", ssl_context=("fullchain.pem", "privkey.pem"))

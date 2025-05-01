@@ -20,19 +20,16 @@ export const dnsApi = {
   // Toma todos los DNS records
   getAllRecords: async () => {
     try {
-      const response = await api.get("/all-domains");
-      if (response.status === 200) {
-
-        return response.data; 
+      const { status, data } = await api.get("/all-domains");
+      console.log("getAllRecords response:", { status, data });
+      if (status === 200) {
+        return data;
       } else {
-        console.warn(
-          "Respuesta inesperada al obtener dominios:",
-          response.status
-        );
+        console.warn(`Unexpected status ${status} when fetching domains`);
         return [];
       }
     } catch (error) {
-      console.error("Error al cargar dominios:", error);
+      console.error("Error fetching domains:", error);
       return [];
     }
   },
@@ -48,7 +45,7 @@ export const dnsApi = {
           ip: direction,
         },
       });
-
+      console.log("Response:", response);
       if (response.status === 200) {
         return {
           health: true,
@@ -93,36 +90,33 @@ export const dnsApi = {
     }
   },
 
-  // Revisa conexión con firebase
-  checkFirebaseStatus : async () =>
-    {
-      const response = await api.get('/firebase-status');
-  
-      if (response.status === 200) {
-        return {  
-          message: true
-        };
-      }
-        else {
-          return {
-            message: false
-          };  
-      }
-    },
-  
+  checkFirebaseStatus: async () => {
+    const response = await api.get("/firebase-status");
+
+    if (response.status === 200) {
+      return {
+        message: true,
+      };
+    } else {
+      return {
+        message: false,
+      };
+    }
+  },
+
   // Actualiza en la base de datos los registros
   createDNSRecord: async (recordData) => {
     try {
-      const response = await api.post('/domains', recordData);
+      const response = await api.post("/domains", recordData);
       return {
         success: response.status === 201,
         data: response.data,
-        message: response.data.message || 'Registro creado exitosamente'
+        message: response.data.message || "Registro creado exitosamente",
       };
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.error || 'Error al crear el registro'
+        message: error.response?.data?.error || "Error al crear el registro",
       };
     }
   },
@@ -130,18 +124,18 @@ export const dnsApi = {
   // Elimina un registro
   deleteDNSRecord: async (record) => {
     try {
-      const response = await api.delete('/domains', {
-        data: record
+      const response = await api.delete("/domains", {
+        data: record,
       });
       return {
         success: response.status === 200,
-        message: 'Registro eliminado exitosamente'
+        message: "Registro eliminado exitosamente",
       };
     } catch (error) {
-      console.error('Error al eliminar el registro DNS:', error);
+      console.error("Error al eliminar el registro DNS:", error);
       return {
         success: false,
-        message: error.response?.data?.error || 'Error al eliminar el registro'
+        message: error.response?.data?.error || "Error al eliminar el registro",
       };
     }
   },
@@ -149,27 +143,28 @@ export const dnsApi = {
   // Edita un registro
   editDNSRecord: async (recordData) => {
     try {
-      const response = await api.put('/domains', recordData);
-      
+      const response = await api.put("/domains", recordData);
+
       if (response.status === 201) {
         return {
           success: true,
           data: response.data,
-          message: 'Registro actualizado exitosamente'
+          message: "Registro actualizado exitosamente",
         };
       } else {
         return {
           success: false,
-          message: response.data?.error || 'Error al actualizar el registro'
+          message: response.data?.error || "Error al actualizar el registro",
         };
       }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.error || 'Error al actualizar el registro'
+        message:
+          error.response?.data?.error || "Error al actualizar el registro",
       };
     }
-  }
+  },
 };
 
 // IP to Country Database API

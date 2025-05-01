@@ -24,6 +24,10 @@ provider "aws" {
   region = "us-east-1"
 }
 
+module "networking" {
+  source = "./modules/networking"
+}
+
 data "template_file" "dns_docker_compose" {
   template = file("${path.module}/scripts/docker-compose-dns.tpl.yml")
   vars = {
@@ -31,10 +35,6 @@ data "template_file" "dns_docker_compose" {
     dns_server_host = var.dns_server.host
     dns_server_port = var.dns_server.port
   }
-}
-
-module "networking" {
-  source = "./modules/networking"
 }
 
 module "dns_instance" {
@@ -54,7 +54,7 @@ module "dns_instance" {
 data "template_file" "ui_docker_compose" {
   template = file("${path.module}/scripts/docker-compose-ui.tpl.yml")
   vars = {
-    dns_api_host = module.dns_instance.public_ip
+    dns_api_host = var.api_host
     dns_api_port = var.api_port
   }
 }
@@ -65,6 +65,18 @@ module "ui_instance" {
 
   user_data = templatefile("${path.module}/scripts/install_ui.tftpl", {
     DOCKER_COMPOSE_YML = data.template_file.ui_docker_compose.rendered
+  })
+
+  vpc_id    = module.networking.vpc_id
+  subnet_id = module.networking.public_subnet_id
+}
+
+module "checker_instance" {
+  source   = "./modules/checker_instance"
+  aws_ami  = var.aws_ami
+
+  user_data = templatefile("${path.module}/scripts/install_checkers.tftpl", {
+    checkers           = var.checkers
   })
 
   vpc_id    = module.networking.vpc_id

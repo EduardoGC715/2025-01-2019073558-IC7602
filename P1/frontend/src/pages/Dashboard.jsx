@@ -15,7 +15,6 @@ import DNSRegisterCard from "../components/DNSRegisterCard";
 import EditRecordModal from "../components/EditRecordModal";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
 import { dnsApi } from "../services/api";
-
 const Dashboard = () => {
   const navigate = useNavigate();
 
@@ -49,21 +48,7 @@ const Dashboard = () => {
         // Obtener todos los registros de la tabla
         const records = await dnsApi.getAllRecords();
 
-        // Obtener los estados
-        const updatedRecords = await Promise.all(
-          records.map(async (record) => {
-            const healthResult = await dnsApi.checkHealth(record.domain, record.direction);
-  
-            return {
-              ...record,
-              status: healthResult.health ? 'active' : 'error',
-              statusMessage: healthResult.message
-            };
-          })
-        );
-        // Guardar el estado
-        setDnsRecords(updatedRecords);
-        // Update el APIHealth
+        setDnsRecords(records);
         updateApiHealthStatus();
         updateFirebaseStatus();
       } catch (error) {
@@ -108,20 +93,6 @@ const Dashboard = () => {
     handleCloseAddModal();
   };
 
-
-  // Función para renderizar el indicador de estado
-  const renderStatusBadge = (status) => {
-    switch (status) {
-      case "active":
-        return <Badge bg="success">Activo</Badge>;
-      case "warning":
-        return <Badge bg="warning">Advertencia</Badge>;
-      case "error":
-        return <Badge bg="danger">Error</Badge>;
-      default:
-        return <Badge bg="secondary">Desconocido</Badge>;
-    }
-  };
 
   // Función para renderizar icono de salud
   const renderHealthIcon = (status) => {
@@ -290,8 +261,6 @@ const Dashboard = () => {
         <DNSRecordsTable
           dnsRecords={dnsRecords}
           loading={loading}
-          renderStatusBadge={renderStatusBadge}
-          onRefreshStatus={handleRefreshStatus}
           onEditRecord={handleEditRecord}
           onDeleteRecord={handleDeleteClick}
         />

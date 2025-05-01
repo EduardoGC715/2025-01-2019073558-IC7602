@@ -7,6 +7,7 @@ COPY package*.json ./
 RUN npm install
 
 COPY public ./public
+COPY src/firebaseConfig.json ./src/firebaseConfig.json
 COPY src ./src
 
 EXPOSE 80

@@ -10,8 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api.py .
 COPY logs ./logs
 COPY dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json .
-COPY 127.0.0.1-key.pem .
-COPY 127.0.0.1.pem .
-
+COPY fullchain.pem .
+COPY privkey.pem .
 EXPOSE 5000
-CMD [ "gunicorn", "-b", "0.0.0.0:5000", "--certfile=127.0.0.1.pem", "--keyfile=127.0.0.1-key.pem", "api:app" ]
+CMD [ "gunicorn", "-b", "0.0.0.0:5000", "--certfile=fullchain.pem", "--keyfile=privkey.pem", "api:app" ]
