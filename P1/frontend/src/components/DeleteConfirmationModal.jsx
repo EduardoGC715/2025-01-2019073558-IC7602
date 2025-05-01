@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Button } from 'react-bootstrap';
 
+// Componente visual para eliminar registro
 const DeleteConfirmationModal = ({ show, onHide, onConfirm, domain }) => {
   return (
     <Modal show={show} onHide={onHide} centered>

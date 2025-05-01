@@ -35,29 +35,30 @@ app = Flask(__name__)
 # enable cors
 CORS(app, supports_credentials=True)
 
+
 def ip_to_int(ip):
     return int(ipaddress.ip_address(ip))
 
+
 def make_conflict_obj(key: str, rec: dict) -> dict:
     return {
-        "id":               key,
-        "start_ip":         rec["start_ip"],
-        "end_ip":           rec["end_ip"],
-        "continent_code":   rec["continent_code"],
-        "continent_name":   rec["continent_name"],
+        "id": key,
+        "start_ip": rec["start_ip"],
+        "end_ip": rec["end_ip"],
+        "continent_code": rec["continent_code"],
+        "continent_name": rec["continent_name"],
         "country_iso_code": rec["country_iso_code"],
-        "country_name":     rec["country_name"],
+        "country_name": rec["country_name"],
     }
 
 
 def get_previous_conflict(start_int: int, exclude_key: str = None):
     limit = 2 if exclude_key else 1
     snap = (
-        ip_to_country_ref
-          .order_by_key()
-          .end_at(str(start_int))
-          .limit_to_last(limit)
-          .get()
+        ip_to_country_ref.order_by_key()
+        .end_at(str(start_int))
+        .limit_to_last(limit)
+        .get()
     ) or {}
 
     items = list(snap.items())
@@ -77,11 +78,10 @@ def get_previous_conflict(start_int: int, exclude_key: str = None):
 def get_next_conflict(start_int: int, end_int: int, exclude_key: str = None):
     limit = 2 if exclude_key else 1
     snap = (
-        ip_to_country_ref
-          .order_by_key()
-          .start_at(str(start_int))
-          .limit_to_first(limit)
-          .get()
+        ip_to_country_ref.order_by_key()
+        .start_at(str(start_int))
+        .limit_to_first(limit)
+        .get()
     ) or {}
 
     items = list(snap.items())
@@ -96,6 +96,7 @@ def get_next_conflict(start_int: int, end_int: int, exclude_key: str = None):
         return next_key, next_rec
 
     return None, None
+
 
 @app.route("/")
 def home():
@@ -117,6 +118,7 @@ def home():
 dns_ip = os.environ.get("DNS_SERVER", "8.8.8.8")
 dns_port = os.environ.get("DNS_PORT", "53")
 dns_server = (dns_ip, dns_port)
+
 
 @app.route("/api/set_dns_server", methods=["POST"])
 def set_dns():
@@ -308,6 +310,7 @@ def exists():
         else:
             return "Ese dominio no existe", 404
 
+
 @app.route("/api/countries", methods=["GET"])
 def countries():
     if request.method == "GET":
@@ -320,7 +323,6 @@ def countries():
         if not country:
             return {"exists": False}
         return {"exists": True}
-
 
 
 @app.route("/api/status", methods=["GET"])
@@ -359,14 +361,12 @@ def get_all_domains():
         id_counter = 0
         domain_map = {}
 
-        # Ciclo por dominio
         for tld, domain_block in raw_data.items():
             for domain, www_data in domain_block.items():
                 www_info = www_data.get("www", {})
                 routing_policy = www_info.get("routing_policy")
                 domain_name = f"{domain}.{tld}"
 
-                # Clasifica el dominio por su tipo de routing policy
                 if routing_policy == "single":
                     ip = www_info.get("ip")
                     if ip:
@@ -389,7 +389,6 @@ def get_all_domains():
                         )
 
                 elif routing_policy in ["multi", "weight", "geo", "round-trip"]:
-                    # Para los otros tipos debido a que permiten mas de un address
                     if domain_name not in domain_map:
                         domain_map[domain_name] = {
                             "id": id_counter,
@@ -401,7 +400,6 @@ def get_all_domains():
                         }
                         id_counter += 1
 
-                    # Para multi y round-trip: formato "ip1,ip2,ip3"
                     if routing_policy in ["multi", "round-trip"]:
                         ips = www_info.get("ips", [])
                         ip_addresses = [ip.get("address", "N/A") for ip in ips]
@@ -409,13 +407,15 @@ def get_all_domains():
                         domain_map[domain_name]["status"] = ",".join(
                             [str(ip.get("health", "unknown")) for ip in ips]
                         )
-                        # Tomamos los healthcheck settings del primer IP (deberían ser iguales para todos)
-                        if ips and len(ips) > 0:
+                        if ips:
                             domain_map[domain_name]["healthcheck_settings"] = ips[
                                 0
                             ].get("healthcheck_settings", {})
+                        if routing_policy in ["multi"]:
+                            counter = www_info.get("counter")
+                            if counter is not None:
+                                domain_map[domain_name]["counter"] = counter
 
-                    # Para weight: formato "ip1:peso1,ip2:peso2"
                     elif routing_policy == "weight":
                         ips = www_info.get("ips", [])
                         weighted_ips = [
@@ -426,37 +426,31 @@ def get_all_domains():
                         domain_map[domain_name]["status"] = ",".join(
                             [str(ip.get("health", "unknown")) for ip in ips]
                         )
-                        # Tomamos los healthcheck settings del primer IP
-                        if ips and len(ips) > 0:
+                        if ips:
                             domain_map[domain_name]["healthcheck_settings"] = ips[
                                 0
                             ].get("healthcheck_settings", {})
 
-                    # Para geo: formato "ip1:país1,ip2:país2"
                     elif routing_policy == "geo":
                         geo_ips = www_info.get("ips", {})
                         geo_entries = []
                         statuses = []
-                        # Tomamos los healthcheck settings del primer IP
                         first_ip = next(iter(geo_ips.values())) if geo_ips else None
                         if first_ip:
                             domain_map[domain_name]["healthcheck_settings"] = (
                                 first_ip.get("healthcheck_settings", {})
                             )
-
                         for country, ip in geo_ips.items():
                             geo_entries.append(f"{ip.get('address', 'N/A')}:{country}")
                             statuses.append(ip.get("health", "unknown"))
                         domain_map[domain_name]["direction"] = ",".join(geo_entries)
                         domain_map[domain_name]["status"] = ",".join(map(str, statuses))
 
-        # Añadir los dominios agrupados a la respuesta
         for domain_info in domain_map.values():
             if isinstance(domain_info["status"], list):
                 domain_info["status"] = ",".join(map(str, domain_info["status"]))
             response.append(domain_info)
 
-        # Ordenar respuesta por ID
         response.sort(key=lambda x: x["id"])
         return jsonify(response), 200
 
@@ -466,6 +460,7 @@ def get_all_domains():
 
         traceback.print_exc()
         return jsonify({"error": "No se pudo obtener la información"}), 500
+
 
 # Valida que exista dominio
 def validate_domain(data):
@@ -508,7 +503,14 @@ def create_Domain(ref, domain, data):
         healthcheck_settings["port"] = int(healthcheck_settings["port"])
         healthcheck_settings["timeout"] = int(healthcheck_settings["timeout"])
     except ValueError:
-        return jsonify({"error": "Valores numéricos inválidos en la configuración del healthcheck"}), 400
+        return (
+            jsonify(
+                {
+                    "error": "Valores numéricos inválidos en la configuración del healthcheck"
+                }
+            ),
+            400,
+        )
 
     ip_data = {"routing_policy": domain_type}
 
@@ -634,7 +636,9 @@ def manage_domain():
         try:
             ref.delete()
         except Exception as e:
-            logger.warning(f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}")
+            logger.warning(
+                f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}"
+            )
 
         return create_Domain(ref, domain, data)
 
@@ -646,6 +650,7 @@ def manage_domain():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+
 @app.route("/api/ip-to-country", methods=["GET"])
 def get_country_from_ip():
     ip_str = request.args.get("ip")
@@ -656,28 +661,29 @@ def get_country_from_ip():
 
         # Buscar el registro con la clave (start_ip_int) más cercana hacia abajo
         snapshot = (
-            ip_to_country_ref
-              .order_by_key()
-              .end_at(str(ip_int))
-              .limit_to_last(1)
-              .get()
-        ) 
+            ip_to_country_ref.order_by_key().end_at(str(ip_int)).limit_to_last(1).get()
+        )
 
         if snapshot:
             for key, record in snapshot.items():
                 record_start = int(key)
-                record_end   = ip_to_int(record["end_ip"])
+                record_end = ip_to_int(record["end_ip"])
 
                 if record_start <= ip_int <= record_end:
-                    return jsonify({
-                        "id":               record_start,
-                        "country_name":     record["country_name"],
-                        "country_iso_code": record["country_iso_code"],
-                        "continent_name":   record["continent_name"],
-                        "continent_code":   record["continent_code"],
-                        "start_ip":         record["start_ip"],
-                        "end_ip":           record["end_ip"]
-                    }), 200
+                    return (
+                        jsonify(
+                            {
+                                "id": record_start,
+                                "country_name": record["country_name"],
+                                "country_iso_code": record["country_iso_code"],
+                                "continent_name": record["continent_name"],
+                                "continent_code": record["continent_code"],
+                                "start_ip": record["start_ip"],
+                                "end_ip": record["end_ip"],
+                            }
+                        ),
+                        200,
+                    )
 
             return jsonify({"error": "No hay un registro para este IP"}), 404
 
@@ -686,7 +692,7 @@ def get_country_from_ip():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/ip-to-country", methods=["POST","PUT","DELETE"])
+@app.route("/api/ip-to-country", methods=["POST", "PUT", "DELETE"])
 def manage_ip_to_country():
     data = request.get_json() or {}
     logger.debug(data)
@@ -695,26 +701,25 @@ def manage_ip_to_country():
         record_id = data.get("id")
 
         if record_id is None:
-            return jsonify({"error":"Falta el 'id' para la eliminación"}), 400
-        
+            return jsonify({"error": "Falta el 'id' para la eliminación"}), 400
+
         key = str(int(record_id))
         ref = ip_to_country_ref.child(key)
 
         if not ref.get():
-            return jsonify({"error":f"No hay un registro {record_id}"}), 404
-        
-        ref.delete()
-        return jsonify({"message":f"Eliminado el registro {record_id}"}), 200
+            return jsonify({"error": f"No hay un registro {record_id}"}), 404
 
+        ref.delete()
+        return jsonify({"message": f"Eliminado el registro {record_id}"}), 200
 
     start_ip = data.get("start_ip")
-    end_ip   = data.get("end_ip")
+    end_ip = data.get("end_ip")
     if start_ip is None or end_ip is None:
         return jsonify({"error": "Se necesitan 'start_ip' y 'end_ip'"}), 400
 
     try:
         start_int = ip_to_int(start_ip)
-        end_int   = ip_to_int(end_ip)
+        end_int = ip_to_int(end_ip)
     except ValueError:
         return jsonify({"error": "Formato de IP inválido"}), 400
 
@@ -722,67 +727,104 @@ def manage_ip_to_country():
         return jsonify({"error": "'start_ip' debe estar antes de 'end_ip'"}), 400
 
     new_key = str(start_int)
-    required = ["continent_code","continent_name","country_iso_code","country_name"]
+    required = ["continent_code", "continent_name", "country_iso_code", "country_name"]
     missing = [f for f in required if f not in data]
     if missing:
-        return jsonify({"error":"Faltan campos","missing":missing}), 400
+        return jsonify({"error": "Faltan campos", "missing": missing}), 400
 
     if request.method == "POST":
         try:
             pk, prec = get_previous_conflict(start_int)
             if pk:
-                return jsonify({"error":"Hay traslape con el registro anterior.", "conflict": make_conflict_obj(pk, prec)}), 409
+                return (
+                    jsonify(
+                        {
+                            "error": "Hay traslape con el registro anterior.",
+                            "conflict": make_conflict_obj(pk, prec),
+                        }
+                    ),
+                    409,
+                )
 
             nk, nrec = get_next_conflict(start_int, end_int)
             if nk:
-                return jsonify({"error":"Hay traslape con el registro siguiente.", "conflict": make_conflict_obj(nk, nrec)}), 409
+                return (
+                    jsonify(
+                        {
+                            "error": "Hay traslape con el registro siguiente.",
+                            "conflict": make_conflict_obj(nk, nrec),
+                        }
+                    ),
+                    409,
+                )
 
             ref = ip_to_country_ref.child(new_key)
 
             if ref.get():
-                return jsonify({"error":f"El registro ya existe en {start_ip}"}), 409
+                return jsonify({"error": f"El registro ya existe en {start_ip}"}), 409
 
             payload = {
-                "start_ip":         start_ip,
-                "end_ip":           end_ip,
-                **{k: data[k] for k in required}
+                "start_ip": start_ip,
+                "end_ip": end_ip,
+                **{k: data[k] for k in required},
             }
 
             ref.set(payload)
             logger.debug(payload)
-            record = { "id": start_int, **payload }
+            record = {"id": start_int, **payload}
 
-            return jsonify({
-                "message": f"Registro creado en {start_ip}",
-                "record":  record
-            }), 201
+            return (
+                jsonify(
+                    {"message": f"Registro creado en {start_ip}", "record": record}
+                ),
+                201,
+            )
         except Exception as e:
             logger.debug("Error creando el registro", e)
             return jsonify({"error": str(e)}), 500
-    
+
     if request.method == "PUT":
         orig_id = data.get("original_start_ip")
         if orig_id is None:
-            return jsonify({"error":"Falta el 'original_start_ip'"}), 400
-        
+            return jsonify({"error": "Falta el 'original_start_ip'"}), 400
+
         old_key = str(int(orig_id))
         old_ref = ip_to_country_ref.child(old_key)
-        
+
         if not old_ref.get():
-            return jsonify({"error":f"No hay un registro para actualizer en {orig_id}"}), 404
+            return (
+                jsonify({"error": f"No hay un registro para actualizer en {orig_id}"}),
+                404,
+            )
 
         pk, prec = get_previous_conflict(start_int, exclude_key=old_key)
         if pk:
-            return jsonify({"error":"Hay traslape con el registro anterior.","conflict": make_conflict_obj(pk, prec)}), 409
+            return (
+                jsonify(
+                    {
+                        "error": "Hay traslape con el registro anterior.",
+                        "conflict": make_conflict_obj(pk, prec),
+                    }
+                ),
+                409,
+            )
 
         nk, nrec = get_next_conflict(start_int, end_int, exclude_key=old_key)
         if nk:
-            return jsonify({"error":"Hay traslape con el registro siguiente.","conflict": make_conflict_obj(nk, nrec)}), 409
+            return (
+                jsonify(
+                    {
+                        "error": "Hay traslape con el registro siguiente.",
+                        "conflict": make_conflict_obj(nk, nrec),
+                    }
+                ),
+                409,
+            )
 
         payload = {
             "start_ip": start_ip,
-            "end_ip":   end_ip,
-            **{k: data[k] for k in required}
+            "end_ip": end_ip,
+            **{k: data[k] for k in required},
         }
         logger.debug(payload)
 
@@ -793,25 +835,22 @@ def manage_ip_to_country():
         else:
             old_ref.update(payload)
             msg = f"Actualizado registro {new_key}"
-        
-        record = { "id": start_int, **payload }
 
-        return jsonify({
-            "message": msg,
-            "record":  record
-        }), 200
-    
+        record = {"id": start_int, **payload}
+
+        return jsonify({"message": msg, "record": record}), 200
+
+
 @app.route("/api/ip-to-country/all", methods=["GET"])
 def get_all_ip_to_country_records():
     try:
         snapshot = ip_to_country_ref.get()
 
         if not snapshot:
-            return jsonify([]), 200  
+            return jsonify([]), 200
 
         result = [
-            { "id": int(start_key), **record }
-            for start_key, record in snapshot.items()
+            {"id": int(start_key), **record} for start_key, record in snapshot.items()
         ]
 
         result.sort(key=lambda r: r["id"])

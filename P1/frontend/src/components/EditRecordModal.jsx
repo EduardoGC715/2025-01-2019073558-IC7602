@@ -9,7 +9,7 @@ import WeightConfig from "./configCards/weightConfig";
 import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
 
-
+// Modelo visual para editar un dominio
 const EditRecordModal = ({ show, handleClose, record, onSave }) => {
   const [editedRecord, setEditedRecord] = useState({
     domain: "",
@@ -36,6 +36,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
       let weightedDirections = [];
       let geoDirections = [];
 
+      // Filtra por el tipo de dominio
       if (record.type === "multi") {
         directions = record.direction.split(",").map(d => d.trim());
       } else if (record.type === "weight" && record.direction) {
@@ -50,6 +51,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         });
       }
 
+      // Guarda la información del dominio
       setEditedRecord({
         ...record,
         directions,
@@ -163,6 +165,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     }));
   };
 
+  // Valida que el dominio sea correcto
   const isValidDomain = (domain) => {
     const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z]{2,})+$/;
     return domainRegex.test(domain);
@@ -181,13 +184,16 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
       }
       sum += numWeight;
     }
-    return sum !== 1; // Si todo es válido, retorna false
+    return sum !== 1;
   };
+
+  // Guarda la información y la valida antes de mandarla
   const handleSave = async () => {
     try {
       let recordData = {
         domain: editedRecord.domain,
         type: editedRecord.type,
+        counter: editedRecord.counter,
         status: true,
         healthcheck_settings: {
           acceptable_codes: editedRecord.healthcheck_settings.acceptable_codes,
@@ -262,7 +268,8 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         default:
           throw new Error('Tipo de registro no válido');
       }
-  
+      
+      // Se publica con la base de datos
       const result = await dnsApi.editDNSRecord(recordData);
   
       if (result.success) {
@@ -274,6 +281,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     }
   };
 
+  // Componente visual
   return (
     <Modal show={show} onHide={handleClose} size="lg">
       <Modal.Header closeButton>
@@ -449,6 +457,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         <Button 
         variant="primary" 
         onClick={handleSave}
+        // Boton desactivado hasta que cumpla las validaciones
         disabled={
           !isValidDomain(editedRecord.domain) || (
             editedRecord.type === "multi"

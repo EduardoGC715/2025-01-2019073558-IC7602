@@ -5,6 +5,7 @@ import { RotateCw, Edit2, Trash2 } from "lucide-react";
 const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStatus, onEditRecord, onDeleteRecord }) => {
   // Permite devolver los registros en base al tipo donde se ordenan para la tabla
   const renderDirections = (record) => {
+    // Cambia manejo dependiendo del tipo
     if (record.type === "multi" || record.type === "round-trip") {
       if (!record.direction) return;
       const directions = record.direction.split(",").map(d => d.trim());
@@ -19,7 +20,7 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
         </div>
       );
     }
-  
+    
     if (record.type === "weight") {
       if (!record.direction) return;
       const weightedDirections = record.direction.split(",").map(item => {
@@ -60,6 +61,7 @@ const DNSRecordsTable = ({ dnsRecords, loading, renderStatusBadge, onRefreshStat
     return record.direction ?? "Sin datos";
   };
 
+  // Componente visual para la tabla de dominios
   return (
     <Row>
       <Col>

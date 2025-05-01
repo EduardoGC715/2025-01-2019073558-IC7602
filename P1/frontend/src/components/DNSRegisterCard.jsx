@@ -8,7 +8,7 @@ import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
 import { dnsApi, databaseApi} from "../services/api";
 
-
+// Modelo visual para agregar un dominio
 const DNSRegisterCard = ({
   show,
   handleClose,
@@ -66,7 +66,7 @@ const DNSRegisterCard = ({
       console.log("Dominio no válido");
     }
 
-    // Check if the input is a healthcheck setting
+    // Reivsa si el input tiene healthcheck
     if (name.startsWith('healthcheck_')) {
       const settingName = name.replace('healthcheck_', '');
       setLocalRecord(prev => ({
@@ -85,6 +85,7 @@ const DNSRegisterCard = ({
     }
   };
 
+  // Crea el nuevo registro
   const handleAddRecord = async () => {
     try {
       let recordData = {
@@ -108,7 +109,7 @@ const DNSRegisterCard = ({
       if (missingFields.length > 0) {
         throw new Error(`Faltan campos requeridos de healthcheck: ${missingFields.join(', ')}`);
       }
-  
+      // Cambia por el tipo de dominio
       switch (localRecord.type) {
         case 'single':
           recordData = {
@@ -294,38 +295,6 @@ const DNSRegisterCard = ({
     return sum !== 1; // Si todo es válido, retorna false
   };
 
-  // Función para preparar y enviar el registro con el formato adecuado
-  const handleSaveRecord = () => {
-    // Copia del registro local para modificaciones
-    let recordToSave = { ...localRecord };
-
-    // Procesar direcciones según el tipo de registro
-    if (localRecord.type === "multi") {
-      // Convertir array de direcciones a string separado por comas
-      recordToSave.direction = localRecord.directions.join(", ");
-    } 
-    else if (localRecord.type === "weight") {
-      // Convertir array de objetos {ip, weight} a string con formato "ip:weight, ip:weight"
-      recordToSave.direction = localRecord.weightedDirections
-        .map(item => `${item.ip}:${item.weight}`)
-        .join(", ");
-    } 
-    else if (localRecord.type === "geo") {
-      // Convertir array de objetos {ip, country} a string con formato "ip:country, ip:country"
-      recordToSave.direction = localRecord.geoDirections
-        .map(item => `${item.ip}:${item.country}`)
-        .join(", ");
-    }
-    
-    // Actualizar el estado direction antes de guardar
-    handleInputChange({ target: { name: "direction", value: recordToSave.direction } });
-    
-    // Añadir un pequeño retraso para asegurar que el estado se actualizó
-    setTimeout(() => {
-      handleAddRecord();
-    }, 100);
-  };
-
   return (
     <Modal show={show} onHide={handleClose} size="lg">
       <Modal.Header closeButton>
@@ -495,6 +464,7 @@ const DNSRegisterCard = ({
           onClick={() => {
             handleAddRecord();
           }}
+          // Se desactiva submit hasta que se cumplan validaciones
           disabled={
             !isValidDomain(localRecord.domain) ||
             (localRecord.type === "single" && !localRecord.direction) ||

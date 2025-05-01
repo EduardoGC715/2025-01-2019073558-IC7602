@@ -22,7 +22,6 @@ const Dashboard = () => {
   // Estados para los datos y modales
   const [dnsRecords, setDnsRecords] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showDatabaseModal, setShowDatabaseModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -48,7 +47,7 @@ const Dashboard = () => {
       setLoading(true);
       try {
         // Obtener todos los registros de la tabla
-        const records = await dnsApi.getAllRecords(); 
+        const records = await dnsApi.getAllRecords();
 
         // Obtener los estados
         const updatedRecords = await Promise.all(
@@ -90,7 +89,6 @@ const Dashboard = () => {
   };
 
   // Añadir nuevo registro
-
   const handleAddRecord = () => {
     const newId = dnsRecords.length + 1;
     const recordWithId = {
@@ -180,19 +178,19 @@ const Dashboard = () => {
       setDnsRecords(errorRecords);
     }
   };
-
+  
+  // Permite eliminar dominio
   const handleDeleteClick = (record) => {
     setRecordToDelete(record);
     setShowDeleteModal(true);
   };
-
+  // Permite confirmar eliminar el dominio
   const handleDeleteConfirm = async () => {
     try {
       const record = {
         domain: recordToDelete.domain
       };
   
-      console.log(record)
       const result = await dnsApi.deleteDNSRecord(record);
   
       if (result.success) {
@@ -208,14 +206,17 @@ const Dashboard = () => {
     }
   };
 
+  // Cancela eliminar registro
   const handleDeleteCancel = () => {
     setShowDeleteModal(false);
     setRecordToDelete(null);
   };
   
+  // Revisa estado del Backend API
   const updateApiHealthStatus = async () => {
     const result = await dnsApi.checkApiStatus();
   
+  // Revisa estado del Firebase
     setHealthStatus(prev => ({
       ...prev,
       api: result.message ? "healthy" : "error"

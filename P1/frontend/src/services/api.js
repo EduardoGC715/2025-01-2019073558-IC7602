@@ -1,11 +1,11 @@
 import axios from "axios";
 
 // Sin docker
-// const API_BASE_URL = 'http://127.0.0.1:5000/api';
+const API_BASE_URL = 'https://127.0.0.1:5000/api';
 
 // Con docker
-const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
-console.log("API_BASE_URL:", API_BASE_URL); // para verificar
+//const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
+// console.log("API_BASE_URL:", API_BASE_URL); // para verificar
 // console.log(API_BASE_URL); // para verificar
 
 const api = axios.create({
@@ -17,13 +17,13 @@ const api = axios.create({
 
 // DNS Records API
 export const dnsApi = {
-  // Get all DNS records
+  // Toma todos los DNS records
   getAllRecords: async () => {
     try {
       const response = await api.get("/all-domains");
       if (response.status === 200) {
 
-        return response.data; // [{ id, domain, type, direction, status }]
+        return response.data; 
       } else {
         console.warn(
           "Respuesta inesperada al obtener dominios:",
@@ -78,6 +78,7 @@ export const dnsApi = {
     }
   },
 
+  // Revisa conexión con el backend
   checkApiStatus: async () => {
     const response = await api.get("/status");
 
@@ -92,6 +93,7 @@ export const dnsApi = {
     }
   },
 
+  // Revisa conexión con firebase
   checkFirebaseStatus : async () =>
     {
       const response = await api.get('/firebase-status');
@@ -125,6 +127,7 @@ export const dnsApi = {
     }
   },
 
+  // Elimina un registro
   deleteDNSRecord: async (record) => {
     try {
       const response = await api.delete('/domains', {
@@ -143,6 +146,7 @@ export const dnsApi = {
     }
   },
 
+  // Edita un registro
   editDNSRecord: async (recordData) => {
     try {
       const response = await api.put('/domains', recordData);

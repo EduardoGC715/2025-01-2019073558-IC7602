@@ -1,6 +1,7 @@
 import React from 'react';
 import { Row, Col, Card } from 'react-bootstrap';
 
+// Componente visual para estado del sistema API y Firebase
 const SystemStatusCard = ({ healthStatus, renderHealthIcon }) => {
   return (
     <Row className="mb-4">

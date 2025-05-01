@@ -1,6 +1,7 @@
 import { Card, Form, Button } from "react-bootstrap";
 import { Plus, Trash2 } from "lucide-react";
 
+// Componente visual para la modificación de geo
 const GeoConfig = ({ editedRecord, handleAddGeoDirection, handleGeoDirectionChange, handleRemoveGeoDirection }) => (
   <Card className="mb-3">
     <Card.Header>Configuración Geolocation</Card.Header>
