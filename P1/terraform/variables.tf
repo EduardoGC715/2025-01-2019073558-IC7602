@@ -6,6 +6,7 @@ variable "aws_ami" {
 variable "api_host" {
   description = "Nombre de host de la API que usará la instancia"
   type        = string
+  default     = null
 }
 
 variable "api_port" {

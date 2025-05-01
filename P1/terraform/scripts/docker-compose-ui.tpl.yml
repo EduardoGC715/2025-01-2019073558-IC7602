@@ -7,3 +7,4 @@ services:
     environment:
       - REACT_APP_DNS_API=${dns_api_host}
       - REACT_APP_DNS_API_PORT=${dns_api_port}
+    restart: unless-stopped

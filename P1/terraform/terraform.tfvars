@@ -1,5 +1,4 @@
 aws_ami  = "ami-0f9de6e2d2f067fca"
-api_host = "dnsproject.mooo.com"
 api_port = 443
 checkers = [
   {
