@@ -18,27 +18,27 @@ export default function LookupIPModal({ show, onHide }) {
       if (res && !res.error) {
         setLookupResult(res);
       } else {
-        setLookupError('IP not found in any range');
+        setLookupError('IP no encontrada en ningún rango');
       }
     } catch {
-      setLookupError('Error fetching IP');
+      setLookupError('Error al obtener IP');
     }
   };
 
   return (
     <Modal show={show} onHide={onHide} centered size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>Lookup IP Address</Modal.Title>
+        <Modal.Title>Buscar dirección IP</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <InputGroup className="mb-3">
           <FormControl
-            placeholder="Enter IP (e.g. 1.0.1.2)"
+            placeholder="Ej: 192.168.0.254"
             value={lookupIp}
             onChange={e => setLookupIp(e.target.value)}
           />
           <Button variant="primary" onClick={handleLookup}>
-            Go
+            Buscar
           </Button>
         </InputGroup>
 
@@ -49,12 +49,12 @@ export default function LookupIPModal({ show, onHide }) {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Country</th>
-                <th>Country ISO Code</th>
-                <th>Continent</th>
-                <th>Continent Code</th>
-                <th>Start IP</th>
-                <th>End IP</th>
+                <th>País</th>
+                <th>Código ISO</th>
+                <th>Continente</th>
+                <th>Código Continente</th>
+                <th>IP Inicio</th>
+                <th>IP Fin</th>
               </tr>
             </thead>
             <tbody>
