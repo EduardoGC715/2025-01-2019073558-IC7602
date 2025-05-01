@@ -367,6 +367,7 @@ def get_all_domains():
                 id_counter += 1
                 fqdn = ".".join(reversed(path))
                 logger.debug(fqdn)
+
                 if policy == "single":
                     addresses = [node["ip"].get("address", "")]
                 elif policy == "weight":
@@ -393,6 +394,11 @@ def get_all_domains():
                     "type": policy,
                     "direction": direction,
                 }
+
+                if policy == "multi":
+                    counter = node.get("counter")
+                    if counter is not None:
+                        record["counter"] = counter
 
                 results.append(record)
 
