@@ -33,7 +33,18 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
     }
   }, [show]);
   
-
+  const ipToInt = (ip) => {
+    const parts = ip.split(".");
+    if (parts.length !== 4) throw new Error("Formato de IP inválido");
+    return parts.reduce((acc, part) => {
+      const num = parseInt(part, 10);
+      if (isNaN(num) || num < 0 || num > 255) {
+        throw new Error("Formato de IP inválido");
+      }
+      return (acc << 8) + num;
+    }, 0);
+  };
+  
   const handleChange = (e) => {
     const { name, value } = e.target;
     onSubmit(prev => ({ ...prev, [name]: value }));
@@ -51,7 +62,48 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
   const handleSave = async () => {
   setConflictRecords([]);
 
-  // Validate required fields
+  const {
+    start_ip,
+    end_ip,
+    continent_code,
+    continent_name,
+    country_iso_code,
+    country_name
+  } = ipToCountry;
+
+  // Validar campos obligatorios
+  if (!start_ip || !end_ip) {
+    toast.error("Se necesitan 'IP de inicio' y 'IP de fin'");
+    return;
+  }
+
+  let startInt, endInt;
+  try {
+    startInt = ipToInt(start_ip);
+    endInt = ipToInt(end_ip);
+  } catch {
+    toast.error("Formato de IP inválido");
+    return;
+  }
+
+  if (startInt >= endInt) {
+    toast.error("'IP de inicio' debe ser menor que 'IP de fin'");
+    return;
+  }
+
+  const requiredFields = {
+    "código del continente": continent_code,
+    "nombre del continente": continent_name,
+    "código del país": country_iso_code,
+    "nombre del país": country_name
+  };
+
+  const missing = Object.entries(requiredFields).filter(([_, v]) => !v).map(([k]) => k);
+  if (missing.length > 0) {
+    toast.error(`Faltan los siguientes campos: ${missing.join(", ")}`);
+    return;
+  }
+
   if (!ipToCountry.country_iso_code || !ipToCountry.country_name) {
     toast.error("Por favor seleccione un país.");
     return;
@@ -177,7 +229,7 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
       </div>
         {conflictRecords.length > 0 && (
           <>
-            <h5 className="mt-4">Conflicting Ranges</h5>
+            <h5 className="mt-4">Rangos en conflicto</h5>
             <Table striped bordered hover size="sm" responsive>
               <thead>
                 <tr>
@@ -206,7 +258,7 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
             </Table>
             {conflictRecords.length > 1 && (
               <div className="text-muted">
-                Y {conflictRecords.length - 1} more conflict(s)
+                Y {conflictRecords.length - 1} conflicto(s) más
               </div>
             )}
           </>
