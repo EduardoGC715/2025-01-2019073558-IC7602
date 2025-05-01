@@ -39,6 +39,7 @@ const IPToCountryDashboard = () => {
   const [showLookupModal, setShowLookupModal] = useState(false);
     
   const [records, setRecords] = useState([]);
+  const [clickedSortColumn, setClickedSortColumn] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -99,7 +100,8 @@ const IPToCountryDashboard = () => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const handleSort = (field) => {
+  const handleSort = (field, visualColumn = field) => {
+    setClickedSortColumn(visualColumn);
     if (sortField === field) {
       setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -208,7 +210,6 @@ const IPToCountryDashboard = () => {
             variant="link"
             className="p-0 me-4 text-dark"
             onClick={() => navigate("/")}
-            title="Back to Dashboard" // optional tooltip on hover
           >
             <ArrowLeftCircle size={24} />
           </Button>
@@ -229,22 +230,22 @@ const IPToCountryDashboard = () => {
               setCurrentPage(1);
             }}
           >
-            <option value="all">All</option>
+            <option value="all">Todos</option>
             <option value="id">ID</option>
-            <option value="country_name">Country</option>
-            <option value="continent_name">Continent</option>
+            <option value="country_name">País</option>
+            <option value="continent_name">Continente</option>
             <option value="ip">IP</option>
           </Form.Select>
         </div>
         <div className="d-flex gap-2">
           <Button variant="success" onClick={openCreateModal}>
-            <Plus size={16} className="me-1" /> Add IPToCountry
+            <Plus size={16} className="me-1" /> Agregar IPToCountry
           </Button>
           <Button
             variant="info"
             onClick={() => setShowLookupModal(true)}
           >
-            Lookup IP
+            Buscar IP
           </Button>
         </div>
       </div>
@@ -254,25 +255,25 @@ const IPToCountryDashboard = () => {
         <thead>
           <tr>
             <th className="cursor-pointer" onClick={() => handleSort('id')}>
-              ID {sortField === 'id' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+              ID {clickedSortColumn === 'id' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
             <th className="cursor-pointer" onClick={() => handleSort('country_name')}>
-              Country Name {sortField === 'country_name' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+              País {clickedSortColumn === 'country_name' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
             <th className="cursor-pointer" onClick={() => handleSort('country_iso_code')}>
-              Country ISO Code {sortField === 'country_iso_code' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+              Código ISO {clickedSortColumn === 'country_iso_code' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
             <th className="cursor-pointer" onClick={() => handleSort('continent_name')}>
-              Continent Name {sortField === 'continent_name' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+              Continente {clickedSortColumn === 'continent_name' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
             <th className="cursor-pointer" onClick={() => handleSort('continent_code')}>
-              Continent Code {sortField === 'continent_code' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+              Código continente {clickedSortColumn === 'continent_code' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
-            <th className="cursor-pointer" onClick={() => handleSort('start_ip')}>
-              Start IP {sortField === 'start_ip' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+            <th className="cursor-pointer" onClick={() => handleSort('id', 'start_ip')}>
+              IP inicial {clickedSortColumn === 'start_ip' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
-            <th className="cursor-pointer" onClick={() => handleSort('end_ip')}>
-              End IP {sortField === 'end_ip' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
+            <th className="cursor-pointer" onClick={() => handleSort('id', 'end_ip')}>
+              IP final {clickedSortColumn === 'end_ip' && (sortOrder === 'asc' ? <ArrowDown size={14} /> : <ArrowDown size={14} style={{ transform: 'rotate(180deg)' }} />)}
             </th>
             <th className="text-center">Actions</th>
           </tr>
@@ -326,11 +327,11 @@ const IPToCountryDashboard = () => {
       {/* Deletion Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={cancelDelete} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Confirm Deletion</Modal.Title>
+          <Modal.Title>Confirmar eliminación</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {deleteCandidate && (
-            <p>Are you sure you want to delete IPToCountry {deleteCandidate.country_name} with range {deleteCandidate.start_ip} - {deleteCandidate.end_ip}?</p>
+            <p>¿Está seguro de que desea eliminar el país {deleteCandidate.country_name} con rango {deleteCandidate.start_ip} - {deleteCandidate.end_ip}?</p>
           )}
         </Modal.Body>
         <Modal.Footer>

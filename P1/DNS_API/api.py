@@ -327,6 +327,19 @@ def countries():
             return {"exists": False}
         return {"exists": True}
 
+@app.route("/api/countries/all", methods=["GET"])
+def get_all_countries():
+    try:
+        countries = countries_ref.get()
+        if not countries:
+            return jsonify([]), 200
+
+        country_list = [{"code": code, "name": name} for code, name in countries.items()]
+        return jsonify(country_list), 200
+    except Exception as e:
+        app.logger.error(f"Error retrieving countries: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/status", methods=["GET"])
 def get_api_status():

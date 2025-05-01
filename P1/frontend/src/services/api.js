@@ -15,6 +15,7 @@ const api = axios.create({
   },
 });
 
+
 // DNS Records API
 export const dnsApi = {
   // Toma todos los DNS records
@@ -209,7 +210,6 @@ export const databaseApi = {
       if (response.status === 201) {
         return response.data;
       } else {
-        // handle 4xx/5xx with conflict
         return {
           error: response.data.error || "Unknown error",
           conflict: response.data.conflict || null,
@@ -276,6 +276,20 @@ export const databaseApi = {
     } catch (error) {
       console.error("Error fetching country:", error);
       return false;
+    }
+  },
+  getAllCountries: async () => {
+    try {
+      const response = await api.get("/countries/all");
+      if (response.status === 200) {
+        return response.data;
+      } else {
+        console.warn("Unexpected response getting all countries:", response.status);
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching all countries:", error);
+      return [];
     }
   },
 };
