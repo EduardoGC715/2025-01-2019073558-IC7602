@@ -141,13 +141,15 @@ def set_dns():
 def dns_resolver():
     if request.method == "POST":
         data = request.get_data(as_text=True)
+        # Código obtenido de https://www.geeksforgeeks.org/base64-b64decode-in-python/
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
 
         # Crea un socket UDP para enviar la consulta DNS
+        # Código obtenido de https://wiki.python.org/moin/UdpCommunicatione 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
-            data, _ = s.recvfrom(512)
+            data, _ = s.recvfrom(512) # Tamaño máximo especificado por el RFC 1035
             logger.debug("Recibida la respuesta DNS:", data)
         codified_data = base64.b64encode(data).decode("utf-8")
         return codified_data
