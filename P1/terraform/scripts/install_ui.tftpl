@@ -25,6 +25,7 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin 
 sudo systemctl enable docker
 sudo systemctl start docker
 sudo usermod -aG docker ubuntu
+sudo usermod -aG docker ssm-user
 
 cat <<"EOF" > /home/ubuntu/docker-compose.yml
 ${DOCKER_COMPOSE_YML}

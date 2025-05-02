@@ -143,12 +143,12 @@ def dns_resolver():
         data = request.get_data(as_text=True)
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
-
+        logger.debug(dns_server)
         # Crea un socket UDP para enviar la consulta DNS
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
             data, _ = s.recvfrom(512)
-            logger.debug("Recibida la respuesta DNS:", data)
+            logger.debug(f"Recibida la respuesta DNS: {data}")
         codified_data = base64.b64encode(data).decode("utf-8")
         return codified_data
 
@@ -327,6 +327,7 @@ def countries():
             return {"exists": False}
         return {"exists": True}
 
+
 @app.route("/api/countries/all", methods=["GET"])
 def get_all_countries():
     try:
@@ -334,7 +335,9 @@ def get_all_countries():
         if not countries:
             return jsonify([]), 200
 
-        country_list = [{"code": code, "name": name} for code, name in countries.items()]
+        country_list = [
+            {"code": code, "name": name} for code, name in countries.items()
+        ]
         return jsonify(country_list), 200
     except Exception as e:
         app.logger.error(f"Error retrieving countries: {e}")
