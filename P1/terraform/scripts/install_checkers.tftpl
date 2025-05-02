@@ -37,5 +37,6 @@ docker run -d --name checker-${checker.id} \
   -e CHECKER_CONTINENT="${checker.continent}" \
   dandiego235/dns-health-checker:latest
 
+sleep 5
 %{ endfor ~}
 # https://developer.hashicorp.com/terraform/language/functions/templatefile

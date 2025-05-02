@@ -54,7 +54,7 @@ module "dns_instance" {
 data "template_file" "ui_docker_compose" {
   template = file("${path.module}/scripts/docker-compose-ui.tpl.yml")
   vars = {
-    dns_api_host = var.api_host
+    dns_api_host = coalesce(var.api_host, module.dns_instance.public_ip)
     dns_api_port = var.api_port
   }
 }
@@ -72,11 +72,11 @@ module "ui_instance" {
 }
 
 module "checker_instance" {
-  source   = "./modules/checker_instance"
-  aws_ami  = var.aws_ami
+  source  = "./modules/checker_instance"
+  aws_ami = var.aws_ami
 
   user_data = templatefile("${path.module}/scripts/install_checkers.tftpl", {
-    checkers           = var.checkers
+    checkers = var.checkers
   })
 
   vpc_id    = module.networking.vpc_id

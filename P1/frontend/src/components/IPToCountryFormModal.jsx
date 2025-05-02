@@ -6,6 +6,7 @@ import { databaseApi } from '../services/api';
 const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipToCountry, isEditing }) => {
   const [conflictRecords, setConflictRecords] = useState([]);
   const [allCountries, setAllCountries] = useState([]);
+  const [formValues, setFormValues] = useState({});
 
   const continentMap = {
     AF: 'Africa',
@@ -19,6 +20,7 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
 
   useEffect(() => {
     if (show) {
+      setFormValues({ ...ipToCountry });
       databaseApi.getAllCountries()
         .then(countries => {
           const sorted = countries.sort((a, b) =>
@@ -31,7 +33,7 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
           toast.error("No se pudo cargar la lista de países");
         });
     }
-  }, [show]);
+  }, [show, ipToCountry]);
   
   const ipToInt = (ip) => {
     const parts = ip.split(".");
@@ -45,17 +47,29 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
     }, 0);
   };
   
-  const handleChange = (e) => {
+  const handleChange = e => {
     const { name, value } = e.target;
-    onSubmit(prev => ({ ...prev, [name]: value }));
+    setFormValues(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleCountryChange = (e) => {
+    const code = e.target.value;
+    const selected = allCountries.find(c => c.code === code);
+    if (selected) {
+      setFormValues(prev => ({
+        ...prev,
+        country_iso_code: selected.code,
+        country_name: selected.name,
+      }));
+    }
+  };
+  
   const handleContinentChange = (e) => {
     const code = e.target.value;
-    onSubmit(prev => ({
+    setFormValues(prev => ({
       ...prev,
       continent_code: code,
-      continent_name: continentMap[code]
+      continent_name: continentMap[code],
     }));
   };
 
@@ -69,7 +83,7 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
     continent_name,
     country_iso_code,
     country_name
-  } = ipToCountry;
+  } = formValues;
 
   // Validar campos obligatorios
   if (!start_ip || !end_ip) {
@@ -91,43 +105,26 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
     return;
   }
 
-  const requiredFields = {
-    "código del continente": continent_code,
-    "nombre del continente": continent_name,
-    "código del país": country_iso_code,
-    "nombre del país": country_name
+  const missing = [];
+  if (!country_iso_code || !country_name) {
+    missing.push("país");
+  }
+  if (!continent_code || !continent_name) {
+    missing.push("continente");
+  }
+  if (missing.length) {
+    toast.error(`Faltan campos: ${missing.join(", ")}`);
+    return;
+  }
+
+  const payload = {
+    ...formValues,
+    ...(isEditing && { original_start_ip: ipToCountry.id })
   };
-
-  const missing = Object.entries(requiredFields).filter(([_, v]) => !v).map(([k]) => k);
-  if (missing.length > 0) {
-    toast.error(`Faltan los siguientes campos: ${missing.join(", ")}`);
-    return;
-  }
-
-  if (!ipToCountry.country_iso_code || !ipToCountry.country_name) {
-    toast.error("Por favor seleccione un país.");
-    return;
-  }
-  
-  if (!ipToCountry.continent_code || !ipToCountry.continent_name) {
-    toast.error("Por favor seleccione un continente.");
-    return;
-  }
 
   const fn = isEditing
     ? databaseApi.updateIPToCountryRecord
     : databaseApi.createIPToCountryRecord;
-
-    // prepare payload
-    const payload = {
-      start_ip:         ipToCountry.start_ip,
-      end_ip:           ipToCountry.end_ip,
-      continent_code:   ipToCountry.continent_code,
-      continent_name:   ipToCountry.continent_name,
-      country_iso_code: ipToCountry.country_iso_code,
-      country_name:     ipToCountry.country_name,
-      ...(isEditing && { original_start_ip: ipToCountry.id })
-    };
     
     const result = await fn(payload);
 
@@ -166,20 +163,10 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
           )}
           <Form.Group className="mb-3">
             <Form.Label>País</Form.Label>
-            <Form.Select
-              value={ipToCountry.country_iso_code || ''}
-              onChange={(e) => {
-                const selectedCode = e.target.value;
-                const selected = allCountries.find(c => c.code === selectedCode);
-                if (selected) {
-                  onSubmit(prev => ({
-                    ...prev,
-                    country_iso_code: selected.code,
-                    country_name: selected.name,
-                  }));
-                }
-              }}
-            >
+              <Form.Select
+                value={formValues.country_iso_code || ''}
+                onChange={handleCountryChange}
+              >
               <option value="">-- Seleccione un país --</option>
               {allCountries.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -191,7 +178,7 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
           <Form.Group className="mb-3">
             <Form.Label>Continente</Form.Label>
             <Form.Select
-              value={ipToCountry.continent_code || ''}
+              value={formValues.continent_code || ''}
               onChange={handleContinentChange}
             >
               <option value="">-- Seleccione un continente --</option>
@@ -204,21 +191,21 @@ const IPToCountryFormModal = ({ show, onClose, onSubmit, onDelete, onSaved, ipTo
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>IP de inicio</Form.Label>
-            <Form.Control
-              name="start_ip"
-              value={ipToCountry.start_ip || ''}
-              onChange={handleChange}
-              placeholder="Ej: 192.168.0.1"
+              <Form.Control
+                name="start_ip"
+                value={formValues.start_ip || ''}
+                onChange={handleChange}
+                placeholder="Ej: 192.168.0.1"
               />
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>IP de fin</Form.Label>
-            <Form.Control
-              name="end_ip"
-              value={ipToCountry.end_ip || ''}
-              onChange={handleChange}
-              placeholder="Ej: 192.168.0.254"
-            />
+              <Form.Control
+                name="end_ip"
+                value={formValues.end_ip || ''}
+                onChange={handleChange}
+                placeholder="Ej: 192.168.0.254"
+              />
           </Form.Group>
           <div className="d-flex justify-content-end gap-2">
             <Button variant="primary" onClick={handleSave}>
