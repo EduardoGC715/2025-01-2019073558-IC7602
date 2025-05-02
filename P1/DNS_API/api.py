@@ -257,6 +257,7 @@ def exists():
                         try:
                             healthcheckers = healthcheckers_ref.get()
                             for health_checker, checker_info in healthcheckers.items():
+                                # Código obtenido de https://www.geeksforgeeks.org/python-calculate-distance-between-two-places-using-geopy/
                                 distance = geodesic(
                                     ip_location,
                                     (
