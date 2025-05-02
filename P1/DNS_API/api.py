@@ -141,10 +141,12 @@ def set_dns():
 def dns_resolver():
     if request.method == "POST":
         data = request.get_data(as_text=True)
+        # Código obtenido de https://www.geeksforgeeks.org/base64-b64decode-in-python/
         dns_query = base64.b64decode(data)
         logger.debug(dns_query)
         logger.debug(dns_server)
         # Crea un socket UDP para enviar la consulta DNS
+        # Código obtenido de https://wiki.python.org/moin/UdpCommunicatione 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
             data, _ = s.recvfrom(512)
@@ -257,6 +259,7 @@ def exists():
                         try:
                             healthcheckers = healthcheckers_ref.get()
                             for health_checker, checker_info in healthcheckers.items():
+                                # Código obtenido de https://www.geeksforgeeks.org/python-calculate-distance-between-two-places-using-geopy/
                                 distance = geodesic(
                                     ip_location,
                                     (
