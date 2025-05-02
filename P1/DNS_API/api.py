@@ -123,8 +123,9 @@ except:
 dns_server = (dns_ip, dns_port)
 
 
-@app.route("/api/set_dns_server", methods=["POST"])
+@app.route("/api/set_dns_server", methods=["POST", "GET"])
 def set_dns():
+    global dns_server
     if request.method == "POST":
         server = request.args.get("server")
         port = request.args.get("port")
@@ -135,6 +136,10 @@ def set_dns():
                 return jsonify({"message": "Servidor DNS actualizado"}), 200
             except ValueError:
                 return jsonify({"error": "Puerto inválido"}), 400
+    if request.method == "GET":
+        return jsonify({"dns_server": dns_server}), 200
+    return jsonify({"error": "Método no permitido"}), 405
+
 
 
 @app.route("/api/dns_resolver", methods=["POST"])
