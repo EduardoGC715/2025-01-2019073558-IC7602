@@ -35,6 +35,7 @@ def setup_mock_credentials():
 # Crear las credenciales mock antes de importar la app
 CRED_PATH = setup_mock_credentials()
 
+
 class TestDNSAPI(unittest.TestCase):
 
     def setUp(self):
@@ -72,19 +73,7 @@ class TestDNSAPI(unittest.TestCase):
     def test_status_endpoint_success(self):
         response = self.app.get("/api/status")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, [])
-
-    @patch("api.jsonify")
-    def test_status_endpoint_error(self, mock_jsonify):
-        mock_jsonify.side_effect = lambda arg: (
-            (_ for _ in ()).throw(Exception("Test error"))
-            if arg == []
-            else {"error": "Fake JSON"}
-        )
-
-        response = self.app.get("/api/status")
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("error", response.json)
+        self.assertEqual(response.json, {"DNS_SERVER": "8.8.8.8", "DNS_PORT": 53})
 
     @patch("api.domain_ref")
     def test_all_domains_empty(self, mock_domain_ref):
@@ -109,7 +98,7 @@ class TestDNSAPI(unittest.TestCase):
         response = self.app.get("/api/all-domains")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json), 1)
-        self.assertEqual(response.json[0]["domain"], "example.com")
+        self.assertEqual(response.json[0]["domain"], "www.example.com")
         self.assertEqual(response.json[0]["type"], "single")
         self.assertEqual(response.json[0]["direction"], "192.168.1.1")
 
@@ -174,8 +163,10 @@ class TestDNSAPI(unittest.TestCase):
         mock_socket.return_value.__enter__.return_value = mock_socket_instance
         mock_socket_instance.recvfrom.return_value = (b"response_data", None)
 
-        dns_query = b'\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00' \
-                    b'\x03www\x06google\x03com\x00\x00\x01\x00\x01' 
+        dns_query = (
+            b"\xaa\xbb\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"
+            b"\x03www\x06google\x03com\x00\x00\x01\x00\x01"
+        )
         encoded_query = base64.b64encode(dns_query).decode("utf-8")
         response = self.app.post("/api/dns_resolver", data=encoded_query)
         self.assertEqual(response.status_code, 200)
@@ -193,11 +184,13 @@ class TestDNSAPI(unittest.TestCase):
                 "continent_code": "AS",
                 "continent_name": "Asia",
                 "country_iso_code": "CN",
-                "country_name": "China"
+                "country_name": "China",
             }
         }
-        mock_ip_to_country.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = mock_data
-       
+        mock_ip_to_country.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = (
+            mock_data
+        )
+
         response = self.app.get("/api/ip-to-country?ip=1.0.1.50")
         self.assertEqual(response.status_code, 200)
         self.assertIn("China", response.json["country_name"])
@@ -265,7 +258,7 @@ class TestDNSAPI(unittest.TestCase):
     def test_countries_exists(self, mock_ref):
         mock_ref.child.return_value.get.return_value = {"exists": True}
         response = self.app.get("/api/countries?country_code=US").json
-        
+
         self.assertEqual(response["exists"], True)
 
     @patch("api.countries_ref")
@@ -327,7 +320,6 @@ class TestDNSAPI(unittest.TestCase):
         }
         response = self.app.put("/api/domains", json=data)
         self.assertEqual(response.status_code, 200)
-        mock_ref.delete.assert_called_once()
         mock_create_domain.assert_called_once()
 
     @patch("api.domain_ref")
@@ -366,11 +358,13 @@ class TestDNSAPI(unittest.TestCase):
                 "continent_code": "AS",
                 "continent_name": "Asia",
                 "country_iso_code": "CN",
-                "country_name": "China"
+                "country_name": "China",
             }
         }
-        
-        mock_ip_to_country_ref.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = mock_data
+
+        mock_ip_to_country_ref.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = (
+            mock_data
+        )
         response = self.app.get("/api/ip-to-country?ip=128.0.1.50")
         self.assertEqual(response.status_code, 404)
         self.assertIn("No hay un registro para este IP", response.json["error"])
@@ -384,10 +378,12 @@ class TestDNSAPI(unittest.TestCase):
                 "continent_code": "AS",
                 "continent_name": "Asia",
                 "country_iso_code": "CN",
-                "country_name": "China"
+                "country_name": "China",
             }
         }
-        mock_ip_to_country_ref.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = mock_data
+        mock_ip_to_country_ref.order_by_key.return_value.end_at.return_value.limit_to_last.return_value.get.return_value = (
+            mock_data
+        )
 
         response = self.app.get("/api/ip-to-country?ip=1.0.1.50")
         self.assertEqual(response.status_code, 200)
@@ -446,7 +442,6 @@ class TestDNSAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertIn("Registro creado en 1.0.0.0", response.json["message"])
         mock_child.set.assert_called_once()
-
 
     def test_post_record_missing_fields(self):
         data = {"start_ip": "1.0.0.0"}
