@@ -157,14 +157,15 @@ char *build_dns_url(const char *dns_api, const char *dns_api_port, char * endpoi
     }
 
     if (!ip_address && !domain) {
+        // Formato de la URL
+        // http://dns_api:dns_api_port/api/dns_resolver
         snprintf(url, total_length, "%s%s:%s%s", prefix, dns_api, dns_api_port, endpoint);
     } else {
-
+        // Formato de la URL
+        // http://dns_api:dns_api_port/api/exists?domain=domain&ip=ip_address
+        snprintf(url, total_length, "%s%s:%s%s?domain=%s&ip=%s",
+            prefix, dns_api, dns_api_port, endpoint, domain, ip_address);
     }
-    // Formato de la URL
-    // http://dns_api:dns_api_port/api/dns_resolver?domain=domain&ip=ip_address
-    snprintf(url, total_length, "%s%s:%s%s?domain=%s&ip=%s",
-             prefix, dns_api, dns_api_port, endpoint, domain, ip_address);
     return url;
 }
 
@@ -348,10 +349,13 @@ void query_dns_resolver(
             printf("Failed to decode base64 response\n");
             free(response->memory);
             free(response);
+            free(encoded_data);
+            free(url);
             return;
         }
         // Enviar la respuesta decodificada al cliente
         sendto(dns_socket, decoded_data->data, decoded_data->length, 0, (struct sockaddr *) &client_addr, addr_len);
+        printf("Sent decoded response to client\n");
         free(decoded_data->data);
         free(decoded_data);
     } else {
@@ -454,12 +458,10 @@ void * process_dns_request(void * arg) {
         
         // Enviar la respuesta
         sendto(dns_socket, response_buffer, offset, 0, (struct sockaddr *) &client_addr, addr_len);
+        printf("Sent parsed response to client\n");
     } else if (response->status_code == DOMAIN_NOT_EXISTS) {
         printf("Domain does not exist, querying dns_resolver\n");
         query_dns_resolver(dns_api, dns_api_port, dns_socket, client_addr, addr_len, request, request_size);
-        free(request);
-        free(args);
-        return NULL;
     } else {
         printf("Invalid response from DNS API, status code: %ld\n", response->status_code);
     }
