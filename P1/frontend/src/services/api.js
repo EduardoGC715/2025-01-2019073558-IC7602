@@ -6,7 +6,6 @@ import axios from "axios";
 // Con docker
 const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
 console.log("API_BASE_URL:", API_BASE_URL); // para verificar
-
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
