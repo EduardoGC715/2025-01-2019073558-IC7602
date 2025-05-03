@@ -118,9 +118,6 @@ char * encode_b64(const char * data, int request_size, int *actual_length) {
     encoded_ptr += count;
     *encoded_ptr = '\0';
     *actual_length = encoded_ptr - encoded_data;
-    printf("Encoded length: %d\n", encoded_length);
-    printf("Actual length: %d\n", *actual_length);
-    printf("Encoded data: %s\n", encoded_data);
     return encoded_data;
 }
 
@@ -254,22 +251,27 @@ memory_struct * send_https_request(const char *url, const char * data, int lengt
 // Función para parsear la request DNS
 dns_request * parse_dns_request(const char *request, const int size) {
     dns_header* header = parse_dns_header(request);
-    printf("Transaction ID: %u\n", header->id);
-    printf("QR: %u\n", header->qr);
-    printf("Opcode: %u\n", header->opcode);
-    printf("AA: %u\n", header->aa);
-    printf("TC: %u\n", header->tc);
-    printf("RD: %u\n", header->rd);
-    printf("RA: %u\n", header->ra);
-    printf("Z: %u\n", header->z);
-    printf("AD: %u\n", header->ad);
-    printf("CD: %u\n", header->cd);
-    printf("Rcode: %u\n", header->rcode);
-    printf("QDCount: %u\n", header->qdcount);
-    printf("ANCount: %u\n", header->ancount);
-    printf("NSCount: %u\n", header->nscount);
-    printf("ARCount: %u\n", header->arcount);
-    printf("BYTES: %zu\n", sizeof(dns_header));
+    printf("Parsed DNS header:\n");
+    printf(
+        "Transaction ID: %u, QR: %u, Opcode: %u, AA: %u, TC: %u, RD: %u, RA: %u, Z: %u, AD: %u, CD: %u, Rcode: %u, QDCount: %u, ANCount: %u, NSCount: %u, ARCount: %u, BYTES: %zu\n",
+        header->id,
+        header->qr,
+        header->opcode,
+        header->aa,
+        header->tc,
+        header->rd,
+        header->ra,
+        header->z,
+        header->ad,
+        header->cd,
+        header->rcode,
+        header->qdcount,
+        header->ancount,
+        header->nscount,
+        header->arcount,
+        sizeof(dns_header)
+    );
+    
     int offset = sizeof(dns_header);
 
     if (!(header->qr == 0 && header->opcode == 0)) {
@@ -287,9 +289,7 @@ dns_request * parse_dns_request(const char *request, const int size) {
 
     uint16_t qtype = ntohs(*(uint16_t *)(request + offset)); // Query type
     uint16_t qclass = ntohs(*(uint16_t *)(request + offset + 2)); // Query class
-    printf("QNAME: %s\n", qname);
-    printf("QTYPE: %u\n", qtype);
-    printf("QCLASS: %u\n", qclass);
+    printf("QNAME: %s. QTYPE: %u. QCLASS: %u\n", qname, qtype, qclass);
 
     dns_request *req = malloc(sizeof(dns_request));
     if (!req) {
@@ -480,6 +480,7 @@ void * process_dns_request(void * arg) {
 
 #ifndef UNIT_TEST
 int main() {
+    setvbuf(stdout, NULL, _IONBF, 0);
     const char *dns_api = getenv("DNS_API");
     const char *dns_api_port = getenv("DNS_API_PORT");
     if (!dns_api || !dns_api_port) {

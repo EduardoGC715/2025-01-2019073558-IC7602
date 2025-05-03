@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       tags:
-        - dandiego235/dns-interceptor:3
+        - dandiego235/dns-interceptor:4
         - dandiego235/dns-interceptor:latest
   dev:
     build:
