@@ -356,6 +356,9 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
             <RoundTripConfig
               editedRecord={editedRecord}
               handleInputChange={handleInputChange}
+              handleAddDirection={handleAddDirection}
+              handleDirectionChange={handleDirectionChange}
+              handleRemoveDirection={handleRemoveDirection}
             />
           )}
 
