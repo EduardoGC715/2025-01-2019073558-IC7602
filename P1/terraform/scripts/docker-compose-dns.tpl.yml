@@ -13,7 +13,7 @@ services:
   api:
     image: "dandiego235/dns-api:latest"
     ports:
-      - "${dns_api_port}:{dns_api_port}"
+      - "${dns_api_port}:${dns_api_port}"
     container_name: dns_api
     networks:
       - shared-network
