@@ -141,7 +141,6 @@ def set_dns():
     return jsonify({"error": "Método no permitido"}), 405
 
 
-
 @app.route("/api/dns_resolver", methods=["POST"])
 def dns_resolver():
     if request.method == "POST":
@@ -151,7 +150,7 @@ def dns_resolver():
         logger.debug(dns_query)
         logger.debug(dns_server)
         # Crea un socket UDP para enviar la consulta DNS
-        # Código obtenido de https://wiki.python.org/moin/UdpCommunicatione 
+        # Código obtenido de https://wiki.python.org/moin/UdpCommunicatione
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
             data, _ = s.recvfrom(512)
@@ -276,7 +275,7 @@ def exists():
                                     closest_distance = distance
                                     closest_hc = health_checker
                         except Exception as e:
-                            logger.debug("No se encontró el healthcheck", e)
+                            logger.debug(f"No se encontró el healthcheck: {e}")
                             return "No se encontró el healthcheck", 500
 
                         logger.debug(closest_hc)
@@ -313,7 +312,7 @@ def exists():
                         return "El routing policy no existe", 500
 
             except Exception as e:
-                logger.debug("Ese dominio no existe", e)
+                logger.debug(f"Ese dominio no existe: {e}")
                 return "Ese dominio no existe", 404
         if ip_response != "Unhealthy" and ip_response != "":
             logger.debug(ip_response)
@@ -357,7 +356,7 @@ def get_api_status():
     try:
         return jsonify({"DNS_SERVER": dns_ip, "DNS_PORT": dns_port}), 200
     except Exception as e:
-        logger.debug("Error con el API backend", e)
+        logger.debug(f"Error con el API backend: {e}")
         return jsonify({"error": "No se pudo obtener la información"}), 500
 
 
@@ -654,7 +653,7 @@ def get_country_from_ip():
             return jsonify({"error": "No hay un registro para este IP"}), 404
 
     except Exception as e:
-        logger.debug("Error buscando país por IP", e)
+        logger.debug(f"Error buscando país por IP: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -746,7 +745,7 @@ def manage_ip_to_country():
                 201,
             )
         except Exception as e:
-            logger.debug("Error creando el registro", e)
+            logger.debug(f"Error creando el registro: {e}")
             return jsonify({"error": str(e)}), 500
 
     if request.method == "PUT":

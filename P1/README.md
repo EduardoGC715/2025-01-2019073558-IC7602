@@ -34,7 +34,7 @@ Servidor backend que expone una API RESTful para gestionar configuraciones y dat
 
 - Python (Flask)
 
-### 3. `DNS_Interceptor/`
+### 3. `DNS_Interceptor`
 
 Este módulo escucha el tráfico DNS en la red y decide si redirigir ciertas solicitudes según las reglas configuradas a través de `DNSAPI`. Incluye:
 
