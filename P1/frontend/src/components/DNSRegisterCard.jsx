@@ -88,6 +88,39 @@ const DNSRegisterCard = ({
   // Crea el nuevo registro
   const handleAddRecord = async () => {
     try {
+      // Validar IPs según el tipo de registro
+      if (localRecord.type === "single" && !isValidIP(localRecord.direction)) {
+        alert("La dirección IP no tiene un formato válido");
+        return;
+      }
+
+      if (localRecord.type === "multi" || localRecord.type === "round-trip") {
+        for (const ip of localRecord.directions) {
+          if (!isValidIP(ip)) {
+            alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+        }
+      }
+
+      if (localRecord.type === "weight") {
+        for (const { ip } of localRecord.weightedDirections) {
+          if (!isValidIP(ip)) {
+            alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+        }
+      }
+
+      if (localRecord.type === "geo") {
+        for (const { ip } of localRecord.geoDirections) {
+          if (!isValidIP(ip)) {
+            alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+        }
+      }
+
       let recordData = {
         domain: localRecord.domain,
         type: localRecord.type,
@@ -277,6 +310,22 @@ const DNSRegisterCard = ({
   const isValidDomain = (domain) => {
     const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z]{2,})+$/;
     return domainRegex.test(domain);
+  };
+
+  // Valida que la dirección IP sea correcta
+  const isValidIP = (ip) => {
+    const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = ip.match(ipRegex);
+    
+    if (!match) return false;
+    
+    // Verifica que cada octeto esté entre 0 y 255
+    for (let i = 1; i <= 4; i++) {
+      const octet = parseInt(match[i]);
+      if (octet < 0 || octet > 255) return false;
+    }
+    
+    return true;
   };
 
   const checkWeights = (weightedAddresses) => {

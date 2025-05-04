@@ -37,7 +37,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
       let geoDirections = [];
 
       // Filtra por el tipo de dominio
-      if (record.type === "multi") {
+      if (record.type === "multi" || record.type === "round-trip") {
         directions = record.direction.split(",").map(d => d.trim());
       } else if (record.type === "weight" && record.direction) {
         weightedDirections = record.direction.split(",").map(item => {
@@ -171,6 +171,22 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     return domainRegex.test(domain);
   };
 
+  // Valida que la dirección IP sea correcta
+  const isValidIP = (ip) => {
+    const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = ip.match(ipRegex);
+    
+    if (!match) return false;
+    
+    // Verifica que cada octeto esté entre 0 y 255
+    for (let i = 1; i <= 4; i++) {
+      const octet = parseInt(match[i]);
+      if (octet < 0 || octet > 255) return false;
+    }
+    
+    return true;
+  };
+
   const checkWeights = (weightedAddresses) => {
     let sum = 0;
     for (let i = 0; i < weightedAddresses.length; i++) {
@@ -190,6 +206,39 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
   // Guarda la información y la valida antes de mandarla
   const handleSave = async () => {
     try {
+      // Validar IPs según el tipo de registro
+      if (editedRecord.type === "single" && !isValidIP(editedRecord.direction)) {
+        alert("La dirección IP no tiene un formato válido");
+        return;
+      }
+
+      if (editedRecord.type === "multi" || editedRecord.type === "round-trip") {
+        for (const ip of editedRecord.directions) {
+          if (!isValidIP(ip)) {
+            alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+        }
+      }
+
+      if (editedRecord.type === "weight") {
+        for (const { ip } of editedRecord.weightedDirections) {
+          if (!isValidIP(ip)) {
+            alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+        }
+      }
+
+      if (editedRecord.type === "geo") {
+        for (const { ip } of editedRecord.geoDirections) {
+          if (!isValidIP(ip)) {
+            alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+        }
+      }
+
       let recordData = {
         domain: editedRecord.domain,
         type: editedRecord.type,
