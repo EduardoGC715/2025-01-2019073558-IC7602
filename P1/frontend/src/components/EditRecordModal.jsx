@@ -218,7 +218,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
           recordData = {
             ...recordData,
             direction: editedRecord.directions.join(","),
-            counter: editedRecord.counter
+            counter: parseInt(editedRecord.counter)
           };
           break;
   

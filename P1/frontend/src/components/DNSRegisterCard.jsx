@@ -122,7 +122,7 @@ const DNSRegisterCard = ({
           recordData = {
             ...recordData,
             direction: localRecord.directions.join(","),
-            counter: localRecord.counter
+            counter: parseInt(localRecord.counter)
           };
           break;
   
