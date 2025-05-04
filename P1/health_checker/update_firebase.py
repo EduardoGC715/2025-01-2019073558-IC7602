@@ -280,8 +280,8 @@ def scan_and_update_crontab():
     initialize_firebase()
 
     # Obtener la referencia a la base de datos de Firebase
-    root_ref = db.reference("/domains")
-    all_tlds = root_ref.get()
+    tlds_ref = db.reference("/domains")
+    all_tlds = tlds_ref.get()
 
     if not all_tlds:
         print("No TLDs found in Firebase.")
@@ -316,159 +316,113 @@ def scan_and_update_crontab():
     updated_job_count = 0
 
     # Recorrer todos los TLDs y dominios en Firebase
-    for tld_name, tld_data in all_tlds.items():
-        if not isinstance(tld_data, dict):
-            continue
-
-        for domain_name, domain_data in tld_data.items():
-            if not isinstance(domain_data, dict):
+    all_ips = find_all_ips(all_tlds)
+    for domain_path, ip_data in all_ips.items():
+        if "address" in ip_data:
+            # Caso 1: IP única en el campo "ip"
+            ip_idx = "ip"
+            ip = ip_data["address"]
+            health_check_config = ip_data.get("healthcheck_settings", {})
+            if not health_check_config:
+                print(f"No health check configuration for IP {ip} at {domain_path}")
                 continue
+            check_type = health_check_config.get("type", "tcp")
+            frecuency = health_check_config.get("frequency", "*/2 * * * *")
 
-            for subdomain, subdomain_data in domain_data.items():
-                domain_path = f"{tld_name}/{domain_name}/{subdomain}"
-
-                if not isinstance(subdomain_data, dict):
+            command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
+            comment = f"health_check {domain_path} {ip_idx} {ip}"
+            job_id = f"{domain_path}|{ip_idx}|{ip}"
+            required_jobs.add(job_id)
+            if job_id in existing_jobs:
+                # Actualizar el trabajo existente
+                old_frecuency = str(existing_jobs[job_id].schedule)
+                if old_frecuency != frecuency:
+                    existing_jobs[job_id].setall(frecuency)
+                    print(f"Updated job frequency for {job_id} from {old_frecuency} to {frecuency}")
+                updated_job_count += 1
+            else:
+                # Crear un nuevo trabajo
+                job = cron.new(command=command, comment=comment)
+                job.setall(frecuency)
+                new_job_count += 1
+        else:
+            if isinstance(ip_data, dict):
+                items = ip_data.items()
+            elif isinstance(ip_data, list):
+                items = enumerate(ip_data)
+            else:
+                continue
+            # Caso 2: IPs múltiples en el campo "ips"
+            for ip_idx, single_ip in items:
+                if not isinstance(single_ip, dict):
                     continue
+                ip = single_ip.get("address")
+                health_check_config = single_ip.get("healthcheck_settings", {})
+                if not health_check_config:
+                    print(f"No health check configuration for IP {ip} at {domain_path}")
+                    continue
+                check_type = health_check_config.get("type", "tcp")
+                frecuency = health_check_config.get("frequency", "*/2 * * * *")
 
-                # Caso1: IP única en el campo "ip"
-                if "ip" in subdomain_data:
-                    ip_data = subdomain_data.get("ip", {})
-
-                    # Verificar si ip_data es un diccionario y contiene la dirección IP
-                    if "address" in ip_data:
-                        ip = ip_data.get("address")
-                        health_check_config = ip_data.get("healthcheck_settings", {})
-
-                        if not health_check_config:
-                            continue
-
-                        check_type = health_check_config.get("type")
-                        if not check_type:
-                            continue
-
-                        frequency = health_check_config.get("crontab", "*/2 * * * *")
-
-                        if " " not in frequency or frequency.count(" ") < 4:
-                            frequency = f"{frequency} * * * *"
-
-                        command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
-
-                        # Crear ID de trabajo para esta entrada
-                        job_id = f"{domain_path}|ip|{ip}"
-                        required_jobs.add(job_id)
-
-                        # Verificar si el trabajo ya existe
-                        if job_id in existing_jobs:
-                            existing_job = existing_jobs[job_id]
-                            old_schedule = str(existing_job.slices)
-
-                            if old_schedule != frequency:
-                                try:
-                                    existing_job.setall(frequency)
-                                    updated_job_count += 1
-                                    print(
-                                        f"Updated schedule for {job_id}: {old_schedule} -> {frequency}"
-                                    )
-                                except Exception as e:
-                                    print(
-                                        f"Error updating cron schedule '{frequency}' for {ip}: {e}"
-                                    )
-                        else:
-                            # Crear un nuevo trabajo
-                            job = cron.new(command=command, comment="health_check")
-                            try:
-                                job.setall(frequency)
-                                new_job_count += 1
-                                print(
-                                    f"Created new job for {job_id} with schedule {frequency}"
-                                )
-                            except Exception as e:
-                                print(
-                                    f"Error setting cron schedule '{frequency}' for {ip}: {e}"
-                                )
-                                print(f"Using default schedule '*/2 * * * *' instead")
-                                job.setall("*/2 * * * *")
-
-                # Caso 2: IPs múltiples en el campo "ips"
-                elif "ips" in subdomain_data:
-                    ips_data = subdomain_data.get("ips", {})
-
-                    if isinstance(ips_data, dict):
-                        items = ips_data.items()
-                    elif isinstance(ips_data, list):
-                        items = enumerate(ips_data)
-                    else:
-                        continue
-
-                    for ip_idx, ip_data in items:
-                        ip_idx = str(ip_idx)
-
-                        if not isinstance(ip_data, dict) or "address" not in ip_data:
-                            continue
-
-                        ip = ip_data.get("address")
-                        health_check_config = ip_data.get("healthcheck_settings", {})
-
-                        if not health_check_config:
-                            continue
-
-                        check_type = health_check_config.get("type")
-                        if not check_type:
-                            continue
-
-                        frequency = health_check_config.get("crontab", "*/2 * * * *")
-
-                        if " " not in frequency or frequency.count(" ") < 4:
-                            frequency = f"{frequency} * * * *"
-
-                        command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx={ip_idx}&ip={ip}&check_type={check_type}'"
-
-                        job_id = f"{domain_path}|{ip_idx}|{ip}"
-                        required_jobs.add(job_id)
-
-                        if job_id in existing_jobs:
-                            existing_job = existing_jobs[job_id]
-                            old_schedule = str(existing_job.slices)
-
-                            if old_schedule != frequency:
-                                try:
-                                    existing_job.setall(frequency)
-                                    updated_job_count += 1
-                                    print(
-                                        f"Updated schedule for {job_id}: {old_schedule} -> {frequency}"
-                                    )
-                                except Exception as e:
-                                    print(
-                                        f"Error updating cron schedule '{frequency}' for {ip}: {e}"
-                                    )
-                        else:
-                            job = cron.new(command=command, comment="health_check")
-                            try:
-                                job.setall(frequency)
-                                new_job_count += 1
-                                print(
-                                    f"Created new job for {job_id} with schedule {frequency}"
-                                )
-                            except Exception as e:
-                                print(
-                                    f"Error setting cron schedule '{frequency}' for {ip}: {e}"
-                                )
-                                print(f"Using default schedule '*/2 * * * *' instead")
-                                job.setall("*/2 * * * *")
-
-    # Eliminar trabajos obsoletos
+                command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx={ip_idx}&ip={ip}&check_type={check_type}'"
+                comment = f"health_check {domain_path} {ip_idx} {ip}"
+                job_id = f"{domain_path}|{ip_idx}|{ip}"
+                required_jobs.add(job_id)
+                if job_id in existing_jobs:
+                    # Actualizar el trabajo existente
+                    old_frecuency = str(existing_jobs[job_id].schedule)
+                    if old_frecuency != frecuency:
+                        existing_jobs[job_id].setall(frecuency)
+                        print(f"Updated job frequency for {job_id} from {old_frecuency} to {frecuency}")
+                    updated_job_count += 1
+                else:
+                    # Crear un nuevo trabajo
+                    job = cron.new(command=command, comment=comment)
+                    job.setall(frecuency)
+                    new_job_count += 1
+    # Eliminar trabajos que no están en required_jobs
     removal_count = 0
     for job_id, job in existing_jobs.items():
         if job_id not in required_jobs:
             cron.remove(job)
             removal_count += 1
-            print(f"Removed obsolete job: {job_id}")
-
+            print(f"Removed job {job_id} from crontab")
     cron.write()
-    print(
-        f"Crontab updated: {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs"
-    )
+    print(f"Updated crontab: {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs")
 
+def find_all_ips(domains, path=""):
+    """
+    Recorre recursivamente los dominios para encontrar claves 'ip' o 'ips'.
+    
+    Args:
+        domains: Diccionario a recorrer
+        path: Ruta actual (usado en la recursión)
+        
+    Returns:
+        Un diccionario donde las claves son las rutas y los valores son los diccionarios 'ip' o 'ips'
+    """
+    results = {}
+    
+    if not isinstance(domains, dict):
+        return results
+    
+    # Buscar las claves ip o ips directamente en este nivel
+    if 'ip' in domains:
+        results[path] = domains['ip']
+    
+    if 'ips' in domains:
+        results[path] = domains['ips']
+    
+    # Explorar recursivamente las demás claves
+    for key, value in domains.items():
+        if key != 'ip' and key != 'ips' and isinstance(value, dict):
+            # Construir la nueva ruta
+            new_path = f"{path}/{key}" if path else key
+            # Llamada recursiva y fusionar resultados
+            sub_results = find_all_ips(value, new_path)
+            results.update(sub_results)
+    
+    return results
 
 def execute_single_check(domain_path, ip_idx, ip, check_type):
     """
