@@ -18,7 +18,7 @@
 // https: // medium.com/@trish07/simple-steps-to-build-an-http-client-in-c-8e225b5c718c
 
 #define BUFFER_SIZE 4096
-#define DEFAULT_TIMEOUT 5
+#define DEFAULT_TIMEOUT 300
 #define DEFAULT_MAX_RETRIES 3
 #define DEFAULT_HTTP_OK "200"
 FILE *log_file = NULL;
@@ -27,7 +27,7 @@ const char *LOG_FILENAME = "health_checker.log";
 #ifdef TEST_MODE
 #define ENABLE_LOGGING 1
 #else
-#define ENABLE_LOGGING 0
+#define ENABLE_LOGGING 1
 #endif
 
 void log_message(const char *format, ...)
@@ -131,23 +131,7 @@ void extract_status_code(const char *response, char *status_code_buf)
     }
 }
 
-int wait_for_socket(int sockfd, int for_write, int timeout_secs)
-{
-    fd_set fds;
-    struct timeval tv;
-    FD_ZERO(&fds);
-    FD_SET(sockfd, &fds);
-
-    tv.tv_sec = timeout_secs;
-    tv.tv_usec = 0;
-
-    if (for_write)
-        return select(sockfd + 1, NULL, &fds, NULL, &tv);
-    else
-        return select(sockfd + 1, &fds, NULL, NULL, &tv);
-}
-
-check_result_t tcp_check(const char *hostname, const char *port, int timeout_secs, int max_retries)
+check_result_t tcp_check(const char *hostname, const char *port, int timeout_ms, int max_retries)
 // Funcion para verificar la disponibilidad de un servidor TCP
 // Pasos:
 // 1. Obtener la dirección IP del servidor utilizando getaddrinfo
@@ -190,8 +174,8 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
                 continue;
 
             struct timeval tv;
-            tv.tv_sec = timeout_secs;
-            tv.tv_usec = 0;
+            tv.tv_sec = timeout_ms / 1000;
+            tv.tv_usec = (timeout_ms % 1000) * 1000;
             if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0 ||
                 setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
             {
@@ -226,7 +210,7 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_sec
 }
 
 check_result_t http_check(const char *hostname, const char *port, const char *path,
-                          int timeout_secs, int max_retries, const char *acceptable_status_codes,
+                          int timeout_ms, int max_retries, const char *acceptable_status_codes,
                           const char *host_header)
 // Funcion para verificar la disponibilidad de un servidor HTTP
 // Pasos:
@@ -275,8 +259,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         }
 
         struct timeval tv;
-        tv.tv_sec = timeout_secs;
-        tv.tv_usec = 0;
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
         if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0 ||
             setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
         {
@@ -399,7 +383,7 @@ int main(int argc, char *argv[])
         if (max_retries < 0)
             max_retries = DEFAULT_MAX_RETRIES;
 
-        log_message("Checking TCP connection to %s:%s (timeout: %ds, max retries: %d)...\n",
+        log_message("Checking TCP connection to %s:%s (timeout: %dms, max retries: %d)...\n",
                     hostname, port, timeout, max_retries);
 
         check_result_t result = tcp_check(hostname, port, timeout, max_retries);

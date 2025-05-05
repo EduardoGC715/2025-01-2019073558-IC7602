@@ -41,7 +41,7 @@ def health_check():
     ip = request.args.get("ip")
     check_type = request.args.get("check_type")
 
-    logger.info(f"Executing health check for {ip} ({domain_path}, idx: {ip_idx})")
+    logger.info(f"Executing health check for {ip} ({domain_path}, idx: {ip_idx}, [PID: {os.getpid()}])")
 
     try:
         execute_single_check(domain_path, ip_idx, ip, check_type)

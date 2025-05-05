@@ -295,10 +295,10 @@ def scan_and_update_crontab():
     for job in cron.find_comment("health_check"):
         # Extraer el comando y los parámetros del trabajo existente
         cmd = job.command
-        domain_path_match = re.search(r"--domain-path '([^']+)'", cmd)
-        ip_idx_match = re.search(r"--ip-idx '([^']+)'", cmd)
-        ip_match = re.search(r"--ip '([^']+)'", cmd)
-
+        domain_path_match = re.search(r"domain_path=([^&]+)", cmd)
+        ip_idx_match = re.search(r"ip_idx=([^&]+)", cmd)
+        ip_match = re.search(r"ip=([^&]+)", cmd)
+        print(f"Job command: {cmd}")
         if domain_path_match and ip_idx_match and ip_match:
             domain_path = domain_path_match.group(1)
             ip_idx = ip_idx_match.group(1)
@@ -307,7 +307,8 @@ def scan_and_update_crontab():
             # Crear un ID de trabajo único basado en el dominio y la IP
             job_id = f"{domain_path}|{ip_idx}|{ip}"
             existing_jobs[job_id] = job
-
+            print(f"Found existing job: {job_id}")
+    
     print(f"Found {len(existing_jobs)} existing health check jobs")
 
     # Conjunto para almacenar trabajos requeridos
@@ -327,20 +328,22 @@ def scan_and_update_crontab():
                 print(f"No health check configuration for IP {ip} at {domain_path}")
                 continue
             check_type = health_check_config.get("type", "tcp")
-            frecuency = health_check_config.get("frequency", "*/2 * * * *")
+            frecuency = health_check_config.get("crontab", "*/2 * * * *")
 
             command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
-            comment = f"health_check {domain_path} {ip_idx} {ip}"
+            comment = f"health_check"
             job_id = f"{domain_path}|{ip_idx}|{ip}"
             required_jobs.add(job_id)
             if job_id in existing_jobs:
+                print(f"Job {job_id} already exists in crontab")
                 # Actualizar el trabajo existente
-                old_frecuency = str(existing_jobs[job_id].schedule)
+                old_frecuency = str(existing_jobs[job_id].slices)
                 if old_frecuency != frecuency:
                     existing_jobs[job_id].setall(frecuency)
                     print(f"Updated job frequency for {job_id} from {old_frecuency} to {frecuency}")
-                updated_job_count += 1
+                    updated_job_count += 1
             else:
+                print(f"Creating new job {job_id} in crontab")
                 # Crear un nuevo trabajo
                 job = cron.new(command=command, comment=comment)
                 job.setall(frecuency)
@@ -362,22 +365,22 @@ def scan_and_update_crontab():
                     print(f"No health check configuration for IP {ip} at {domain_path}")
                     continue
                 check_type = health_check_config.get("type", "tcp")
-                frecuency = health_check_config.get("frequency", "*/2 * * * *")
+                frecuency = health_check_config.get("crontab", "*/2 * * * *")
 
                 command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx={ip_idx}&ip={ip}&check_type={check_type}'"
-                comment = f"health_check {domain_path} {ip_idx} {ip}"
+                _comment = f"health_check"
                 job_id = f"{domain_path}|{ip_idx}|{ip}"
                 required_jobs.add(job_id)
                 if job_id in existing_jobs:
                     # Actualizar el trabajo existente
-                    old_frecuency = str(existing_jobs[job_id].schedule)
+                    old_frecuency = str(existing_jobs[job_id].slices)
                     if old_frecuency != frecuency:
                         existing_jobs[job_id].setall(frecuency)
                         print(f"Updated job frequency for {job_id} from {old_frecuency} to {frecuency}")
-                    updated_job_count += 1
+                        updated_job_count += 1
                 else:
                     # Crear un nuevo trabajo
-                    job = cron.new(command=command, comment=comment)
+                    job = cron.new(command=command, comment=_comment)
                     job.setall(frecuency)
                     new_job_count += 1
     # Eliminar trabajos que no están en required_jobs
@@ -388,7 +391,7 @@ def scan_and_update_crontab():
             removal_count += 1
             print(f"Removed job {job_id} from crontab")
     cron.write()
-    print(f"Updated crontab: {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs")
+    print(f"Updated crontab: existing jobs {len(existing_jobs)}, {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs")
 
 def find_all_ips(domains, path=""):
     """
