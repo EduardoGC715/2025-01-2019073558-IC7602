@@ -28,6 +28,13 @@ dns_server = {
   port = 53
 }
 
+# {
+#   id        = "europe"
+#   lat       = "51.1657"
+#   lon       = "10.4515"
+#   country   = "Germany"
+#   continent = "Europe"
+# }
 # ,
 #   {
 #     id        = "south-america"

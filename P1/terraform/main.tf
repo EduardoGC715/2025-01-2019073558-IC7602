@@ -58,6 +58,7 @@ data "template_file" "ui_docker_compose" {
     dns_api_port = var.api_port
   }
 }
+# https://developer.hashicorp.com/terraform/language/functions/coalesce
 
 module "ui_instance" {
   source  = "./modules/ui_instance"
