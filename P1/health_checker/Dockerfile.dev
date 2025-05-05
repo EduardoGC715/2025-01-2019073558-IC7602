@@ -1,0 +1,35 @@
+FROM ubuntu:22.04
+
+# Avoid prompts from apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Accept location parameters with defaults
+ARG CHECKER_ID="default-checker"
+ARG CHECKER_LAT="0.0"
+ARG CHECKER_LON="0.0"
+ARG CHECKER_COUNTRY="Unknown"
+ARG CHECKER_CONTINENT="Unknown"
+
+# Then set ENVs from those ARGs
+ENV CHECKER_ID=$CHECKER_ID
+ENV CHECKER_LAT=$CHECKER_LAT
+ENV CHECKER_LON=$CHECKER_LON
+ENV CHECKER_COUNTRY=$CHECKER_COUNTRY
+ENV CHECKER_CONTINENT=$CHECKER_CONTINENT
+
+# Install essential build tools and common dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    python3 \
+    python3-pip \
+    build-essential \
+    libssl-dev \
+    cron \
+    check \
+    && rm -rf /var/lib/apt/lists/*
+# Set default working directory
+WORKDIR /app
+
+# Default command
+CMD ["/bin/bash"]
