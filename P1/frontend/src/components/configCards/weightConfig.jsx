@@ -25,7 +25,7 @@ const WeightConfig = ({ editedRecord, handleAddWeightedDirection, handleWeighted
             type="number" 
             value={item.weight}
             onChange={(e) => handleWeightedDirectionChange(index, 'weight', e.target.value)}
-            placeholder="10"
+            placeholder="0.1"
             className="me-2"
           />
           <Button variant="outline-danger" size="sm" onClick={() => handleRemoveWeightedDirection(index)}>
