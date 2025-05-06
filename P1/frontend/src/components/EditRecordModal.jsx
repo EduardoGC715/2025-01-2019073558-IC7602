@@ -10,7 +10,8 @@ import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
 
 // Modelo visual para editar un dominio
-const EditRecordModal = ({ show, handleClose, record, onSave }) => {
+const EditRecordModal = ({ show, handleClose, record, onSave}) => {
+  const oldDomain = record ? record.domain : "";
   const [editedRecord, setEditedRecord] = useState({
     domain: "",
     type: "single",
@@ -326,6 +327,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
 
       let recordData = {
         domain: editedRecord.domain,
+        oldDomain: oldDomain,
         type: editedRecord.type,
         counter: editedRecord.counter,
         status: true,

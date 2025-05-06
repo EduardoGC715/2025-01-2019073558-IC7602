@@ -65,13 +65,10 @@ typedef struct
 // Funcion para verificar si el código de estado HTTP es aceptable
 bool is_acceptable_status(const char *response, const char *acceptable_codes)
 {
-    // Se definen las variables necesarias para la verificación
     char *codes_copy = strdup(acceptable_codes);
     char *token, *save_ptr;
     bool result = false;
 
-    // Se obtiene la línea de estado HTTP de la respuesta con el método strstr
-    // strstr busca la primera aparición de una subcadena dentro de otra cadena
     char *status_line = strstr(response, "HTTP/");
     if (!status_line)
     {
@@ -79,8 +76,6 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
         return false;
     }
 
-    // Se busca el primer espacio en la línea de estado HTTP
-    // strchr busca la primera aparición de un carácter dentro de una cadena
     char *status_start = strchr(status_line, ' ');
     if (!status_start)
     {
@@ -88,18 +83,10 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
         return false;
     }
 
-    // Se avanza el puntero status_start para omitir el espacio
-    // y se copia el código de estado HTTP en la variable status_code
-    // Se utiliza strncpy para copiar los primeros 3 caracteres del código de estado
-    // y se inicializa el último carácter como nulo para formar una cadena válida
     status_start++;
     char status_code[4] = {0};
     strncpy(status_code, status_start, 3);
 
-    // Se forma un token a partir de la cadena de códigos aceptables
-    // Se utiliza strtok_r para dividir la cadena en tokens utilizando la coma como delimitador
-    // Se recorre cada token y se compara con el código de estado HTTP
-    // Se utiliza isspace para eliminar espacios en blanco al principio y al final del token
     token = strtok_r(codes_copy, ",", &save_ptr);
     while (token)
     {
@@ -108,10 +95,9 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
         char *end = token + strlen(token) - 1;
         while (end > token && isspace(*end))
             *end-- = '\0';
-        // Se utiliza strcmp para comparar el código de estado HTTP con cada token
+
         if (strcmp(status_code, token) == 0)
         {
-            // Si se encuentra una coincidencia, se establece el resultado como verdadero
             result = true;
             break;
         }
@@ -482,7 +468,7 @@ int main(int argc, char *argv[])
         if (max_retries < 0)
             max_retries = DEFAULT_MAX_RETRIES;
 
-        log_message("Checking HTTP path %s on %s:%s (timeout: %dms, max retries: %d, acceptable codes: %s)...%f\n",
+        log_message("Checking HTTP path %s on %s:%s (timeout: %ds, max retries: %d, acceptable codes: %s)...\n",
                     path, hostname, port, timeout, max_retries, acceptable_codes);
         // Se llama a la función http_check para verificar la conexión HTTP
         check_result_t result = http_check(hostname, port, path, timeout, max_retries, acceptable_codes, host_header);
