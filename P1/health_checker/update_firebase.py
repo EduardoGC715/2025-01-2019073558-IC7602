@@ -328,7 +328,9 @@ def scan_and_update_crontab():
                 print(f"No health check configuration for IP {ip} at {domain_path}")
                 continue
             check_type = health_check_config.get("type", "tcp")
-            frecuency = health_check_config.get("crontab", "*/2 * * * *")
+            frequency = health_check_config.get("crontab", "*/2 * * * *")
+            if frequency == "*/1 * * * *":
+                frequency = "* * * * *"
 
             command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
             comment = f"health_check"
@@ -337,16 +339,20 @@ def scan_and_update_crontab():
             if job_id in existing_jobs:
                 print(f"Job {job_id} already exists in crontab")
                 # Actualizar el trabajo existente
-                old_frecuency = str(existing_jobs[job_id].slices)
-                if old_frecuency != frecuency:
-                    existing_jobs[job_id].setall(frecuency)
-                    print(f"Updated job frequency for {job_id} from {old_frecuency} to {frecuency}")
+                old_frequency = str(existing_jobs[job_id].slices)
+                if old_frequency != frequency:
+                    existing_jobs[job_id].setall(frequency)
+                    print(f"Updated job frequency for {job_id} from {old_frequency} to {frequency}")
+                    updated_job_count += 1
+                if existing_jobs[job_id].command != command:
+                    existing_jobs[job_id].set_command(command)
+                    print(f"Updated job command for {job_id} to {command}")
                     updated_job_count += 1
             else:
                 print(f"Creating new job {job_id} in crontab")
                 # Crear un nuevo trabajo
                 job = cron.new(command=command, comment=comment)
-                job.setall(frecuency)
+                job.setall(frequency)
                 new_job_count += 1
         else:
             if isinstance(ip_data, dict):
@@ -365,7 +371,7 @@ def scan_and_update_crontab():
                     print(f"No health check configuration for IP {ip} at {domain_path}")
                     continue
                 check_type = health_check_config.get("type", "tcp")
-                frecuency = health_check_config.get("crontab", "*/2 * * * *")
+                frequency = health_check_config.get("crontab", "*/2 * * * *")
 
                 command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx={ip_idx}&ip={ip}&check_type={check_type}'"
                 _comment = f"health_check"
@@ -373,15 +379,15 @@ def scan_and_update_crontab():
                 required_jobs.add(job_id)
                 if job_id in existing_jobs:
                     # Actualizar el trabajo existente
-                    old_frecuency = str(existing_jobs[job_id].slices)
-                    if old_frecuency != frecuency:
-                        existing_jobs[job_id].setall(frecuency)
-                        print(f"Updated job frequency for {job_id} from {old_frecuency} to {frecuency}")
+                    old_frequency = str(existing_jobs[job_id].slices)
+                    if old_frequency != frequency:
+                        existing_jobs[job_id].setall(frequency)
+                        print(f"Updated job frequency for {job_id} from {old_frequency} to {frequency}")
                         updated_job_count += 1
                 else:
                     # Crear un nuevo trabajo
                     job = cron.new(command=command, comment=_comment)
-                    job.setall(frecuency)
+                    job.setall(frequency)
                     new_job_count += 1
     # Eliminar trabajos que no están en required_jobs
     removal_count = 0
