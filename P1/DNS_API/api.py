@@ -454,7 +454,6 @@ def create_Domain(ref, domain, data):
     direction = data.get("direction")
     status_flag = data.get("status")
     counter_value = data.get("counter", 0)
-    weights = data.get("weight")
     healthcheck_settings = data.get("healthcheck_settings", {})
 
     if not all([domain_type, direction is not None, status_flag is not None]):
@@ -580,6 +579,47 @@ def create_Domain(ref, domain, data):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def updateDomain(ref, domain, data):
+    domain_type = data.get("type")
+    direction = data.get("direction")
+
+    if not all([domain_type, direction is not None]):
+        return jsonify({"error": "Faltan campos"}), 400
+
+    
+    ip_data = {"routing_policy": None}
+
+    # Se van creando los dominios según sus tipos
+    if domain_type == "single":
+
+        ip_data["ip"] = None
+
+    elif domain_type in ["multi", "round-trip", "weight", "geo"]:
+        if not isinstance(direction, str):
+            return jsonify(
+                {
+                    "error": f"Para el tipo de dominio '{domain_type}', 'direction' tiene que ser un string de IPs separados por comas"
+                },
+                400,
+            )
+        ip_data["ips"] = None
+        if domain_type == "multi":
+            ip_data["counter"] = None  # Solo multi tiene contador
+
+    try:
+        ref.update(ip_data)
+        return (
+            jsonify(
+                {
+                    "message": f"El dominio {domain} creado exitosamente con el routing policy {domain_type}",
+                    "status": "created",
+                }
+            ),
+            201,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # Ruta para crear, acutalizar o eliminar un dominio
 @app.route("/api/domains", methods=["POST", "PUT", "DELETE"])
@@ -587,7 +627,7 @@ def manage_domain():
     data = request.get_json()
     if not data:
         return jsonify({"error": "Cuerpo del JSON inválido o faltante"}), 400
-
+    logger.debug(data)
     # Se valida el dominio enviado en el JSON
     domain, error_response, status = validate_domain(data)
     if error_response:
@@ -604,13 +644,24 @@ def manage_domain():
     ref = domain_ref.child(flipped_path)
 
     # Si es una solicitud POST, se crea el dominio nuevo
-    if request.method == "POST" or request.method == "PUT":
+    if request.method == "POST":
+        return create_Domain(ref, domain, data)
+    
+    elif request.method == "PUT":
+        try:
+            oldDomain = data.get("oldDomain")
+            if oldDomain:
+                oldFlippedPath = "/".join(reversed(oldDomain.strip().split(".")))
+                oldRef = domain_ref.child(oldFlippedPath)
+                updateDomain(oldRef, domain, data)
+        except Exception as e:
+            logger.warning(f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}")
         return create_Domain(ref, domain, data)
 
     # Si es una solicitud DELETE, se elimina el dominio
     elif request.method == "DELETE":
         try:
-            ref.delete()
+            updateDomain(ref, domain, data)
             return jsonify({"message": "Dominio eliminado", "status": "success"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
