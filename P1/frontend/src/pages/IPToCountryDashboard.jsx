@@ -335,8 +335,8 @@ const IPToCountryDashboard = () => {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={cancelDelete}>Cancel</Button>
-          <Button variant="danger" onClick={confirmDelete}>Delete</Button>
+          <Button variant="secondary" onClick={cancelDelete}>Cancelar</Button>
+          <Button variant="danger" onClick={confirmDelete}>Borrar</Button>
         </Modal.Footer>
       </Modal>
       {/* Lookup‑IP Modal */}

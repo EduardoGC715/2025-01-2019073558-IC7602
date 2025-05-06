@@ -393,22 +393,97 @@ def get_all_domains():
 
                 if policy == "single":
                     addresses = [node["ip"].get("address", "")]
+                    healthcheck_settings = node["ip"].get(
+                        "healthcheck_settings",
+                        {
+                            "acceptable_codes": "200, 304",
+                            "crontab": "*/1 * * * *",
+                            "max_retries": 3,
+                            "path": "/",
+                            "port": 80,
+                            "timeout": 5000,
+                            "type": "http",
+                        },
+                    )
                 elif policy == "weight":
                     addresses = [
                         f"{ip.get('address', '')}:{ip.get('weight', 0)}"
                         for ip in node.get("ips", [])
                     ]
+                    healthcheck_settings = node.get("ips", [{}])[0].get(
+                        "healthcheck_settings",
+                        {
+                            "acceptable_codes": "200, 304",
+                            "crontab": "*/1 * * * *",
+                            "max_retries": 3,
+                            "path": "/",
+                            "port": 80,
+                            "timeout": 5000,
+                            "type": "http",
+                        },
+                    )
                 elif policy == "geo":
                     addresses = [
                         f"{ip.get('address', '')}:{country}"
                         for country, ip in node.get("ips", {}).items()
                     ]
+                    first_ip = next(iter(node.get("ips", {}).values()), {})
+                    healthcheck_settings = first_ip.get(
+                        "healthcheck_settings",
+                        {
+                            "acceptable_codes": "200, 304",
+                            "crontab": "*/1 * * * *",
+                            "max_retries": 3,
+                            "path": "/",
+                            "port": 80,
+                            "timeout": 5000,
+                            "type": "http",
+                        },
+                    )
                 else:
                     raw_ips = node.get("ips", [])
                     if isinstance(raw_ips, list):
                         addresses = [ip.get("address", "") for ip in raw_ips]
+                        healthcheck_settings = (
+                            raw_ips[0].get(
+                                "healthcheck_settings",
+                                {
+                                    "acceptable_codes": "200, 304",
+                                    "crontab": "*/1 * * * *",
+                                    "max_retries": 3,
+                                    "path": "/",
+                                    "port": 80,
+                                    "timeout": 5000,
+                                    "type": "http",
+                                },
+                            )
+                            if raw_ips
+                            else {
+                                "acceptable_codes": "200, 304",
+                                "crontab": "*/1 * * * *",
+                                "max_retries": 3,
+                                "path": "/",
+                                "port": 80,
+                                "timeout": 5000,
+                                "type": "http",
+                            }
+                        )
                     else:
                         addresses = [ip.get("address", "") for ip in raw_ips.values()]
+                        first_ip = next(iter(raw_ips.values()), {})
+                        healthcheck_settings = first_ip.get(
+                            "healthcheck_settings",
+                            {
+                                "acceptable_codes": "200, 304",
+                                "crontab": "*/1 * * * *",
+                                "max_retries": 3,
+                                "path": "/",
+                                "port": 80,
+                                "timeout": 5000,
+                                "type": "http",
+                            },
+                        )
+
                 direction = ",".join(addresses)
 
                 record = {
@@ -416,6 +491,7 @@ def get_all_domains():
                     "domain": fqdn,
                     "type": policy,
                     "direction": direction,
+                    "healthcheck_settings": healthcheck_settings,
                 }
 
                 if policy == "multi":

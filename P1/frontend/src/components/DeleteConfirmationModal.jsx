@@ -16,7 +16,7 @@ const DeleteConfirmationModal = ({ show, onHide, onConfirm, domain }) => {
           Cancelar
         </Button>
         <Button variant="danger" onClick={onConfirm}>
-          Eliminar
+          Borrar
         </Button>
       </Modal.Footer>
     </Modal>
