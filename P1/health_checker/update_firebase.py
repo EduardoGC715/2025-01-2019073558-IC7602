@@ -20,7 +20,7 @@ from crontab import CronTab
 
 
 def run_health_check(check_type, *args):
-    """ Correr el programa en C del healthchecker con los argumentos dados
+    """Correr el programa en C del healthchecker con los argumentos dados
 
     Args:
         check_type (str): Tipo de chequeo ('tcp' o 'http')
@@ -218,7 +218,7 @@ def update_ip_health_status(domain_path, ip_idx, ip, health_result):
 
 
 def build_health_check_args(check_type, ip, config, domain_path=None):
-    """ Construir los argumentos para el chequeo de salud
+    """Construir los argumentos para el chequeo de salud
 
     Args:
         check_type (str): Tipo de chequeo ('tcp' o 'http')
@@ -298,7 +298,6 @@ def scan_and_update_crontab():
         domain_path_match = re.search(r"domain_path=([^&]+)", cmd)
         ip_idx_match = re.search(r"ip_idx=([^&]+)", cmd)
         ip_match = re.search(r"ip=([^&]+)", cmd)
-        print(f"Job command: {cmd}")
         if domain_path_match and ip_idx_match and ip_match:
             domain_path = domain_path_match.group(1)
             ip_idx = ip_idx_match.group(1)
@@ -307,9 +306,6 @@ def scan_and_update_crontab():
             # Crear un ID de trabajo único basado en el dominio y la IP
             job_id = f"{domain_path}|{ip_idx}|{ip}"
             existing_jobs[job_id] = job
-            print(f"Found existing job: {job_id}")
-    
-    print(f"Found {len(existing_jobs)} existing health check jobs")
 
     # Conjunto para almacenar trabajos requeridos
     required_jobs = set()
@@ -342,7 +338,9 @@ def scan_and_update_crontab():
                 old_frequency = str(existing_jobs[job_id].slices)
                 if old_frequency != frequency:
                     existing_jobs[job_id].setall(frequency)
-                    print(f"Updated job frequency for {job_id} from {old_frequency} to {frequency}")
+                    print(
+                        f"Updated job frequency for {job_id} from {old_frequency} to {frequency}"
+                    )
                     updated_job_count += 1
                 if existing_jobs[job_id].command != command:
                     existing_jobs[job_id].set_command(command)
@@ -383,7 +381,9 @@ def scan_and_update_crontab():
                     old_frequency = str(existing_jobs[job_id].slices)
                     if old_frequency != frequency:
                         existing_jobs[job_id].setall(frequency)
-                        print(f"Updated job frequency for {job_id} from {old_frequency} to {frequency}")
+                        print(
+                            f"Updated job frequency for {job_id} from {old_frequency} to {frequency}"
+                        )
                         updated_job_count += 1
                 else:
                     # Crear un nuevo trabajo
@@ -398,41 +398,45 @@ def scan_and_update_crontab():
             removal_count += 1
             print(f"Removed job {job_id} from crontab")
     cron.write()
-    print(f"Updated crontab: existing jobs {len(existing_jobs)}, {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs")
+    print(
+        f"Updated crontab: existing jobs {len(existing_jobs)}, {new_job_count} new jobs, {updated_job_count} updated jobs, {removal_count} removed jobs"
+    )
+
 
 def find_all_ips(domains, path=""):
     """
     Recorre recursivamente los dominios para encontrar claves 'ip' o 'ips'.
-    
+
     Args:
         domains: Diccionario a recorrer
         path: Ruta actual (usado en la recursión)
-        
+
     Returns:
         Un diccionario donde las claves son las rutas y los valores son los diccionarios 'ip' o 'ips'
     """
     results = {}
-    
+
     if not isinstance(domains, dict):
         return results
-    
+
     # Buscar las claves ip o ips directamente en este nivel
-    if 'ip' in domains:
-        results[path] = domains['ip']
-    
-    if 'ips' in domains:
-        results[path] = domains['ips']
-    
+    if "ip" in domains:
+        results[path] = domains["ip"]
+
+    if "ips" in domains:
+        results[path] = domains["ips"]
+
     # Explorar recursivamente las demás claves
     for key, value in domains.items():
-        if key != 'ip' and key != 'ips' and isinstance(value, dict):
+        if key != "ip" and key != "ips" and isinstance(value, dict):
             # Construir la nueva ruta
             new_path = f"{path}/{key}" if path else key
             # Llamada recursiva y fusionar resultados
             sub_results = find_all_ips(value, new_path)
             results.update(sub_results)
-    
+
     return results
+
 
 def execute_single_check(domain_path, ip_idx, ip, check_type):
     """
