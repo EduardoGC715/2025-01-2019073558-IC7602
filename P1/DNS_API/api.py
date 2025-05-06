@@ -613,11 +613,12 @@ def create_Domain(ref, domain, data):
                     {
                         "address": ip.strip(),
                         "health": status_flag,
-                        "weight": int(weight.strip()),
+                        "weight": float(weight.strip()),
                         "healthcheck_settings": healthcheck_settings,
                     }
                 )
-        except ValueError:
+        except ValueError as e:
+            logger.debug(f"Error al crear el dominio: {e}")
             return jsonify({"error": "Formato inválido para IPs con peso."}), 400
 
     elif domain_type == "geo":
