@@ -248,7 +248,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         if (retry_count > 0)
         {
             log_message("HTTP Check: Retry attempt %d of %d\n", retry_count, max_retries);
-            sleep(1);
         }
 
         clock_gettime(CLOCK_MONOTONIC, &start);
