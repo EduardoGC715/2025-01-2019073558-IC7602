@@ -76,9 +76,9 @@ RUN echo '#!/bin/bash\n\
     echo "CHECKER_LAT=$CHECKER_LAT CHECKER_LON=$CHECKER_LON"\n\
     echo "CHECKER_CONTINENT=$CHECKER_CONTINENT"\n\
     echo "Starting Gunicorn API for flask_app..."\n\
-    gunicorn -w 4 -b 0.0.0.0:5000 flask_app:app &\n\
+    gunicorn -w 4 -t 60 -b 0.0.0.0:5000 flask_app:app &\n\
     echo "Setting up cron job for update_firebase.py..."\n\
-    echo "*/5 * * * * cd /app && CHECKER_ID=\"$CHECKER_ID\" CHECKER_LAT=\"$CHECKER_LAT\" CHECKER_LON=\"$CHECKER_LON\" CHECKER_COUNTRY=\"$CHECKER_COUNTRY\" CHECKER_CONTINENT=\"$CHECKER_CONTINENT\" python3 update_firebase.py --scan >> /var/log/cron.log 2>&1" > /etc/cron.d/health-scan\n\
+    echo "*/3 * * * * cd /app && CHECKER_ID=\"$CHECKER_ID\" CHECKER_LAT=\"$CHECKER_LAT\" CHECKER_LON=\"$CHECKER_LON\" CHECKER_COUNTRY=\"$CHECKER_COUNTRY\" CHECKER_CONTINENT=\"$CHECKER_CONTINENT\" python3 update_firebase.py --scan >> /var/log/cron.log 2>&1" > /etc/cron.d/health-scan\n\
     chmod 0644 /etc/cron.d/health-scan\n\
     crontab /etc/cron.d/health-scan\n\
     touch /var/log/cron.log\n\
