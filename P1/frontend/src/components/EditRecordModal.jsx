@@ -235,14 +235,17 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
     for (let i = 0; i < weightedAddresses.length; i++) {
       const address = weightedAddresses[i];
       if (address.weight === "" || address.ip === "") {
+        console.log("Campo vacío");
         return true; // Si hay un campo vacío, no es válido
       }
       const numWeight = Number(address.weight);
       if (isNaN(numWeight) || numWeight < 0) {
+        console.log("N[umero inválido o negativo");
         return true; // Si no es un número o es negativo, no es válido
       }
       sum += numWeight;
     }
+    console.log("Suma de pesos:", sum !== 1);
     return sum !== 1;
   };
 
