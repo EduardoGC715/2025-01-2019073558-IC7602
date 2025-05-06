@@ -10,7 +10,8 @@ import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
 
 // Modelo visual para editar un dominio
-const EditRecordModal = ({ show, handleClose, record, onSave }) => {
+const EditRecordModal = ({ show, handleClose, record, onSave}) => {
+  const oldDomain = record ? record.domain : "";
   const [editedRecord, setEditedRecord] = useState({
     domain: "",
     type: "single",
@@ -51,25 +52,67 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         });
       }
 
-      // Guarda la información del dominio
+      // NUEVO: Rellenar healthcheck_settings con defaults si faltan campos
+      const defaultHealthcheck = {
+        acceptable_codes: "200, 304",
+        crontab: "*/1 * * * *",
+        max_retries: 3,
+        path: "/",
+        port: 80,
+        timeout: 5000,
+        type: "http"
+      };
+
       setEditedRecord({
         ...record,
         directions,
         weightedDirections,
         geoDirections,
-        direction: ["multi", "weight", "geo"].includes(record.type) ? "" : record.direction,
-        healthcheck_settings: record.healthcheck_settings || {
-          acceptable_codes: "200, 304",
-          crontab: "*/1 * * * *",
-          max_retries: 3,
-          path: "/",
-          port: 80,
-          timeout: 5000,
-          type: "http"
+        direction: ["multi", "weight", "geo", "round-trip"].includes(record.type) ? "" : record.direction,
+        healthcheck_settings: {
+          ...defaultHealthcheck,
+          ...(record.healthcheck_settings || {})
         }
       });
     }
   }, [record]);
+
+
+  useEffect(() => {
+    if (editedRecord.type === "single") {
+      setEditedRecord(prev => ({
+        ...prev,
+        directions: [],
+        weightedDirections: [],
+        geoDirections: [],
+        direction: ""
+      }));
+    } else if (editedRecord.type === "multi" || editedRecord.type === "round-trip") {
+      setEditedRecord(prev => ({
+        ...prev,
+        weightedDirections: [],
+        geoDirections: [],
+        direction: "",
+        directions: prev.directions.length > 0 ? prev.directions : [""]
+      }));
+    } else if (editedRecord.type === "weight") {
+      setEditedRecord(prev => ({
+        ...prev,
+        directions: [],
+        geoDirections: [],
+        direction: "",
+        weightedDirections: prev.weightedDirections.length > 0 ? prev.weightedDirections : [{ ip: "", weight: "" }]
+      }));
+    } else if (editedRecord.type === "geo") {
+      setEditedRecord(prev => ({
+        ...prev,
+        directions: [],
+        weightedDirections: [],
+        direction: "",
+        geoDirections: prev.geoDirections.length > 0 ? prev.geoDirections : [{ ip: "", country: "" }]
+      }));
+    }
+  }, [editedRecord.type]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -192,14 +235,17 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
     for (let i = 0; i < weightedAddresses.length; i++) {
       const address = weightedAddresses[i];
       if (address.weight === "" || address.ip === "") {
+        console.log("Campo vacío");
         return true; // Si hay un campo vacío, no es válido
       }
       const numWeight = Number(address.weight);
       if (isNaN(numWeight) || numWeight < 0) {
+        console.log("N[umero inválido o negativo");
         return true; // Si no es un número o es negativo, no es válido
       }
       sum += numWeight;
     }
+    console.log("Suma de pesos:", sum !== 1);
     return sum !== 1;
   };
 
@@ -213,6 +259,10 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
       }
 
       if (editedRecord.type === "multi" || editedRecord.type === "round-trip") {
+        if (!editedRecord.directions || editedRecord.directions.length === 0) {
+          alert("Debe agregar al menos una dirección IP");
+          return;
+        }
         for (const ip of editedRecord.directions) {
           if (!isValidIP(ip)) {
             alert(`La dirección IP "${ip}" no tiene un formato válido`);
@@ -222,25 +272,65 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
       }
 
       if (editedRecord.type === "weight") {
-        for (const { ip } of editedRecord.weightedDirections) {
+        if (!editedRecord.weightedDirections || editedRecord.weightedDirections.length === 0) {
+          alert("Debe agregar al menos una dirección IP con peso");
+          return;
+        }
+        for (const { ip, weight } of editedRecord.weightedDirections) {
+          if (!ip || !weight) {
+            alert("Todas las direcciones IP deben tener un peso asignado");
+            return;
+          }
           if (!isValidIP(ip)) {
             alert(`La dirección IP "${ip}" no tiene un formato válido`);
             return;
           }
+        }
+        if (checkWeights(editedRecord.weightedDirections)) {
+          alert("La suma de los pesos debe ser 1");
+          return;
         }
       }
 
       if (editedRecord.type === "geo") {
-        for (const { ip } of editedRecord.geoDirections) {
+        if (!editedRecord.geoDirections || editedRecord.geoDirections.length === 0) {
+          alert("Debe agregar al menos una dirección IP con país");
+          return;
+        }
+        for (const { ip, country } of editedRecord.geoDirections) {
+          if (!ip || !country) {
+            alert("Todas las direcciones IP deben tener un país asignado");
+            return;
+          }
           if (!isValidIP(ip)) {
             alert(`La dirección IP "${ip}" no tiene un formato válido`);
+            return;
+          }
+          try {
+            const countryExists = await databaseApi.checkCountry(country);
+            if (!countryExists) {
+              alert(`El país "${country}" no es válido.`);
+              return;
+            }
+          } catch (error) {
+            console.error("Error al verificar el país:", error);
+            alert("Ocurrió un error al verificar el país. Inténtalo de nuevo.");
             return;
           }
         }
       }
 
+      // Validar campos requeridos de healthcheck
+      const requiredHealthcheckFields = ['acceptable_codes', 'crontab', 'max_retries', 'path', 'port', 'timeout', 'type'];
+      const missingFields = requiredHealthcheckFields.filter(field => !editedRecord.healthcheck_settings[field]);
+
+      if (missingFields.length > 0) {
+        throw new Error(`Faltan campos requeridos de healthcheck: ${missingFields.join(', ')}`);
+      }
+
       let recordData = {
         domain: editedRecord.domain,
+        oldDomain: oldDomain,
         type: editedRecord.type,
         counter: editedRecord.counter,
         status: true,
@@ -507,22 +597,29 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
           Cancelar
         </Button>
         <Button 
-        variant="primary" 
-        onClick={handleSave}
-        // Boton desactivado hasta que cumpla las validaciones
-        disabled={
-          !isValidDomain(editedRecord.domain) || (
-            editedRecord.type === "multi"
-              ? editedRecord.directions.length === 0
-              : editedRecord.type === "weight"
-                ? !editedRecord.weightedDirections ||
-                  editedRecord.weightedDirections.length === 0 || checkWeights(editedRecord.weightedDirections)
-                : editedRecord.type === "geo"
-                  ? !editedRecord.geoDirections || editedRecord.geoDirections.length === 0
-                  : !editedRecord.direction
-          )          
-        }
-      >
+          variant="primary" 
+          onClick={handleSave}
+          disabled={
+            !isValidDomain(editedRecord.domain) || (
+              editedRecord.type === "single"
+                ? !editedRecord.direction
+                : editedRecord.type === "multi"
+                  ? !editedRecord.directions || editedRecord.directions.length === 0
+                  : editedRecord.type === "weight"
+                    ? !editedRecord.weightedDirections ||
+                      editedRecord.weightedDirections.length === 0 ||
+                      editedRecord.weightedDirections.some(dir => !dir.ip || !dir.weight) ||
+                      checkWeights(editedRecord.weightedDirections)
+                    : editedRecord.type === "geo"
+                      ? !editedRecord.geoDirections ||
+                        editedRecord.geoDirections.length === 0 ||
+                        editedRecord.geoDirections.some(dir => !dir.ip || !dir.country)
+                      : editedRecord.type === "round-trip"
+                        ? !editedRecord.directions || editedRecord.directions.length === 0
+                        : true
+            )
+          }
+        >
           Guardar Cambios
         </Button>
       </Modal.Footer>

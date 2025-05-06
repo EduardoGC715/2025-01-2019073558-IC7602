@@ -393,22 +393,97 @@ def get_all_domains():
 
                 if policy == "single":
                     addresses = [node["ip"].get("address", "")]
+                    healthcheck_settings = node["ip"].get(
+                        "healthcheck_settings",
+                        {
+                            "acceptable_codes": "200, 304",
+                            "crontab": "*/1 * * * *",
+                            "max_retries": 3,
+                            "path": "/",
+                            "port": 80,
+                            "timeout": 5000,
+                            "type": "http",
+                        },
+                    )
                 elif policy == "weight":
                     addresses = [
                         f"{ip.get('address', '')}:{ip.get('weight', 0)}"
                         for ip in node.get("ips", [])
                     ]
+                    healthcheck_settings = node.get("ips", [{}])[0].get(
+                        "healthcheck_settings",
+                        {
+                            "acceptable_codes": "200, 304",
+                            "crontab": "*/1 * * * *",
+                            "max_retries": 3,
+                            "path": "/",
+                            "port": 80,
+                            "timeout": 5000,
+                            "type": "http",
+                        },
+                    )
                 elif policy == "geo":
                     addresses = [
                         f"{ip.get('address', '')}:{country}"
                         for country, ip in node.get("ips", {}).items()
                     ]
+                    first_ip = next(iter(node.get("ips", {}).values()), {})
+                    healthcheck_settings = first_ip.get(
+                        "healthcheck_settings",
+                        {
+                            "acceptable_codes": "200, 304",
+                            "crontab": "*/1 * * * *",
+                            "max_retries": 3,
+                            "path": "/",
+                            "port": 80,
+                            "timeout": 5000,
+                            "type": "http",
+                        },
+                    )
                 else:
                     raw_ips = node.get("ips", [])
                     if isinstance(raw_ips, list):
                         addresses = [ip.get("address", "") for ip in raw_ips]
+                        healthcheck_settings = (
+                            raw_ips[0].get(
+                                "healthcheck_settings",
+                                {
+                                    "acceptable_codes": "200, 304",
+                                    "crontab": "*/1 * * * *",
+                                    "max_retries": 3,
+                                    "path": "/",
+                                    "port": 80,
+                                    "timeout": 5000,
+                                    "type": "http",
+                                },
+                            )
+                            if raw_ips
+                            else {
+                                "acceptable_codes": "200, 304",
+                                "crontab": "*/1 * * * *",
+                                "max_retries": 3,
+                                "path": "/",
+                                "port": 80,
+                                "timeout": 5000,
+                                "type": "http",
+                            }
+                        )
                     else:
                         addresses = [ip.get("address", "") for ip in raw_ips.values()]
+                        first_ip = next(iter(raw_ips.values()), {})
+                        healthcheck_settings = first_ip.get(
+                            "healthcheck_settings",
+                            {
+                                "acceptable_codes": "200, 304",
+                                "crontab": "*/1 * * * *",
+                                "max_retries": 3,
+                                "path": "/",
+                                "port": 80,
+                                "timeout": 5000,
+                                "type": "http",
+                            },
+                        )
+
                 direction = ",".join(addresses)
 
                 record = {
@@ -416,6 +491,7 @@ def get_all_domains():
                     "domain": fqdn,
                     "type": policy,
                     "direction": direction,
+                    "healthcheck_settings": healthcheck_settings,
                 }
 
                 if policy == "multi":
@@ -454,7 +530,6 @@ def create_Domain(ref, domain, data):
     direction = data.get("direction")
     status_flag = data.get("status")
     counter_value = data.get("counter", 0)
-    weights = data.get("weight")
     healthcheck_settings = data.get("healthcheck_settings", {})
 
     if not all([domain_type, direction is not None, status_flag is not None]):
@@ -538,11 +613,12 @@ def create_Domain(ref, domain, data):
                     {
                         "address": ip.strip(),
                         "health": status_flag,
-                        "weight": int(weight.strip()),
+                        "weight": float(weight.strip()),
                         "healthcheck_settings": healthcheck_settings,
                     }
                 )
-        except ValueError:
+        except ValueError as e:
+            logger.debug(f"Error al crear el dominio: {e}")
             return jsonify({"error": "Formato inválido para IPs con peso."}), 400
 
     elif domain_type == "geo":
@@ -580,6 +656,47 @@ def create_Domain(ref, domain, data):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def updateDomain(ref, domain, data):
+    domain_type = data.get("type")
+    direction = data.get("direction")
+
+    if not all([domain_type, direction is not None]):
+        return jsonify({"error": "Faltan campos"}), 400
+
+    
+    ip_data = {"routing_policy": None}
+
+    # Se van creando los dominios según sus tipos
+    if domain_type == "single":
+
+        ip_data["ip"] = None
+
+    elif domain_type in ["multi", "round-trip", "weight", "geo"]:
+        if not isinstance(direction, str):
+            return jsonify(
+                {
+                    "error": f"Para el tipo de dominio '{domain_type}', 'direction' tiene que ser un string de IPs separados por comas"
+                },
+                400,
+            )
+        ip_data["ips"] = None
+        if domain_type == "multi":
+            ip_data["counter"] = None  # Solo multi tiene contador
+
+    try:
+        ref.update(ip_data)
+        return (
+            jsonify(
+                {
+                    "message": f"El dominio {domain} creado exitosamente con el routing policy {domain_type}",
+                    "status": "created",
+                }
+            ),
+            201,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # Ruta para crear, acutalizar o eliminar un dominio
 @app.route("/api/domains", methods=["POST", "PUT", "DELETE"])
@@ -587,7 +704,7 @@ def manage_domain():
     data = request.get_json()
     if not data:
         return jsonify({"error": "Cuerpo del JSON inválido o faltante"}), 400
-
+    logger.debug(data)
     # Se valida el dominio enviado en el JSON
     domain, error_response, status = validate_domain(data)
     if error_response:
@@ -604,13 +721,24 @@ def manage_domain():
     ref = domain_ref.child(flipped_path)
 
     # Si es una solicitud POST, se crea el dominio nuevo
-    if request.method == "POST" or request.method == "PUT":
+    if request.method == "POST":
+        return create_Domain(ref, domain, data)
+    
+    elif request.method == "PUT":
+        try:
+            oldDomain = data.get("oldDomain")
+            if oldDomain:
+                oldFlippedPath = "/".join(reversed(oldDomain.strip().split(".")))
+                oldRef = domain_ref.child(oldFlippedPath)
+                updateDomain(oldRef, domain, data)
+        except Exception as e:
+            logger.warning(f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}")
         return create_Domain(ref, domain, data)
 
     # Si es una solicitud DELETE, se elimina el dominio
     elif request.method == "DELETE":
         try:
-            ref.delete()
+            updateDomain(ref, domain, data)
             return jsonify({"message": "Dominio eliminado", "status": "success"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
