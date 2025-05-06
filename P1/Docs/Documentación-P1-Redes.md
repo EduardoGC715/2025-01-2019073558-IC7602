@@ -171,6 +171,7 @@ En esta _routing policy_, se escoge el IP que esté más cerca al usuario con ba
     En está política de enrutamiento, se busca brindar el IP con menos latencia, dependiendo de la ubicación del usuario y la de los health checkers. Con la latitud y longitud del health checker y el IP del usuario, se obtiene el health checker más cercano. Luego, se busca cuál IP tiene menos latencia con ese health checker. Se asume que ese debe ser el que está más cerca al usuario, entonces ese escoge. Tiene la siguiente configuración:
 
 ![](images/image52.png)
+
 Se utiliza la duración de lo que tardó el request del health checker en ser devuelto. Esto se almacena en los healthcheck results, por health checker.
 
 ### 4.1.2. Health Checks
