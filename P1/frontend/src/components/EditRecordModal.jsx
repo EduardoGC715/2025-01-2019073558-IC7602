@@ -10,8 +10,9 @@ import GeoConfig from "./configCards/geoConfig";
 import RoundTripConfig from "./configCards/roundTripConfig";
 
 // Modelo visual para editar un dominio
-const EditRecordModal = ({ show, handleClose, record, onSave}) => {
+const EditRecordModal = ({ show, handleClose, record, onSave }) => {
   const oldDomain = record ? record.domain : "";
+  const oldType = record ? record.type : "single";
   const [editedRecord, setEditedRecord] = useState({
     domain: "",
     type: "single",
@@ -27,8 +28,8 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
       path: "/",
       port: 80,
       timeout: 5000,
-      type: "http"
-    }
+      type: "http",
+    },
   });
 
   useEffect(() => {
@@ -39,14 +40,14 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
 
       // Filtra por el tipo de dominio
       if (record.type === "multi" || record.type === "round-trip") {
-        directions = record.direction.split(",").map(d => d.trim());
+        directions = record.direction.split(",").map((d) => d.trim());
       } else if (record.type === "weight" && record.direction) {
-        weightedDirections = record.direction.split(",").map(item => {
+        weightedDirections = record.direction.split(",").map((item) => {
           const [ip, weight] = item.trim().split(":");
           return { ip: ip || "", weight: weight || "" };
         });
       } else if (record.type === "geo" && record.direction) {
-        geoDirections = record.direction.split(",").map(item => {
+        geoDirections = record.direction.split(",").map((item) => {
           const [ip, country] = item.trim().split(":");
           return { ip: ip || "", country: country || "" };
         });
@@ -60,7 +61,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
         path: "/",
         port: 80,
         timeout: 5000,
-        type: "http"
+        type: "http",
       };
 
       setEditedRecord({
@@ -68,48 +69,60 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
         directions,
         weightedDirections,
         geoDirections,
-        direction: ["multi", "weight", "geo", "round-trip"].includes(record.type) ? "" : record.direction,
+        direction: ["multi", "weight", "geo", "round-trip"].includes(
+          record.type
+        )
+          ? ""
+          : record.direction,
         healthcheck_settings: {
           ...defaultHealthcheck,
-          ...(record.healthcheck_settings || {})
-        }
+          ...(record.healthcheck_settings || {}),
+        },
       });
     }
   }, [record]);
 
-
   useEffect(() => {
     if (editedRecord.type === "single") {
-      setEditedRecord(prev => ({
+      setEditedRecord((prev) => ({
         ...prev,
         directions: [],
         weightedDirections: [],
         geoDirections: [],
-        direction: ""
+        direction: "",
       }));
-    } else if (editedRecord.type === "multi" || editedRecord.type === "round-trip") {
-      setEditedRecord(prev => ({
+    } else if (
+      editedRecord.type === "multi" ||
+      editedRecord.type === "round-trip"
+    ) {
+      setEditedRecord((prev) => ({
         ...prev,
         weightedDirections: [],
         geoDirections: [],
         direction: "",
-        directions: prev.directions.length > 0 ? prev.directions : [""]
+        directions: prev.directions.length > 0 ? prev.directions : [""],
       }));
     } else if (editedRecord.type === "weight") {
-      setEditedRecord(prev => ({
+      setEditedRecord((prev) => ({
         ...prev,
         directions: [],
         geoDirections: [],
         direction: "",
-        weightedDirections: prev.weightedDirections.length > 0 ? prev.weightedDirections : [{ ip: "", weight: "" }]
+        weightedDirections:
+          prev.weightedDirections.length > 0
+            ? prev.weightedDirections
+            : [{ ip: "", weight: "" }],
       }));
     } else if (editedRecord.type === "geo") {
-      setEditedRecord(prev => ({
+      setEditedRecord((prev) => ({
         ...prev,
         directions: [],
         weightedDirections: [],
         direction: "",
-        geoDirections: prev.geoDirections.length > 0 ? prev.geoDirections : [{ ip: "", country: "" }]
+        geoDirections:
+          prev.geoDirections.length > 0
+            ? prev.geoDirections
+            : [{ ip: "", country: "" }],
       }));
     }
   }, [editedRecord.type]);
@@ -117,94 +130,97 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
-    if (name.startsWith('healthcheck_')) {
-      const settingName = name.replace('healthcheck_', '');
-      setEditedRecord(prev => ({
+    if (name.startsWith("healthcheck_")) {
+      const settingName = name.replace("healthcheck_", "");
+      setEditedRecord((prev) => ({
         ...prev,
         healthcheck_settings: {
           ...prev.healthcheck_settings,
-          [settingName]: value
-        }
+          [settingName]: value,
+        },
       }));
     } else {
-      setEditedRecord(prev => ({
+      setEditedRecord((prev) => ({
         ...prev,
-        [name]: value
+        [name]: value,
       }));
     }
   };
 
   // Handlers para direcciones múltiples (tipo "multi")
   const handleAddDirection = () => {
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      directions: [...prev.directions, ""]
+      directions: [...prev.directions, ""],
     }));
   };
 
   const handleRemoveDirection = (index) => {
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      directions: prev.directions.filter((_, i) => i !== index)
+      directions: prev.directions.filter((_, i) => i !== index),
     }));
   };
 
   const handleDirectionChange = (index, value) => {
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      directions: prev.directions.map((dir, i) => i === index ? value : dir)
+      directions: prev.directions.map((dir, i) => (i === index ? value : dir)),
     }));
   };
 
   // Handlers para tipo "weight"
   const handleAddWeightedDirection = () => {
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      weightedDirections: [...(prev.weightedDirections || []), { ip: '', weight: '' }]
+      weightedDirections: [
+        ...(prev.weightedDirections || []),
+        { ip: "", weight: "" },
+      ],
     }));
   };
 
   const handleWeightedDirectionChange = (index, field, value) => {
     const newDirections = [...editedRecord.weightedDirections];
     newDirections[index] = { ...newDirections[index], [field]: value };
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      weightedDirections: newDirections
+      weightedDirections: newDirections,
     }));
   };
 
   const handleRemoveWeightedDirection = (index) => {
     const newDirections = [...editedRecord.weightedDirections];
     newDirections.splice(index, 1);
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      weightedDirections: newDirections
+      weightedDirections: newDirections,
     }));
   };
 
   // Handlers para tipo "geo"
   const handleAddGeoDirection = () => {
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      geoDirections: [...(prev.geoDirections || []), { ip: '', country: '' }]
+      geoDirections: [...(prev.geoDirections || []), { ip: "", country: "" }],
     }));
   };
 
   const handleGeoDirectionChange = (index, field, value) => {
     const newDirections = [...editedRecord.geoDirections];
     newDirections[index] = { ...newDirections[index], [field]: value };
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      geoDirections: newDirections
+      geoDirections: newDirections,
     }));
   };
 
   const handleRemoveGeoDirection = (index) => {
     const newDirections = [...editedRecord.geoDirections];
     newDirections.splice(index, 1);
-    setEditedRecord(prev => ({
+    setEditedRecord((prev) => ({
       ...prev,
-      geoDirections: newDirections
+      geoDirections: newDirections,
     }));
   };
 
@@ -218,15 +234,15 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
   const isValidIP = (ip) => {
     const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
     const match = ip.match(ipRegex);
-    
+
     if (!match) return false;
-    
+
     // Verifica que cada octeto esté entre 0 y 255
     for (let i = 1; i <= 4; i++) {
       const octet = parseInt(match[i]);
       if (octet < 0 || octet > 255) return false;
     }
-    
+
     return true;
   };
 
@@ -253,7 +269,10 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
   const handleSave = async () => {
     try {
       // Validar IPs según el tipo de registro
-      if (editedRecord.type === "single" && !isValidIP(editedRecord.direction)) {
+      if (
+        editedRecord.type === "single" &&
+        !isValidIP(editedRecord.direction)
+      ) {
         alert("La dirección IP no tiene un formato válido");
         return;
       }
@@ -272,7 +291,10 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
       }
 
       if (editedRecord.type === "weight") {
-        if (!editedRecord.weightedDirections || editedRecord.weightedDirections.length === 0) {
+        if (
+          !editedRecord.weightedDirections ||
+          editedRecord.weightedDirections.length === 0
+        ) {
           alert("Debe agregar al menos una dirección IP con peso");
           return;
         }
@@ -293,7 +315,10 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
       }
 
       if (editedRecord.type === "geo") {
-        if (!editedRecord.geoDirections || editedRecord.geoDirections.length === 0) {
+        if (
+          !editedRecord.geoDirections ||
+          editedRecord.geoDirections.length === 0
+        ) {
           alert("Debe agregar al menos una dirección IP con país");
           return;
         }
@@ -321,16 +346,29 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
       }
 
       // Validar campos requeridos de healthcheck
-      const requiredHealthcheckFields = ['acceptable_codes', 'crontab', 'max_retries', 'path', 'port', 'timeout', 'type'];
-      const missingFields = requiredHealthcheckFields.filter(field => !editedRecord.healthcheck_settings[field]);
+      const requiredHealthcheckFields = [
+        "acceptable_codes",
+        "crontab",
+        "max_retries",
+        "path",
+        "port",
+        "timeout",
+        "type",
+      ];
+      const missingFields = requiredHealthcheckFields.filter(
+        (field) => !editedRecord.healthcheck_settings[field]
+      );
 
       if (missingFields.length > 0) {
-        throw new Error(`Faltan campos requeridos de healthcheck: ${missingFields.join(', ')}`);
+        throw new Error(
+          `Faltan campos requeridos de healthcheck: ${missingFields.join(", ")}`
+        );
       }
 
       let recordData = {
         domain: editedRecord.domain,
         oldDomain: oldDomain,
+        oldType: oldType,
         type: editedRecord.type,
         counter: editedRecord.counter,
         status: true,
@@ -341,82 +379,88 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
           path: editedRecord.healthcheck_settings.path,
           port: parseInt(editedRecord.healthcheck_settings.port),
           timeout: parseInt(editedRecord.healthcheck_settings.timeout),
-          type: editedRecord.healthcheck_settings.type
-        }
+          type: editedRecord.healthcheck_settings.type,
+        },
       };
-  
+
       switch (editedRecord.type) {
-        case 'single':
+        case "single":
           recordData = {
             ...recordData,
-            direction: editedRecord.direction
+            direction: editedRecord.direction,
           };
           break;
-  
-        case 'multi':
+
+        case "multi":
           recordData = {
             ...recordData,
             direction: editedRecord.directions.join(","),
-            counter: parseInt(editedRecord.counter)
+            counter: parseInt(editedRecord.counter),
           };
           break;
-  
-        case 'weight':
+
+        case "weight":
           recordData = {
             ...recordData,
             direction: editedRecord.weightedDirections
-              .map(wd => `${wd.ip}:${wd.weight}`)
-              .join(',')
+              .map((wd) => `${wd.ip}:${wd.weight}`)
+              .join(","),
           };
           break;
-  
-        case 'geo':
+
+        case "geo":
           for (let i = 0; i < editedRecord.geoDirections.length; i++) {
             const item = editedRecord.geoDirections[i];
             if (item.ip === "" || item.country === "") {
-              alert("Por favor, completa todos los campos de las direcciones geográficas.");
+              alert(
+                "Por favor, completa todos los campos de las direcciones geográficas."
+              );
               return;
             }
             try {
-              const countryExists = await databaseApi.checkCountry(item.country);
+              const countryExists = await databaseApi.checkCountry(
+                item.country
+              );
               if (!countryExists) {
                 alert(`El país "${item.country}" no es válido.`);
                 return;
               }
             } catch (error) {
               console.error("Error al verificar el país:", error);
-              alert("Ocurrió un error al verificar el país. Inténtalo de nuevo.");
+              alert(
+                "Ocurrió un error al verificar el país. Inténtalo de nuevo."
+              );
               return;
             }
           }
           recordData = {
             ...recordData,
             direction: editedRecord.geoDirections
-              .map(gd => `${gd.ip}:${gd.country}`)
-              .join(',')
+              .map((gd) => `${gd.ip}:${gd.country}`)
+              .join(","),
           };
           break;
-  
-        case 'round-trip':
+
+        case "round-trip":
           recordData = {
             ...recordData,
-            direction: editedRecord.directions.join(",")
+            direction: editedRecord.directions.join(","),
           };
           break;
-  
+
         default:
-          throw new Error('Tipo de registro no válido');
+          throw new Error("Tipo de registro no válido");
       }
-      
+
       // Se publica con la base de datos
       const result = await dnsApi.editDNSRecord(recordData);
-  
+
       if (result.success) {
         handleClose();
         window.location.reload();
       }
     } catch (error) {
-      console.error('Error al actualizar el registro:', error);
+      console.error("Error al actualizar el registro:", error);
     }
   };
 
@@ -429,19 +473,24 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
       <Modal.Body>
         <Form>
           <Form.Group className="mb-3">
-            <Form.Label>Dominio <span style={{ color: "#6c757d" }}>(Debe terminar en .com, .net o similares)</span></Form.Label>
-            <Form.Control 
-              type="text" 
+            <Form.Label>
+              Dominio{" "}
+              <span style={{ color: "#6c757d" }}>
+                (Debe terminar en .com, .net o similares)
+              </span>
+            </Form.Label>
+            <Form.Control
+              type="text"
               name="domain"
               value={editedRecord.domain}
               onChange={handleInputChange}
-              placeholder="ejemplo.com" 
+              placeholder="ejemplo.com"
             />
           </Form.Group>
 
           <Form.Group className="mb-3">
             <Form.Label>Tipo</Form.Label>
-            <Form.Select 
+            <Form.Select
               name="type"
               value={editedRecord.type}
               onChange={handleInputChange}
@@ -456,7 +505,10 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
 
           {/* SINGLE */}
           {editedRecord.type === "single" && (
-            <SingleConfig editedRecord={editedRecord} handleInputChange={handleInputChange} />
+            <SingleConfig
+              editedRecord={editedRecord}
+              handleInputChange={handleInputChange}
+            />
           )}
 
           {/* MULTI */}
@@ -577,12 +629,12 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
               value={editedRecord.healthcheck_settings.type}
               onChange={(e) => {
                 const { value } = e.target;
-                setEditedRecord(prev => ({
+                setEditedRecord((prev) => ({
                   ...prev,
                   healthcheck_settings: {
                     ...prev.healthcheck_settings,
-                    type: value
-                  }
+                    type: value,
+                  },
                 }));
               }}
             >
@@ -596,28 +648,31 @@ const EditRecordModal = ({ show, handleClose, record, onSave}) => {
         <Button variant="secondary" onClick={handleClose}>
           Cancelar
         </Button>
-        <Button 
-          variant="primary" 
+        <Button
+          variant="primary"
           onClick={handleSave}
           disabled={
-            !isValidDomain(editedRecord.domain) || (
-              editedRecord.type === "single"
-                ? !editedRecord.direction
-                : editedRecord.type === "multi"
-                  ? !editedRecord.directions || editedRecord.directions.length === 0
-                  : editedRecord.type === "weight"
-                    ? !editedRecord.weightedDirections ||
-                      editedRecord.weightedDirections.length === 0 ||
-                      editedRecord.weightedDirections.some(dir => !dir.ip || !dir.weight) ||
-                      checkWeights(editedRecord.weightedDirections)
-                    : editedRecord.type === "geo"
-                      ? !editedRecord.geoDirections ||
-                        editedRecord.geoDirections.length === 0 ||
-                        editedRecord.geoDirections.some(dir => !dir.ip || !dir.country)
-                      : editedRecord.type === "round-trip"
-                        ? !editedRecord.directions || editedRecord.directions.length === 0
-                        : true
-            )
+            !isValidDomain(editedRecord.domain) ||
+            (editedRecord.type === "single"
+              ? !editedRecord.direction
+              : editedRecord.type === "multi"
+              ? !editedRecord.directions || editedRecord.directions.length === 0
+              : editedRecord.type === "weight"
+              ? !editedRecord.weightedDirections ||
+                editedRecord.weightedDirections.length === 0 ||
+                editedRecord.weightedDirections.some(
+                  (dir) => !dir.ip || !dir.weight
+                ) ||
+                checkWeights(editedRecord.weightedDirections)
+              : editedRecord.type === "geo"
+              ? !editedRecord.geoDirections ||
+                editedRecord.geoDirections.length === 0 ||
+                editedRecord.geoDirections.some(
+                  (dir) => !dir.ip || !dir.country
+                )
+              : editedRecord.type === "round-trip"
+              ? !editedRecord.directions || editedRecord.directions.length === 0
+              : true)
           }
         >
           Guardar Cambios

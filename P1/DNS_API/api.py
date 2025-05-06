@@ -656,14 +656,14 @@ def create_Domain(ref, domain, data):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 def updateDomain(ref, domain, data):
-    domain_type = data.get("type")
+    domain_type = data.get("oldType")
     direction = data.get("direction")
 
     if not all([domain_type, direction is not None]):
         return jsonify({"error": "Faltan campos"}), 400
 
-    
     ip_data = {"routing_policy": None}
 
     # Se van creando los dominios según sus tipos
@@ -723,16 +723,18 @@ def manage_domain():
     # Si es una solicitud POST, se crea el dominio nuevo
     if request.method == "POST":
         return create_Domain(ref, domain, data)
-    
+
     elif request.method == "PUT":
         try:
             oldDomain = data.get("oldDomain")
             if oldDomain:
                 oldFlippedPath = "/".join(reversed(oldDomain.strip().split(".")))
                 oldRef = domain_ref.child(oldFlippedPath)
-                updateDomain(oldRef, domain, data)
+                updateDomain(oldRef, oldDomain, data)
         except Exception as e:
-            logger.warning(f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}")
+            logger.warning(
+                f"Advertencia: Se elimina el dominio antes de volverlo a crear: {str(e)}"
+            )
         return create_Domain(ref, domain, data)
 
     # Si es una solicitud DELETE, se elimina el dominio

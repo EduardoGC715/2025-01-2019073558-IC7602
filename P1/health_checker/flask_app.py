@@ -13,6 +13,7 @@ from update_firebase import (
     initialize_firebase,
     execute_single_check,
 )
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
@@ -24,6 +25,8 @@ logging.basicConfig(
 )
 
 initialize_firebase()
+
+executor = ThreadPoolExecutor(max_workers=3)
 
 
 @app.route("/health-check", methods=["GET"])
@@ -41,14 +44,19 @@ def health_check():
     ip = request.args.get("ip")
     check_type = request.args.get("check_type")
 
-    logger.info(f"Executing health check for {ip} ({domain_path}, idx: {ip_idx}, [PID: {os.getpid()}])")
+    logger.info(
+        f"Executing health check for {ip} ({domain_path}, idx: {ip_idx}, [PID: {os.getpid()}])"
+    )
 
-    try:
-        execute_single_check(domain_path, ip_idx, ip, check_type)
-        return jsonify({"status": "Health check executed"}), 200
-    except:
-        logger.error(f"Error executing health check: {sys.exc_info()[1]}")
-        return jsonify({"status": "Error executing health check"}), 500
+    def run_check():
+        try:
+            execute_single_check(domain_path, ip_idx, ip, check_type)
+        except Exception as e:
+            logger.error(f"Error executing health check: {e}")
+
+    executor.submit(run_check)
+
+    return jsonify({"status": "Health check executed"}), 200
 
 
 if __name__ == "__main__":

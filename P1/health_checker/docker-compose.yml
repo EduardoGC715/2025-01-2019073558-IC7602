@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       tags:
-        - dandiego235/dns-health-checker:6
+        - dandiego235/dns-health-checker:7
         - dandiego235/dns-health-checker:latest
   dev:
     build:
