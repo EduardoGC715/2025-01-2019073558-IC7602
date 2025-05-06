@@ -4,14 +4,14 @@ services:
       context: .
       dockerfile: Dockerfile
       tags:
-        - dandiego235/dns-health-checker:5
+        - dandiego235/dns-health-checker:6
         - dandiego235/dns-health-checker:latest
   dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
     stdin_open: true # Keep stdin open for interactive shell
-    container_name: dns_dev
+    container_name: dev_checker
     volumes:
       - ./:/app # Bind mount: current directory to /app
     working_dir: /app
