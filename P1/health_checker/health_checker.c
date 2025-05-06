@@ -427,7 +427,7 @@ int main(int argc, char *argv[])
         if (max_retries < 0)
             max_retries = DEFAULT_MAX_RETRIES;
 
-        log_message("Checking HTTP path %s on %s:%s (timeout: %ds, max retries: %d, acceptable codes: %s)...\n",
+        log_message("Checking HTTP path %s on %s:%s (timeout: %dms, max retries: %d, acceptable codes: %s)...\n",
                     path, hostname, port, timeout, max_retries, acceptable_codes);
 
         check_result_t result = http_check(hostname, port, path, timeout, max_retries, acceptable_codes, host_header);
