@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       tags:
-        - davfer20/p1-ui:6
+        - davfer20/p1-ui:7
         - davfer20/p1-ui:latest
   ui-dev:
     build:
