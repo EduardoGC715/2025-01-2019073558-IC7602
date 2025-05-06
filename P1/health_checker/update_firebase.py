@@ -329,6 +329,8 @@ def scan_and_update_crontab():
                 continue
             check_type = health_check_config.get("type", "tcp")
             frequency = health_check_config.get("crontab", "*/2 * * * *")
+            if frequency == "*/1 * * * *":
+                frequency = "* * * * *"
 
             command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
             comment = f"health_check"
