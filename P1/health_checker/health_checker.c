@@ -174,7 +174,6 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_ms,
         if (retry_count > 0)
         {
             log_message("TCP Connect: Retry attempt %d of %d\n", retry_count, max_retries);
-            sleep(1);
         }
 
         // Empezar a medir el tiempo para la operación de conexión
@@ -214,12 +213,12 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_ms,
             }
             else // Fail
             {
-
+                // Finish timeout
+                select(0, NULL, NULL, NULL, &tv);
                 close(sockfd);
                 continue;
             }
         }
-
         retry_count++;
     }
 
@@ -272,6 +271,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         {
             log_message("getaddrinfo failed");
             retry_count++;
+            usleep(timeout_ms * 1000);
             continue;
         }
 
@@ -282,6 +282,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             log_message("socket creation failed");
             freeaddrinfo(res);
             retry_count++;
+            usleep(timeout_ms * 1000);
             continue;
         }
 
@@ -296,6 +297,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             log_message("Failed to set socket timeouts");
             close(sockfd);
             freeaddrinfo(res);
+            // Finish timeout
+            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
@@ -307,6 +310,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             log_message("connect failed: %s", strerror(errno));
             close(sockfd);
             freeaddrinfo(res);
+            // Finish timeout
+            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
@@ -327,6 +332,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             log_message("Failed to send HTTP request: %s", strerror(errno));
             close(sockfd);
             freeaddrinfo(res);
+            // Finish timeout
+            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
@@ -347,6 +354,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         if (bytes <= 0)
         {
             log_message("Failed to receive HTTP response.");
+            // Finish timeout
+            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
@@ -372,6 +381,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
                 *newline = '\0';
             log_message("%s\n", buffer);
 
+            // Finish timeout
+            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
@@ -468,7 +479,7 @@ int main(int argc, char *argv[])
         if (max_retries < 0)
             max_retries = DEFAULT_MAX_RETRIES;
 
-        log_message("Checking HTTP path %s on %s:%s (timeout: %ds, max retries: %d, acceptable codes: %s)...\n",
+        log_message("Checking HTTP path %s on %s:%s (timeout: %dms, max retries: %d, acceptable codes: %s)...\n",
                     path, hostname, port, timeout, max_retries, acceptable_codes);
         // Se llama a la función http_check para verificar la conexión HTTP
         check_result_t result = http_check(hostname, port, path, timeout, max_retries, acceptable_codes, host_header);
