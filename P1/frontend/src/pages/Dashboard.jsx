@@ -158,11 +158,8 @@ const Dashboard = () => {
   // Permite confirmar eliminar el dominio
   const handleDeleteConfirm = async () => {
     try {
-      const record = {
-        domain: recordToDelete.domain
-      };
   
-      const result = await dnsApi.deleteDNSRecord(record);
+      const result = await dnsApi.deleteDNSRecord(recordToDelete);
   
       if (result.success) {
         window.location.reload();
