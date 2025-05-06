@@ -297,8 +297,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             log_message("Failed to set socket timeouts");
             close(sockfd);
             freeaddrinfo(res);
-            // Finish timeout
-            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
@@ -310,8 +308,6 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             log_message("connect failed: %s", strerror(errno));
             close(sockfd);
             freeaddrinfo(res);
-            // Finish timeout
-            select(0, NULL, NULL, NULL, &tv);
             retry_count++;
             continue;
         }
