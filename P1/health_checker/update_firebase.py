@@ -342,6 +342,10 @@ def scan_and_update_crontab():
                     existing_jobs[job_id].setall(frequency)
                     print(f"Updated job frequency for {job_id} from {old_frequency} to {frequency}")
                     updated_job_count += 1
+                if existing_jobs[job_id].command != command:
+                    existing_jobs[job_id].set_command(command)
+                    print(f"Updated job command for {job_id} to {command}")
+                    updated_job_count += 1
             else:
                 print(f"Creating new job {job_id} in crontab")
                 # Crear un nuevo trabajo
