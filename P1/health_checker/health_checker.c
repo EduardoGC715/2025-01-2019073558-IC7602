@@ -125,9 +125,16 @@ bool is_acceptable_status(const char *response, const char *acceptable_codes)
 // Extraer el código de estado HTTP de la respuesta
 void extract_status_code(const char *response, char *status_code_buf)
 {
+    // Se busca la línea de estado HTTP en la respuesta utilizando strstr
+    // Se utiliza strstr para buscar la primera aparición de una subcadena dentro de otra cadena
     char *status_line = strstr(response, "HTTP/");
     if (status_line)
     {
+        // Se busca el primer espacio en la línea de estado HTTP utilizando strchr
+        // Se utiliza strchr para buscar la primera aparición de un carácter dentro de una cadena
+        // Se avanza el puntero status_start para omitir el espacio
+        // y se copia el código de estado HTTP en la variable status_code_buf
+        // Se utiliza strncpy para copiar los primeros 3 caracteres del código de estado
         char *status_start = strchr(status_line, ' ');
         if (status_start)
         {
@@ -161,9 +168,15 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_ms,
     check_result_t result = {0, 0.0, ""};
 
     memset(&hints, 0, sizeof hints);
+    // ai_family = AF_UNSPEC donde AF_UNSPEC significa que se aceptan tanto IPv4 como IPv6,
+    // y ai_family es un campo de la estructura addrinfo que especifica la familia de direcciones
+    // ai_socktype = SOCK_STREAM donde SOCK_STREAM indica que se está creando un socket de tipo TCP
+    // y ai_socktype es un campo de la estructura addrinfo que especifica el tipo de socket
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
     hints.ai_socktype = SOCK_STREAM; // TCP
 
+    // getaddrinfo() convierte un nombre de host y un número de puerto en una lista de estructuras addrinfo
+    // que contienen información sobre las direcciones IP y los tipos de socket disponibles
     if (getaddrinfo(hostname, port, &hints, &res) != 0)
     {
         perror("getaddrinfo");
@@ -181,6 +194,9 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_ms,
         // Empezar a medir el tiempo para la operación de conexión
         clock_gettime(CLOCK_MONOTONIC, &start);
 
+        // Iterar sobre la lista de direcciones devueltas por getaddrinfo
+        // y tratar de conectarse a cada una de ellas
+        // p es un puntero a la estructura addrinfo que contiene la información de la dirección IP
         for (p = res; p != NULL; p = p->ai_next)
         {
             sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
@@ -190,13 +206,16 @@ check_result_t tcp_check(const char *hostname, const char *port, int timeout_ms,
             struct timeval tv;
             tv.tv_sec = timeout_ms / 1000;
             tv.tv_usec = (timeout_ms % 1000) * 1000;
+            // Configurar el socket para que tenga un tiempo de espera utilizando setsockopt
+            // SO_SNDTIMEO y SO_RCVTIMEO son opciones de socket que establecen el tiempo de espera
             if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0 ||
                 setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
             {
                 close(sockfd);
                 continue;
             }
-
+            // Intentar conectarse al servidor utilizando connect()
+            // connect() intenta establecer una conexión con el servidor utilizando la dirección IP y el puerto
             if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0)
             { // Success
                 clock_gettime(CLOCK_MONOTONIC, &end);
@@ -252,10 +271,17 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
         struct addrinfo hints, *res;
         int sockfd;
 
+        // Inicializar la estructura addrinfo
+        // y establecer los parámetros para la búsqueda de direcciones
+        // ai_family = AF_UNSPEC donde AF_UNSPEC significa que se aceptan tanto IPv4 como IPv6,
+        // y ai_family es un campo de la estructura addrinfo que especifica la familia de direcciones
+        // ai_socktype = SOCK_STREAM donde SOCK_STREAM indica que se está creando un socket de tipo TCP
+        // y ai_socktype es un campo de la estructura addrinfo que especifica el tipo de socket
         memset(&hints, 0, sizeof hints);
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
 
+        // Obtener la dirección IP del servidor utilizando getaddrinfo
         if (getaddrinfo(hostname, port, &hints, &res) != 0)
         {
             log_message("getaddrinfo failed");
@@ -263,6 +289,7 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
+        // Se crea un socket TCP utilizando socket()
         sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
         if (sockfd == -1)
         {
@@ -272,6 +299,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
+        // Configurar el socket para que tenga un tiempo de espera utilizando setsockopt
+        // SO_SNDTIMEO y SO_RCVTIMEO son opciones de socket que establecen el tiempo de espera
         struct timeval tv;
         tv.tv_sec = timeout_ms / 1000;
         tv.tv_usec = (timeout_ms % 1000) * 1000;
@@ -285,6 +314,8 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
+        // Intentar conectarse al servidor utilizando connect()
+        // connect() intenta establecer una conexión con el servidor utilizando la dirección IP y el puerto
         if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0)
         {
             log_message("connect failed: %s", strerror(errno));
@@ -293,14 +324,18 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             retry_count++;
             continue;
         }
-
+        // Se construye la solicitud HTTP GET
+        // Se utiliza snprintf para formatear la cadena de solicitud
         char request[1024];
         const char *effective_host = host_header && strlen(host_header) > 0 ? host_header : hostname;
-
+        // Se utiliza el host_header si se proporciona, de lo contrario se utiliza el hostname
+        // Se utiliza snprintf para formatear la cadena de solicitud
         snprintf(request, sizeof(request),
                  "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nUser-Agent: HealthChecker/1.0\r\n\r\n",
                  path, effective_host);
-
+        // Se envía la solicitud HTTP al servidor utilizando send()
+        // send() envía datos a través del socket
+        // Se utiliza strlen(request) para obtener la longitud de la cadena de solicitud
         if (send(sockfd, request, strlen(request), 0) < 0)
         {
             log_message("Failed to send HTTP request: %s", strerror(errno));
@@ -310,6 +345,9 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             continue;
         }
 
+        // Se espera la respuesta del servidor utilizando recv()
+        // recv() recibe datos del socket
+        // Se utiliza sizeof(buffer) - 1 para dejar espacio para el carácter nulo
         char buffer[BUFFER_SIZE];
         int bytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
 
@@ -326,9 +364,9 @@ check_result_t http_check(const char *hostname, const char *port, const char *pa
             retry_count++;
             continue;
         }
-
+        // Se asegura que el buffer esté terminado en nulo
         buffer[bytes] = '\0';
-
+        // Se extrae el código de estado HTTP de la respuesta
         extract_status_code(buffer, result.status_code);
         if (is_acceptable_status(buffer, acceptable_status_codes))
         // Verifica si el código de estado es aceptable
@@ -369,6 +407,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Se definen las variables necesarias para la verificación
     const char *check_type = argv[1];
     int success = 0;
     double duration_ms = 0.0;
@@ -376,9 +415,10 @@ int main(int argc, char *argv[])
     int timeout = DEFAULT_TIMEOUT;
     int max_retries = DEFAULT_MAX_RETRIES;
     const char *acceptable_codes = DEFAULT_HTTP_OK;
-
+    // Se verifica si el tipo de verificación es TCP
     if (strcmp(check_type, "--tcp") == 0)
     {
+        // Se verifica si se han pasado los argumentos necesarios
         if (argc < 4)
         {
             return 1;
@@ -399,11 +439,11 @@ int main(int argc, char *argv[])
 
         log_message("Checking TCP connection to %s:%s (timeout: %dms, max retries: %d)...\n",
                     hostname, port, timeout, max_retries);
-
+        // Se llama a la función tcp_check para verificar la conexión TCP
         check_result_t result = tcp_check(hostname, port, timeout, max_retries);
         success = result.success;
         duration_ms = result.duration_ms;
-
+        // Se verifica si la conexión fue exitosa
         if (!success)
         {
             log_message("TCP check failed.");
@@ -417,9 +457,10 @@ int main(int argc, char *argv[])
                success ? "true" : "false", duration_ms);
         fflush(stdout);
     }
+    // Se verifica si el tipo de verificación es HTTP
     else if (strcmp(check_type, "--http") == 0)
     {
-
+        // Se verifica si se han pasado los argumentos necesarios
         const char *hostname = argv[2];
         const char *port = argv[3];
         const char *path = argv[4];
@@ -443,8 +484,9 @@ int main(int argc, char *argv[])
 
         log_message("Checking HTTP path %s on %s:%s (timeout: %dms, max retries: %d, acceptable codes: %s)...%f\n",
                     path, hostname, port, timeout, max_retries, acceptable_codes);
-
+        // Se llama a la función http_check para verificar la conexión HTTP
         check_result_t result = http_check(hostname, port, path, timeout, max_retries, acceptable_codes, host_header);
+        // Se verifica si la conexión fue exitosa
         success = result.success;
         duration_ms = result.duration_ms;
         strncpy(status_code, result.status_code, sizeof(status_code));

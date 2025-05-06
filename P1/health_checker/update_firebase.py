@@ -329,8 +329,6 @@ def scan_and_update_crontab():
                 continue
             check_type = health_check_config.get("type", "tcp")
             frequency = health_check_config.get("crontab", "*/2 * * * *")
-            if frequency == "*/1 * * * *":
-                frequency = "* * * * *"
 
             command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx=ip&ip={ip}&check_type={check_type}'"
             comment = f"health_check"
@@ -339,6 +337,8 @@ def scan_and_update_crontab():
             if job_id in existing_jobs:
                 print(f"Job {job_id} already exists in crontab")
                 # Actualizar el trabajo existente
+                if frequency == "*/1 * * * *":
+                    frequency = "* * * * *"
                 old_frequency = str(existing_jobs[job_id].slices)
                 if old_frequency != frequency:
                     existing_jobs[job_id].setall(frequency)
@@ -372,7 +372,8 @@ def scan_and_update_crontab():
                     continue
                 check_type = health_check_config.get("type", "tcp")
                 frequency = health_check_config.get("crontab", "*/2 * * * *")
-
+                if frequency == "*/1 * * * *":
+                    frequency = "* * * * *"
                 command = f"curl -X GET 'http://localhost:5000/health-check?domain_path={domain_path}&ip_idx={ip_idx}&ip={ip}&check_type={check_type}'"
                 _comment = f"health_check"
                 job_id = f"{domain_path}|{ip_idx}|{ip}"
