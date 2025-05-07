@@ -62,3 +62,8 @@ def health_check():
 if __name__ == "__main__":
 
     app.run(host="0.0.0.0", port=5000)
+
+
+# Referencias
+# https://docs.gunicorn.org/en/22.0.0/design.html
+# https://docs.python.org/3/library/concurrent.futures.html

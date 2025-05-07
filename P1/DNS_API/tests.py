@@ -6,7 +6,7 @@ import os
 import json
 
 
-# Primero creamos las credenciales mock
+# Mock de credenciales de Firebase
 def setup_mock_credentials():
     mock_creds = {
         "type": "service_account",
