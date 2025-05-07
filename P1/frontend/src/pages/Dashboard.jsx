@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {Badge, Button, Container} from "react-bootstrap";
+import { Badge, Button, Container } from "react-bootstrap";
 import {
   PlusCircle,
   Database,
@@ -38,7 +38,7 @@ const Dashboard = () => {
     domain: "",
     type: "single",
     direction: "",
-    directions: [] // Array para almacenar múltiples direcciones cuando type es "multi"
+    directions: [], // Array para almacenar múltiples direcciones cuando type es "multi"
   });
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const Dashboard = () => {
         setLoading(false);
       }
     };
-  
+
     fetchData();
   }, []);
 
@@ -81,18 +81,20 @@ const Dashboard = () => {
       ...newRecord,
       status: "active",
       // Si es tipo multi, usamos el array de directions, si no, usamos la dirección única
-      direction: newRecord.type === "multi" ? newRecord.directions.join(", ") : newRecord.direction
-    }
+      direction:
+        newRecord.type === "multi"
+          ? newRecord.directions.join(", ")
+          : newRecord.direction,
+    };
     setDnsRecords([...dnsRecords, recordWithId]);
     setNewRecord({
       domain: "",
       type: "single",
       direction: "",
-      directions: []
+      directions: [],
     });
     handleCloseAddModal();
   };
-
 
   // Función para renderizar icono de salud
   const renderHealthIcon = (status) => {
@@ -110,18 +112,16 @@ const Dashboard = () => {
 
   const handleRefreshStatus = async (recordId, domain, direction) => {
     try {
-      const updatedRecords = dnsRecords.map(record =>
-        record.id === recordId
-          ? { ...record, status: "loading" }
-          : record
+      const updatedRecords = dnsRecords.map((record) =>
+        record.id === recordId ? { ...record, status: "loading" } : record
       );
-  
-      setDnsRecords(updatedRecords); 
-  
+
+      setDnsRecords(updatedRecords);
+
       const healthCheck = await dnsApi.checkHealth(domain, direction);
-    
+
       // Actualiza el estado del registro con el resultado del check
-      const finalRecords = updatedRecords.map(record =>
+      const finalRecords = updatedRecords.map((record) =>
         record.id === recordId
           ? {
               ...record,
@@ -134,22 +134,20 @@ const Dashboard = () => {
             }
           : record
       );
-  
+
       setDnsRecords(finalRecords);
     } catch (error) {
       console.error("Error refreshing record status:", error);
-  
+
       // En caso de error, actualiza el estado a "error"
-      const errorRecords = dnsRecords.map(record =>
-        record.id === recordId
-          ? { ...record, status: "error" }
-          : record
+      const errorRecords = dnsRecords.map((record) =>
+        record.id === recordId ? { ...record, status: "error" } : record
       );
-  
+
       setDnsRecords(errorRecords);
     }
   };
-  
+
   // Permite eliminar dominio
   const handleDeleteClick = (record) => {
     setRecordToDelete(record);
@@ -158,16 +156,16 @@ const Dashboard = () => {
   // Permite confirmar eliminar el dominio
   const handleDeleteConfirm = async () => {
     try {
-  
+      recordToDelete["oldType"] = recordToDelete.type;
       const result = await dnsApi.deleteDNSRecord(recordToDelete);
-  
+
       if (result.success) {
         window.location.reload();
       } else {
         alert(`Error al eliminar el registro`);
       }
     } catch (error) {
-      alert('Error al eliminar el registro DNS');
+      alert("Error al eliminar el registro DNS");
     } finally {
       setShowDeleteModal(false);
       setRecordToDelete(null);
@@ -179,24 +177,24 @@ const Dashboard = () => {
     setShowDeleteModal(false);
     setRecordToDelete(null);
   };
-  
+
   // Revisa estado del Backend API
   const updateApiHealthStatus = async () => {
     const result = await dnsApi.checkApiStatus();
-  
-  // Revisa estado del Firebase
-    setHealthStatus(prev => ({
+
+    // Revisa estado del Firebase
+    setHealthStatus((prev) => ({
       ...prev,
-      api: result.message ? "healthy" : "error"
+      api: result.message ? "healthy" : "error",
     }));
   };
 
   const updateFirebaseStatus = async () => {
     const result = await dnsApi.checkFirebaseStatus();
-  
-    setHealthStatus(prev => ({
+
+    setHealthStatus((prev) => ({
       ...prev,
-      database: result.message ? "healthy" : "error"
+      database: result.message ? "healthy" : "error",
     }));
   };
 
@@ -211,8 +209,8 @@ const Dashboard = () => {
   };
 
   const handleSaveEdit = (updatedRecord) => {
-    setDnsRecords(prevRecords =>
-      prevRecords.map(record =>
+    setDnsRecords((prevRecords) =>
+      prevRecords.map((record) =>
         record.id === updatedRecord.id ? updatedRecord : record
       )
     );
@@ -291,4 +289,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
