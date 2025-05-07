@@ -53,7 +53,7 @@ const EditRecordModal = ({ show, handleClose, record, onSave }) => {
         });
       }
 
-      // NUEVO: Rellenar healthcheck_settings con defaults si faltan campos
+      // Rellenar healthcheck_settings con defaults si faltan campos
       const defaultHealthcheck = {
         acceptable_codes: "200, 304",
         crontab: "*/1 * * * *",
