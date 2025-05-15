@@ -11,3 +11,7 @@
 P1/frontend/src/firebaseConfig.json
 /P1/terraform/.terraform
 /P1/terraform/ssh_keys
+/P2/DNS_API/dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json
+P2/frontend/src/firebaseConfig.json
+/P2/terraform/.terraform
+/P2/terraform/ssh_keys

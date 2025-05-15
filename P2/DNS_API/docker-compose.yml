@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - dandiego235/dns-api:6
+        - dandiego235/dns-api:latest
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    stdin_open: true
+    container_name: dns_api
+    volumes:
+      - ./:/app
+    working_dir: /app
+    tty: true
+    ports:
+      - "5000:5000"
+    networks:
+      - shared-network
+
+networks:
+  shared-network:
+    external: true
