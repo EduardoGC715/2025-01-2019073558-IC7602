@@ -20,7 +20,7 @@ import socket
 from geopy.distance import geodesic
 import os
 
-domain_ref = db.reference("/domains")
+domain_ref = db.reference("/domains_old")
 ip_to_country_ref = db.reference("/ip_to_country")
 healthcheckers_ref = db.reference("/healthcheckers")
 countries_ref = db.reference("/countries")

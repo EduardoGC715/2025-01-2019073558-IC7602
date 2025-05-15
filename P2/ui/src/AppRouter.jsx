@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import NavBar from './components/Navbar';
 import Login from './components/Login';
 import Register from './components/Register';
+import Dashboard from './components/Dashboard';
 
 function AppRouter() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -24,7 +25,7 @@ function AppRouter() {
                   path="/" 
                   element={
                     currentUser 
-                      ? <Navigate to="/home" /> 
+                      ? <Navigate to="/dashboard" /> 
                       : <Login onLoginSuccess={(user) => setCurrentUser(user)} />
                   }
                 />
@@ -35,6 +36,14 @@ function AppRouter() {
                       ? <Navigate to="/" /> 
                       : <Register onRegisterSuccess={(user) => setCurrentUser(user)} />
                   } 
+                />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    currentUser 
+                      ? <Dashboard /> 
+                      : <Navigate to="/" />
+                  }
                 />
               </Routes>
             </div>
