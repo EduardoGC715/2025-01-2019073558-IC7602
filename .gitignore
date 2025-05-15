@@ -15,3 +15,4 @@ P1/frontend/src/firebaseConfig.json
 P2/frontend/src/firebaseConfig.json
 /P2/terraform/.terraform
 /P2/terraform/ssh_keys
+node_modules
