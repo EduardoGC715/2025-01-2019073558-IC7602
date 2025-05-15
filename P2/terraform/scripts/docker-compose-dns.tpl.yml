@@ -1,0 +1,26 @@
+services:
+  interceptor:
+    image: "dandiego235/dns-interceptor:latest"
+    ports:
+      - "53:53/udp"
+    container_name: dns_interceptor
+    networks:
+      - shared-network
+    environment:
+      DNS_API: dns_api
+      DNS_API_PORT: "${dns_api_port}"
+    restart: unless-stopped
+  api:
+    image: "dandiego235/dns-api:latest"
+    ports:
+      - "${dns_api_port}:${dns_api_port}"
+    container_name: dns_api
+    networks:
+      - shared-network
+    environment:
+      - DNS_SERVER=${dns_server_host}
+      - DNS_PORT=${dns_server_port}
+    restart: unless-stopped
+networks:
+  shared-network:
+    driver: bridge

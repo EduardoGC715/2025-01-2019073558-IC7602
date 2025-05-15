@@ -1,0 +1,42 @@
+#!/bin/bash
+
+sudo rm -f /etc/resolv.conf
+echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+
+# Codigo de instalación de Docker y Docker Compose
+# Obtenido de: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
+# Add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install ca-certificates curl -y
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$${UBUNTU_CODENAME:-$$VERSION_CODENAME}") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker ubuntu
+
+docker pull dandiego235/dns-health-checker:latest
+
+%{ for checker in checkers ~}
+docker run -d --name checker-${checker.id} \
+  -e CHECKER_ID="${checker.id}" \
+  -e CHECKER_LAT="${checker.lat}" \
+  -e CHECKER_LON="${checker.lon}" \
+  -e CHECKER_COUNTRY="${checker.country}" \
+  -e CHECKER_CONTINENT="${checker.continent}" \
+  dandiego235/dns-health-checker:latest
+
+sleep 5
+%{ endfor ~}
+# https://developer.hashicorp.com/terraform/language/functions/templatefile
