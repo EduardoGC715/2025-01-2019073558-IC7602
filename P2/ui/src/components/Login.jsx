@@ -30,10 +30,10 @@ function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="flex items-top justify-center px-4 sm:px-6 lg:px-8">
+    <div className="flex items-top justify-center px-4 sm:px-6 lg:px-8 pt-12">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-secundary">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-secondary">
             Iniciar sesión
           </h2>
         </div>
@@ -47,7 +47,7 @@ function Login({ onLoginSuccess }) {
                 placeholder="Correo electrónico"
                 className={`appearance-none rounded-t-md relative block w-full px-3 py-2 border ${
                   errors.email ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secundary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
               />
               {errors.email && (
                 <p className="text-warning text-xs mt-1">{errors.email.message}</p>
@@ -61,7 +61,7 @@ function Login({ onLoginSuccess }) {
                 placeholder="Contraseña"
                 className={`appearance-none rounded-b-md relative block w-full px-3 py-2 border ${
                   errors.password ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secundary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
               />
               {errors.password && (
                 <p className="text-warning text-xs mt-1">{errors.password.message}</p>
@@ -77,7 +77,7 @@ function Login({ onLoginSuccess }) {
                 type="checkbox"
                 className="h-4 w-4 text-primary focus:ring-primary/80 border-gray-300 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-secundary">
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-secondary">
                 Recordarme
               </label>
             </div>
