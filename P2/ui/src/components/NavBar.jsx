@@ -1,6 +1,6 @@
 function NavBar() {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-light border-gray-200 dark:bg-gray-900 shadow-md">
+<nav className="fixed top-0 left-0 right-0 z-50 bg-light border-gray-200 dark:bg-gray-900 shadow-md">
       <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
         <a href="/" className="flex items-center space-x-3 rtl:space-x-reverse">
             <img src="domainIcon.png" className="h-8" alt="Flowbite Logo" />
