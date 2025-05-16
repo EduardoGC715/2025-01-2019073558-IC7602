@@ -4,7 +4,7 @@ import NavBar from './components/Navbar';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
-import AddDomain from './components/DNSRegisterCard';
+import DNSRegisterCard from './components/DNSRegisterCard';
 
 function AppRouter() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -38,22 +38,8 @@ function AppRouter() {
                       : <Register onRegisterSuccess={(user) => setCurrentUser(user)} />
                   } 
                 />
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    currentUser 
-                      ? <Dashboard /> 
-                      : <Navigate to="/" />
-                  }
-                />
-                <Route 
-                  path="/addomain" 
-                  element={
-                    currentUser 
-                      ? <Navigate /> 
-                      : <AddDomain to="/" />
-                  }
-                />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/register-dns" element={<DNSRegisterCard />} />
               </Routes>
             </div>
           </main>
