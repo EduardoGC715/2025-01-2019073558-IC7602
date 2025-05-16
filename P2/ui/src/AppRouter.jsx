@@ -4,6 +4,7 @@ import NavBar from './components/Navbar';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
+import AddDomain from './components/DNSRegisterCard';
 
 function AppRouter() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -43,6 +44,14 @@ function AppRouter() {
                     currentUser 
                       ? <Dashboard /> 
                       : <Navigate to="/" />
+                  }
+                />
+                <Route 
+                  path="/addomain" 
+                  element={
+                    currentUser 
+                      ? <Navigate /> 
+                      : <AddDomain to="/" />
                   }
                 />
               </Routes>
