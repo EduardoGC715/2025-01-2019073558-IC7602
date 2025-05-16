@@ -26,7 +26,7 @@ function AppRouter() {
                   path="/" 
                   element={
                     currentUser 
-                      ? <Navigate to="/dashboard" /> 
+                      ? <Navigate to="/" /> 
                       : <Login onLoginSuccess={(user) => setCurrentUser(user)} />
                   }
                 />
@@ -37,6 +37,10 @@ function AppRouter() {
                       ? <Navigate to="/" /> 
                       : <Register onRegisterSuccess={(user) => setCurrentUser(user)} />
                   } 
+                />
+                 <Route 
+                  path="/change-password" 
+                  element={<Register title="Cambiar contraseña" />} 
                 />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/register-dns" element={<DNSRegisterCard />} />

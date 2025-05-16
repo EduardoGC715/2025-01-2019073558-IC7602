@@ -1,8 +1,9 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router-dom";
 
-// Esquema de validación con Zod
+// Validación con Zod
 const schema = z
   .object({
     name: z.string().min(1, "El nombre es requerido"),
@@ -15,7 +16,8 @@ const schema = z
     path: ["confirmPassword"],
   });
 
-export default function RegisterForm() {
+export default function Register({ title = "Crear una cuenta" }) {
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -26,6 +28,7 @@ export default function RegisterForm() {
 
   const onSubmit = (data) => {
     console.log("Formulario enviado:", data);
+    navigate("/");
   };
 
   return (
@@ -33,7 +36,7 @@ export default function RegisterForm() {
       <div className="max-w-md w-full">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-secondary">
-            Crear una cuenta
+            {title}
           </h2>
         </div>
 
