@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "react-router-dom";
 
 function Login({ onLoginSuccess }) {
   const schema = z.object({
@@ -38,7 +39,7 @@ function Login({ onLoginSuccess }) {
           </h2>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <form className="mt-8" onSubmit={handleSubmit(onSubmit)}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div className="mb-4">
               <input
@@ -69,7 +70,7 @@ function Login({ onLoginSuccess }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
               <input
                 id="remember-me"
@@ -82,11 +83,12 @@ function Login({ onLoginSuccess }) {
               </label>
             </div>
 
-            <div className="text-sm">
-              <a href="#" className="font-medium text-primary hover:text-primary/80">
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
+            <Link 
+              to="/change-password"
+              className="text-sm text-primary hover:text-primary-700"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
           </div>
 
           <div>
