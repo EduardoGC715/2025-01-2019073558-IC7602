@@ -1,4 +1,15 @@
+import { useLocation } from 'react-router-dom';
+
 function NavBar() {
+  const location = useLocation();
+
+  const getNavLinkClass = (path) => {
+    const isActive = location.pathname === path;
+    return isActive
+      ? "block py-2 px-3 text-light bg-primary rounded-sm md:bg-transparent md:text-primary md:p-0 dark:text-light md:dark:text-primary"
+      : "block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 dark:text-light md:dark:hover:text-primary dark:hover:bg-gray-700 dark:hover:text-light md:dark:hover:bg-transparent";
+  };
+
   return (
 <nav className="fixed top-0 left-0 right-0 z-50 bg-light border-gray-200 dark:bg-gray-900 shadow-md">
       <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
@@ -15,12 +26,14 @@ function NavBar() {
         <div className="hidden w-full md:block md:w-auto" id="navbar-default">
           <ul className="font-medium flex flex-col p-4 md:p-0 mt-4 borderrounded-lg md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-light dark:bg-gray-800 md:dark:bg-gray-900 dark:border-gray-700">
             <li>
-              <a href="/" className="block py-2 px-3 text-light bg-primary rounded-sm md:bg-transparent md:text-primary md:p-0 dark:text-light md:dark:text-primary" aria-current="page">Log In</a>
+              <a href="/" className={getNavLinkClass('/')} aria-current="page">Log In</a>
             </li>
             <li>
-              <a href="/register" className="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 dark:text-light md:dark:hover:text-primary dark:hover:bg-gray-700 dark:hover:text-light md:dark:hover:bg-transparent">Registrarse</a>
+              <a href="/register" className={getNavLinkClass('/register')}>Registrarse</a>
             </li>
-
+            <li>
+              <a href="/dashboard" className={getNavLinkClass('/dashboard')}>Dashboard</a>
+            </li>
           </ul>
         </div>
       </div>
