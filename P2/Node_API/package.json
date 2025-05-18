@@ -22,7 +22,6 @@
   "license": "ISC",
   "packageManager": "pnpm@10.11.0",
   "dependencies": {
-    "@codegenie/serverless-express": "^4.16.0",
     "@types/jsonwebtoken": "^9.0.9",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
