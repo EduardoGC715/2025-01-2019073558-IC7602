@@ -21,6 +21,10 @@ app.get("/hello", (req: Request, res: Response) => {
   res.send("Hello World!");
 });
 
+app.get("/status", (req: Request, res: Response) => {
+  res.send("Online");
+});
+
 app.use("/auth", authRoutes);
 
 app.listen(port, () => {
