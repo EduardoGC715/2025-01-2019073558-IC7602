@@ -1,3 +1,4 @@
 .env
 /dist
 /coverage
+/src/serviceAccount.json
