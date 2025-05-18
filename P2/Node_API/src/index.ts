@@ -29,6 +29,8 @@ app.listen(port, () => {
   console.log(`Server is running on ${port}`);
 });
 
+export { app };
+
 /* Referencias:
 código básico generado por express-generator: https://expressjs.com/en/starter/generator.html
 Estructura basada en: https://medium.com/@finnkumar6/mastering-express-js-controllers-the-key-to-clean-and-scalable-applications-45e35f206d0b
