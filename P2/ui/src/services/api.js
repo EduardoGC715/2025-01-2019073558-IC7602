@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Sin docker
-const API_BASE_URL = 'https://127.0.0.1:5000/api';
+const API_BASE_URL = "https://127.0.0.1:5000/api";
 
 // Con docker
 // const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
@@ -14,6 +14,25 @@ const api = axios.create({
   },
 });
 
+export const authApi = {
+  // Registro de usuario
+  registerUser: async (userData) => {
+    try {
+      const response = await api.post("/auth/registerUser", userData);
+      return {
+        success: response.status === 200 || response.status === 201,
+        data: response.data,
+        message: response.data?.message || "Usuario registrado exitosamente",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || "Error al registrar usuario",
+      };
+    }
+  },
+};
+
 // DNS Records API
 export const dnsApi = {
   // Toma todos los DNS records
@@ -25,7 +44,7 @@ export const dnsApi = {
         return data;
       } else {
         console.warn(`Unexpected status ${status} when fetching domains`);
-                return [];
+        return [];
       }
     } catch (error) {
       console.error("Error fetching domains:", error);

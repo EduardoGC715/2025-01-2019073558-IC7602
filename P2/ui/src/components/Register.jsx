@@ -2,13 +2,16 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import { authApi } from "../services/api";
 
 // Validación con Zod
 const schema = z
   .object({
     name: z.string().min(1, "El nombre es requerido"),
     email: z.string().email("Correo inválido"),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -26,9 +29,19 @@ export default function Register({ title = "Crear una cuenta" }) {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = (data) => {
-    console.log("Formulario enviado:", data);
-    navigate("/");
+  const onSubmit = async (data) => {
+    try {
+      const { confirmPassword, ...userData } = data;
+      const result = await authApi.registerUser(userData);
+      if (result.success) {
+        alert(result.message);
+        navigate("/");
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      alert("Error de red al registrar usuario");
+    }
   };
 
   return (
@@ -54,7 +67,9 @@ export default function Register({ title = "Crear una cuenta" }) {
                 placeholder="Nombre completo"
               />
               {errors.name && (
-                <p className="text-warning text-xs mt-1">{errors.name.message}</p>
+                <p className="text-warning text-xs mt-1">
+                  {errors.name.message}
+                </p>
               )}
             </div>
 
@@ -70,7 +85,9 @@ export default function Register({ title = "Crear una cuenta" }) {
                 placeholder="Correo electrónico"
               />
               {errors.email && (
-                <p className="text-warning text-xs mt-1">{errors.email.message}</p>
+                <p className="text-warning text-xs mt-1">
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
@@ -86,7 +103,9 @@ export default function Register({ title = "Crear una cuenta" }) {
                 placeholder="Contraseña"
               />
               {errors.password && (
-                <p className="text-warning text-xs mt-1">{errors.password.message}</p>
+                <p className="text-warning text-xs mt-1">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
@@ -102,7 +121,9 @@ export default function Register({ title = "Crear una cuenta" }) {
                 placeholder="Confirmar contraseña"
               />
               {errors.confirmPassword && (
-                <p className="text-warning text-xs mt-1">{errors.confirmPassword.message}</p>
+                <p className="text-warning text-xs mt-1">
+                  {errors.confirmPassword.message}
+                </p>
               )}
             </div>
           </div>
