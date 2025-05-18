@@ -8,11 +8,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./src",
-    "paths": {
-      "#/*": ["./src/*"]
-    }
+    "rootDir": "./src"
   },
-  "include": ["src/**/*.ts", "types"],
+  "include": ["src/**/*.ts", "types", "src/firebase.ts", "src/index.ts"],
   "exclude": ["dist"]
 }

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { firestore, database } from "#/firebase";
+import { firestore, database } from "../firebase";
 import ms from "ms";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";

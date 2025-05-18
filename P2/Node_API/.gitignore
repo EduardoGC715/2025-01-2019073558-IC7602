@@ -1,5 +1,5 @@
 .env
 /dist
 /coverage
-/src/serviceAccount.json
+*serviceAccount.json
 .vercel

@@ -1,1 +1,10 @@
-{ "version": 2, "rewrites": [{ "source": "/(.*)", "destination": "/src" }] }
+{
+  "version": 2,
+  "devCommand": "pnpm run dev",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ]
+}

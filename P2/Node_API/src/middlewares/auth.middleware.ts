@@ -1,12 +1,12 @@
 import { NextFunction, Request, Response } from "express";
-import { apiKeyCache } from "#/utils/apiKeyCache";
+import { database } from "../firebase";
 import jwt from "jsonwebtoken";
 
-export const authenticateServer = (
+export const authenticateServer = async (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   const apiKey = req.headers["x-api-key"];
   const appId = req.headers["x-app-id"];
 
@@ -16,11 +16,18 @@ export const authenticateServer = (
   }
 
   if (typeof appId !== "string" || typeof apiKey !== "string") {
-    res.status(401).json({ error: "Missing or invalid headers" });
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
-  const isValid = apiKeyCache.get(appId) === apiKey;
+  const snapshot = await database.ref(`apiKeys/${appId}`).once("value");
+  if (!snapshot.exists()) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+  const apiKeyStored = snapshot.val();
+  const isValid = apiKeyStored === apiKey;
+
   if (!isValid) {
     res.status(401).json({ message: "Unauthorized" });
     return;
