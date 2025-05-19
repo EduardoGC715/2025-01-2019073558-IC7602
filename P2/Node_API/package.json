@@ -27,9 +27,11 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "express-bearer-token": "^3.0.0",
     "firebase-admin": "^13.4.0",
     "http-errors": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
+    "jwt-decode": "^4.0.0",
     "morgan": "^1.10.0",
     "ms": "^2.1.3"
   },

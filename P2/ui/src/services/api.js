@@ -1,37 +1,58 @@
 import axios from "axios";
 
 // Sin docker
-const API_BASE_URL = "https://127.0.0.1:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_HOST;
 
 // Con docker
 // const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
 // console.log("API_BASE_URL:", API_BASE_URL); // para verificar
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    "x-api-key": import.meta.env.VITE_API_KEY,
+    "x-app-id": import.meta.env.VITE_APP_ID,
   },
 });
 
-export const authApi = {
-  // Registro de usuario
-  registerUser: async (userData) => {
-    try {
-      const response = await api.post("/auth/registerUser", userData);
-      return {
-        success: response.status === 200 || response.status === 201,
-        data: response.data,
-        message: response.data?.message || "Usuario registrado exitosamente",
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || "Error al registrar usuario",
-      };
-    }
-  },
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    localStorage.setItem("token", token);
+  } else {
+    delete api.defaults.headers.common.Authorization;
+    localStorage.removeItem("token");
+  }
 };
+
+export const getAuthToken = () => {
+  const bearerToken = api.defaults.headers.common.Authorization;
+  if (bearerToken) {
+    const token = bearerToken.split(" ")[1];
+    return token;
+  } else {
+    const token = localStorage.getItem("token");
+    if (token) {
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
+      return token;
+    }
+  }
+  return null;
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      console.error("Token expirado o inválido");
+      delete api.defaults.headers.common.Authorization;
+      window.location.href = "/";
+    }
+    return Promise.reject(error);
+  }
+);
 
 // DNS Records API
 export const dnsApi = {

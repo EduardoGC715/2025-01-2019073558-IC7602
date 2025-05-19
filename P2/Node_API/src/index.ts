@@ -5,6 +5,7 @@ import cors from "cors";
 import { apiKeyCache, initializeApiKeyListener } from "./utils/apiKeyCache";
 import { authenticateServer } from "./middlewares";
 import { authRoutes } from "./routes";
+import bearerToken from "express-bearer-token";
 
 const port = process.env.PORT || 3000;
 const app = express();
@@ -15,6 +16,7 @@ app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(bearerToken());
 app.use(authenticateServer);
 
 app.get("/hello", (req: Request, res: Response) => {

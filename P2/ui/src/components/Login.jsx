@@ -2,11 +2,15 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
-
-function Login({ onLoginSuccess }) {
+import { loginUser } from "../services/auth";
+import { useNavigate } from "react-router-dom";
+function Login() {
+  const navigate = useNavigate();
   const schema = z.object({
-    email: z.string().email("Correo inválido"),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    username: z.string().min(4, "El nombre de usuario es requerido"),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres."),
   });
 
   const {
@@ -18,15 +22,20 @@ function Login({ onLoginSuccess }) {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     console.log("Datos de inicio de sesión:", data);
 
-    const mockUser = {
-      name: "Usuario Demo",
-      email: data.email,
-    };
-
-    onLoginSuccess(mockUser);
+    try {
+      const result = await loginUser(data);
+      if (result.success) {
+        navigate("/dashboard");
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error("Error de red al iniciar sesión:", error);
+      alert("Error de red al iniciar sesión");
+    }
     reset(); // limpia el formulario
   };
 
@@ -43,15 +52,17 @@ function Login({ onLoginSuccess }) {
           <div className="rounded-md shadow-sm -space-y-px">
             <div className="mb-4">
               <input
-                {...register("email")}
-                type="email"
-                placeholder="Correo electrónico"
+                {...register("username")}
+                type="text"
+                placeholder="Nombre de usuario"
                 className={`appearance-none rounded-t-md relative block w-full px-3 py-2 border ${
-                  errors.email ? "border-warning" : "border-gray-300"
+                  errors.username ? "border-warning" : "border-gray-300"
                 } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
               />
-              {errors.email && (
-                <p className="text-warning text-xs mt-1">{errors.email.message}</p>
+              {errors.username && (
+                <p className="text-warning text-xs mt-1">
+                  {errors.username.message}
+                </p>
               )}
             </div>
 
@@ -65,7 +76,9 @@ function Login({ onLoginSuccess }) {
                 } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
               />
               {errors.password && (
-                <p className="text-warning text-xs mt-1">{errors.password.message}</p>
+                <p className="text-warning text-xs mt-1">
+                  {errors.password.message}
+                </p>
               )}
             </div>
           </div>
@@ -78,12 +91,15 @@ function Login({ onLoginSuccess }) {
                 type="checkbox"
                 className="h-4 w-4 text-primary focus:ring-primary/80 border-gray-300 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-secondary">
+              <label
+                htmlFor="remember-me"
+                className="ml-2 block text-sm text-secondary"
+              >
                 Recordarme
               </label>
             </div>
 
-            <Link 
+            <Link
               to="/change-password"
               className="text-sm text-primary hover:text-primary-700"
             >

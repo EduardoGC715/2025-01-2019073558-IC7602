@@ -3,6 +3,7 @@ import { firestore, database } from "../firebase";
 import ms from "ms";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { jwtDecode } from "jwt-decode";
 
 const createSession = async (
   user: string,
@@ -47,11 +48,11 @@ export const registerUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { user, password } = req.body;
-    const docRef = firestore.collection("users").doc(user);
+    const { username, password } = req.body;
+    const docRef = firestore.collection("users").doc(username);
     const doc = await docRef.get();
     if (doc.exists) {
-      res.status(400).json({ message: "User already exists" });
+      res.status(400).json({ message: "El usuario ya existe." });
       return;
     }
 
@@ -59,26 +60,26 @@ export const registerUser = async (
     const hashedPassword = bcrypt.hashSync(password, salt);
 
     await docRef.set({
-      user,
+      username,
       password: hashedPassword,
     });
 
-    const token = await createSession(user, "domain_ui", "1h");
+    const token = await createSession(username, "domain_ui", "1h");
     if (!token) {
-      res.status(500).json({ message: "Failed to create session" });
+      res.status(500).json({ message: "Error al crear la sesión." });
       return;
     }
     res.status(201).json({ token });
   } catch (error) {
-    console.error("Error registering user:", error);
+    console.error("Error al registrar el usuario:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { user, password } = req.body;
-    const docRef = firestore.collection("users").doc(user);
+    const { username, password } = req.body;
+    const docRef = firestore.collection("users").doc(username);
     const doc = await docRef.get();
     if (!doc.exists) {
       res.status(400).json({ message: "User not found" });
@@ -97,7 +98,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = await createSession(user, "domain_ui", "1h");
+    const token = await createSession(username, "domain_ui", "1h");
     if (!token) {
       res.status(500).json({ message: "Failed to create session" });
       return;
@@ -109,10 +110,27 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const logoutUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const token = req.token;
+  if (!token) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+  const decoded: any = jwtDecode(token);
+  const { sessionId } = decoded;
+  const sessionRef = database.ref(`sessions/${sessionId}`);
+  await sessionRef.remove();
+  res.status(200).json({ message: "Session removed" });
+};
+
 /* Referencias:
 https://firebase.google.com/docs/database/admin/save-data
 https://www.npmjs.com/package/ms
 https://github.com/auth0/node-jsonwebtoken
 https://www.npmjs.com/package/bcryptjs
 https://apidog.com/blog/node-js-express-authentication/
+https://www.npmjs.com/package/jwt-decode#getting-started
 */

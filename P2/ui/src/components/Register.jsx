@@ -2,13 +2,12 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { authApi } from "../services/api";
+import { registerUser } from "../services/auth";
 
 // Validación con Zod
 const schema = z
   .object({
-    name: z.string().min(1, "El nombre es requerido"),
-    email: z.string().email("Correo inválido"),
+    username: z.string().min(4, "El nombre de usuario es requerido"),
     password: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -32,10 +31,9 @@ export default function Register({ title = "Crear una cuenta" }) {
   const onSubmit = async (data) => {
     try {
       const { confirmPassword, ...userData } = data;
-      const result = await authApi.registerUser(userData);
+      const result = await registerUser(userData);
       if (result.success) {
-        alert(result.message);
-        navigate("/");
+        navigate("/dashboard");
       } else {
         alert(result.message);
       }
@@ -57,40 +55,21 @@ export default function Register({ title = "Crear una cuenta" }) {
           <div className="rounded-md shadow-sm -space-y-px">
             <div className="mb-4">
               <input
-                {...register("name")}
-                id="name"
+                {...register("username")}
+                id="username"
                 type="text"
-                autoComplete="name"
+                autoComplete="username"
                 className={`appearance-none rounded-t-md relative block w-full px-3 py-2 border ${
-                  errors.name ? "border-warning" : "border-gray-300"
+                  errors.username ? "border-warning" : "border-gray-300"
                 } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
-                placeholder="Nombre completo"
+                placeholder="Nombre de usuario"
               />
-              {errors.name && (
+              {errors.username && (
                 <p className="text-warning text-xs mt-1">
-                  {errors.name.message}
+                  {errors.username.message}
                 </p>
               )}
             </div>
-
-            <div className="mb-4">
-              <input
-                {...register("email")}
-                id="email"
-                type="email"
-                autoComplete="email"
-                className={`appearance-none relative block w-full px-3 py-2 border ${
-                  errors.email ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
-                placeholder="Correo electrónico"
-              />
-              {errors.email && (
-                <p className="text-warning text-xs mt-1">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
-
             <div className="mb-4">
               <input
                 {...register("password")}
