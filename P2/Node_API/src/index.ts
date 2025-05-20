@@ -3,8 +3,8 @@ import cookieParser from "cookie-parser";
 import logger from "morgan";
 import cors from "cors";
 import { apiKeyCache, initializeApiKeyListener } from "./utils/apiKeyCache";
-import { authenticateServer } from "./middlewares";
-import { authRoutes } from "./routes";
+import { authenticateServer, authenticateJWT } from "./middlewares";
+import { authRoutes, domainRoutes } from "./routes";
 import bearerToken from "express-bearer-token";
 
 const port = process.env.PORT || 3000;
@@ -28,6 +28,8 @@ app.get("/status", (req: Request, res: Response) => {
 });
 
 app.use("/auth", authRoutes);
+
+app.use("/domain", authenticateJWT, domainRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running on ${port}`);

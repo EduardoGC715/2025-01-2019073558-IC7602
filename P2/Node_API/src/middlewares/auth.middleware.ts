@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { database } from "../firebase";
 import jwt from "jsonwebtoken";
-
+import { JwtPayload } from "../../types/auth";
+import { jwtDecode } from "jwt-decode";
 export const authenticateServer = async (
   req: Request,
   res: Response,
@@ -36,23 +37,56 @@ export const authenticateServer = async (
   next();
 };
 
-export const authenticateJWT = (
+export const authenticateJWT = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.cookies.token || req.headers["x-access-token"];
+  const token = req.token;
   if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
+    res.status(401).json({ message: "Unauthorized" });
+    return;
   }
+  // const session = jwtDecode(token) as JwtPayload;
+  // req.session = session;
+  // next();
   jwt.verify(
     token,
     process.env.JWT_SECRET || "defaultsecret",
-    (err: any, user: any) => {
+    async (err: any, session: any) => {
       if (err) {
-        return res.status(401).json({ message: "Forbidden" });
+        res.status(401).json({ message: "Unauthorized" });
+        return;
       }
-      req.user = user;
+      const { user, domain, sessionId } = session as JwtPayload;
+      if (!user || !domain || !sessionId) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
+      const snapshot = await database
+        .ref(`sessions/${sessionId}`)
+        .once("value");
+      if (!snapshot.exists()) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
+      const sessionData = snapshot.val();
+      const now = new Date(Date.now());
+      const expiresAt = new Date(sessionData.expiresAt);
+      if (now > expiresAt) {
+        database.ref(`sessions/${sessionId}`).remove();
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
+      if (domain !== sessionData.domain) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
+      if (user !== sessionData.user) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
+      req.session = session;
       next();
     }
   );
