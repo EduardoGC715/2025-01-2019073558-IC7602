@@ -42,7 +42,7 @@ export const authenticateJWT = async (
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.token;
+  const token = req.cookies.token;
   if (!token) {
     res.status(401).json({ message: "Unauthorized" });
     return;

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { loginUser } from "../services/auth";
 import { useNavigate } from "react-router-dom";
-function Login() {
+function Login({ isLoggedIn, setIsLoggedIn }) {
   const navigate = useNavigate();
   const schema = z.object({
     username: z.string().min(4, "El nombre de usuario es requerido"),
@@ -28,11 +28,13 @@ function Login() {
     try {
       const result = await loginUser(data);
       if (result.success) {
+        setIsLoggedIn(true);
         navigate("/dashboard");
       } else {
         alert(result.message);
       }
     } catch (error) {
+      console.log(error);
       console.error("Error de red al iniciar sesión:", error);
       alert("Error de red al iniciar sesión");
     }

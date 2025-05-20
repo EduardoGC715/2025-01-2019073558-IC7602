@@ -1,10 +1,12 @@
-import { api, setAuthToken } from "./api";
+import { api } from "./api";
 
 export const registerUser = async (userData) => {
   try {
-    const response = await api.post("/auth/register", userData);
+    const response = await api.post("/auth/register", userData, {
+      withCredentials: true,
+    });
     if (response.status === 200 || response.status == 201) {
-      setAuthToken(response.data.token);
+      // setAuthToken(response.data.token);
       return {
         success: true,
         message: "Usuario registrado exitosamente",
@@ -24,9 +26,11 @@ export const registerUser = async (userData) => {
 
 export const loginUser = async (userData) => {
   try {
-    const response = await api.post("/auth/login", userData);
+    const response = await api.post("/auth/login", userData, {
+      withCredentials: true,
+    });
     if (response.status === 200) {
-      setAuthToken(response.data.token);
+      // setAuthToken(response.data.token);
       return {
         success: true,
         message: "Usuario logueado exitosamente",
@@ -49,7 +53,7 @@ export const logoutUser = async () => {
     const response = await api.get("/auth/logout");
     if (response.status === 200) {
       console.log("HERE1");
-      setAuthToken(null);
+      // setAuthToken(null);
       return {
         success: true,
         message: "Sesión cerrada exitosamente",

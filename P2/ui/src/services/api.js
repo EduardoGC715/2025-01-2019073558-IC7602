@@ -1,11 +1,6 @@
 import axios from "axios";
 
-// Sin docker
 const API_BASE_URL = import.meta.env.VITE_API_HOST;
-
-// Con docker
-// const API_BASE_URL = `https://${process.env.REACT_APP_DNS_API}:${process.env.REACT_APP_DNS_API_PORT}/api`;
-// console.log("API_BASE_URL:", API_BASE_URL); // para verificar
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,6 +9,7 @@ export const api = axios.create({
     "x-api-key": import.meta.env.VITE_API_KEY,
     "x-app-id": import.meta.env.VITE_APP_ID,
   },
+  withCredentials: true,
 });
 
 export const setAuthToken = (token) => {
@@ -26,17 +22,15 @@ export const setAuthToken = (token) => {
   }
 };
 
+// Obtener el token de autenticación desde las cookies
+// https://www.regex-tutorial.com/getCookieWithRegex.html
 export const getAuthToken = () => {
-  const bearerToken = api.defaults.headers.common.Authorization;
-  if (bearerToken) {
-    const token = bearerToken.split(" ")[1];
+  const cookies = document.cookie;
+  const match = cookies.match(/(?:^|;\s*)token=([^;]*)/);
+
+  if (match) {
+    const token = decodeURIComponent(match[1]);
     return token;
-  } else {
-    const token = localStorage.getItem("token");
-    if (token) {
-      api.defaults.headers.common.Authorization = `Bearer ${token}`;
-      return token;
-    }
   }
   return null;
 };

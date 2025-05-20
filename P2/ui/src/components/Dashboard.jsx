@@ -1,11 +1,11 @@
-import DNSRecordsTable from './DNSRecordsTable';
-import { useNavigate } from 'react-router-dom';
+import DNSRecordsTable from "./DNSRecordsTable";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const navigate = useNavigate();
 
   const handleAddDomain = () => {
-    navigate('/register-dns');
+    navigate("/register-dns");
   };
 
   return (
@@ -17,13 +17,13 @@ const Dashboard = () => {
           </h1>
           <button
             onClick={handleAddDomain}
-            className="px-4 py-2 bg-primary text-light rounded-md hover:bg-primary/80 transition-colors "
+            className="px-4 py-2 bg-primary text-light rounded-md hover:bg-primary/80 transition-colors hover:cursor-pointer"
           >
             Agregar Dominio
           </button>
         </div>
-        <DNSRecordsTable 
-          dnsRecords={[]} 
+        <DNSRecordsTable
+          dnsRecords={[]}
           loading={false}
           onEditRecord={() => {}}
           onDeleteRecord={() => {}}

@@ -1,10 +1,34 @@
 import { useLocation } from "react-router-dom";
-import { getAuthToken, setAuthToken } from "../services/api";
+import { getAuthToken } from "../services/api";
 import { logoutUser } from "../services/auth";
+import { useState, useEffect } from "react";
 
-function NavBar() {
+function NavBar({ isLoggedIn, setIsLoggedIn }) {
   const location = useLocation();
-  const isLoggedIn = !!getAuthToken();
+
+  useEffect(() => {
+    const checkLoginStatus = () => {
+      const currentStatus = !!getAuthToken();
+      console.log("Current login status:", currentStatus);
+
+      if (isLoggedIn && !currentStatus) {
+        console.log("User logged out due to expired token");
+        setIsLoggedIn(false);
+        window.location.href = "/";
+        return;
+      }
+
+      if (isLoggedIn !== currentStatus) {
+        setIsLoggedIn(currentStatus);
+      }
+    };
+
+    checkLoginStatus();
+
+    const interval = setInterval(checkLoginStatus, 60000);
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   const getNavLinkClass = (path) => {
     const isActive = location.pathname === path;
@@ -14,13 +38,20 @@ function NavBar() {
   };
 
   const handleLogout = async () => {
-    const response = await logoutUser();
-    console.log(response);
-    if (response.success) {
+    try {
+      const response = await logoutUser();
+      console.log(response);
+      if (response.success) {
+        setIsLoggedIn(false);
+        window.location.href = "/";
+      } else {
+        console.error("Error al cerrar sesión:", response.message);
+        alert("Error al cerrar sesión");
+      }
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      setIsLoggedIn(false);
       window.location.href = "/";
-    } else {
-      console.error("Error al cerrar sesión:", response.message);
-      alert("Error al cerrar sesión");
     }
   };
 

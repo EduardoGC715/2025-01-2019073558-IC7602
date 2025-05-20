@@ -13,16 +13,12 @@ import DNSRegisterCard from "./components/DNSRegisterCard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 
 function AppRouter() {
-  const [currentUser, setCurrentUser] = useState(null);
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-  };
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   return (
     <Router>
       <div className="min-h-screen bg-light">
-        <NavBar currentUser={currentUser} onLogout={handleLogout} />
+        <NavBar isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
 
         <div className="py-10">
           <main>
@@ -31,23 +27,20 @@ function AppRouter() {
                 <Route
                   path="/"
                   element={
-                    currentUser ? (
-                      <Navigate to="/" />
+                    isLoggedIn ? (
+                      <Navigate to="/dashboard" />
                     ) : (
-                      <Login onLoginSuccess={(user) => setCurrentUser(user)} />
+                      <Login
+                        isLoggedIn={isLoggedIn}
+                        setIsLoggedIn={setIsLoggedIn}
+                      />
                     )
                   }
                 />
                 <Route
                   path="/register"
                   element={
-                    currentUser ? (
-                      <Navigate to="/" />
-                    ) : (
-                      <Register
-                        onRegisterSuccess={(user) => setCurrentUser(user)}
-                      />
-                    )
+                    isLoggedIn ? <Navigate to="/dashboard" /> : <Register />
                   }
                 />
                 <Route

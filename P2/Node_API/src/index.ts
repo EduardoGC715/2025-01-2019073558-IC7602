@@ -5,18 +5,18 @@ import cors from "cors";
 import { apiKeyCache, initializeApiKeyListener } from "./utils/apiKeyCache";
 import { authenticateServer, authenticateJWT } from "./middlewares";
 import { authRoutes, domainRoutes } from "./routes";
-import bearerToken from "express-bearer-token";
+import fs from "fs";
+import https from "https";
 
 const port = process.env.PORT || 3000;
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(bearerToken());
 app.use(authenticateServer);
 
 app.get("/hello", (req: Request, res: Response) => {
@@ -31,9 +31,19 @@ app.use("/auth", authRoutes);
 
 app.use("/domain", authenticateJWT, domainRoutes);
 
-app.listen(port, () => {
-  console.log(`Server is running on ${port}`);
-});
+if (process.env.NODE_ENV === "production") {
+  app.listen(port, () => {
+    console.log(`Server is running on ${port}`);
+  });
+} else {
+  const sslOptions = {
+    key: fs.readFileSync("./src/certs/key.pem"),
+    cert: fs.readFileSync("./src/certs/cert.pem"),
+  };
+  https.createServer(sslOptions, app).listen(port, () => {
+    console.log(`Server is running on ${port}`);
+  });
+}
 
 export default app;
 /* Referencias:

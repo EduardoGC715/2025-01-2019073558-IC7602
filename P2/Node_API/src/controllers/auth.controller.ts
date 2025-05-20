@@ -64,12 +64,18 @@ export const registerUser = async (
       password: hashedPassword,
     });
 
-    const token = await createSession(username, "domain_ui", "1h");
+    const expiration = "1h";
+    const token = await createSession(username, "domain_ui", expiration);
     if (!token) {
-      res.status(500).json({ message: "Error al crear la sesión." });
+      res.status(500).json({ message: "Error creating session" });
       return;
     }
-    res.status(201).json({ token });
+    res.cookie("token", token, {
+      maxAge: ms(expiration),
+      sameSite: "none",
+      secure: true,
+    });
+    res.status(201).json({ message: "User registered successfully", token });
   } catch (error) {
     console.error("Error al registrar el usuario:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -82,7 +88,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     const docRef = firestore.collection("users").doc(username);
     const doc = await docRef.get();
     if (!doc.exists) {
-      res.status(400).json({ message: "User not found" });
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
@@ -94,15 +100,20 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 
     const isPasswordValid = bcrypt.compareSync(password, userData.password);
     if (!isPasswordValid) {
-      res.status(401).json({ message: "Invalid password" });
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
-
-    const token = await createSession(username, "domain_ui", "1h");
+    const expiration = "1h";
+    const token = await createSession(username, "domain_ui", expiration);
     if (!token) {
       res.status(500).json({ message: "Failed to create session" });
       return;
     }
+    res.cookie("token", token, {
+      maxAge: ms(expiration),
+      sameSite: "none",
+      secure: true,
+    });
     res.status(200).json({ token });
   } catch (error) {
     console.error("Error logging in user:", error);
@@ -114,8 +125,9 @@ export const logoutUser = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const token = req.token;
+  const token = req.cookies.token;
   if (!token) {
+    console.error("No token found");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -123,6 +135,11 @@ export const logoutUser = async (
   const { sessionId } = decoded;
   const sessionRef = database.ref(`sessions/${sessionId}`);
   await sessionRef.remove();
+
+  res.clearCookie("token", {
+    sameSite: "none",
+    secure: true,
+  });
   res.status(200).json({ message: "Session removed" });
 };
 

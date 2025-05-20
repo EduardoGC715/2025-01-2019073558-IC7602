@@ -3,3 +3,4 @@
 /coverage
 *serviceAccount.json
 .vercel
+*.pem

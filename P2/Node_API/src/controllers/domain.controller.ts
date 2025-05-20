@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { database } from "../firebase";
+import { database, firestore } from "../firebase";
 import {
   uniqueNamesGenerator,
   adjectives,
@@ -8,6 +8,7 @@ import {
 } from "unique-names-generator";
 import { randomUUID } from "crypto";
 import validator from "validator";
+import { FieldValue } from "firebase-admin/firestore";
 
 const customConfig: Config = {
   dictionaries: [adjectives, animals],
@@ -17,17 +18,13 @@ const customConfig: Config = {
 
 export const registerDomain = async (req: Request, res: Response) => {
   try {
-    const { domain, ip } = req.body as any;
-    if (!domain || !ip) {
-      res.status(400).json({ message: "Domain and IP are required" });
+    const { domain } = req.body as any;
+    if (!domain) {
+      res.status(400).json({ message: "Dominio requerido" });
       return;
     }
     if (!validator.isFQDN(domain)) {
-      res.status(400).json({ message: "Invalid domain format" });
-      return;
-    }
-    if (!validator.isIP(ip)) {
-      res.status(400).json({ message: "Invalid IP format" });
+      res.status(400).json({ message: "Dominio inválido" });
       return;
     }
     const { session } = req;
@@ -35,7 +32,7 @@ export const registerDomain = async (req: Request, res: Response) => {
     const domainRef = database.ref(`domains/${flipped_domain}`);
     const domainSnapshot = await domainRef.once("value");
     if (domainSnapshot.exists()) {
-      res.status(400).json({ message: "Domain already registered" });
+      res.status(400).json({ message: "El dominio ya está registrado" });
       return;
     }
     if (!session) {
@@ -47,17 +44,23 @@ export const registerDomain = async (req: Request, res: Response) => {
     const token = randomUUID();
     const validation = { subdomain, token };
     const domainData = {
-      domain,
-      ip,
       user: session.user,
       createdAt: new Date().toISOString(),
       validation,
+      validated: false,
     };
     const updates: Record<string, any> = {};
-    updates[`domains/${flipped_domain}`] = domainData;
-    updates[`userDomains/${session.user}/${flipped_domain}`] = true;
+    updates[`domains/${flipped_domain}/_data`] = domainData;
 
     await database.ref().update(updates);
+
+    const userDocRef = firestore.collection("users").doc(session.user);
+    await userDocRef.set(
+      {
+        domains: { [domain]: domainData },
+      },
+      { merge: true }
+    );
 
     res.status(201).json({
       message: "Domain registered successfully",
