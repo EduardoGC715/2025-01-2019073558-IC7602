@@ -8,7 +8,6 @@ import {
 } from "unique-names-generator";
 import { randomUUID } from "crypto";
 import validator from "validator";
-import { FieldValue } from "firebase-admin/firestore";
 
 const customConfig: Config = {
   dictionaries: [adjectives, animals],
@@ -68,6 +67,32 @@ export const registerDomain = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error registering domain:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getUserDomains = async (req: Request, res: Response) => {
+  try {
+    const { session } = req;
+
+    if (!session || !session.user) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const userDocRef = firestore.collection("users").doc(session.user);
+    const userDoc = await userDocRef.get();
+
+    if (!userDoc.exists) {
+      res.status(404).json({ message: "Usuario no encontrado" });
+      return;
+    }
+    const userData = userDoc.data();
+    const domains = userData?.domains || {};
+
+    res.status(200).json({ domains });
+  } catch (error) {
+    console.error("Error fetching user domains:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
