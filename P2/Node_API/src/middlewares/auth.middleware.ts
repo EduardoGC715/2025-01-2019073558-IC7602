@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { database } from "../firebase";
+import { database, firestore } from "../firebase";
 import jwt from "jsonwebtoken";
 import { JwtPayload } from "../../types/auth";
 import { jwtDecode } from "jwt-decode";
@@ -23,7 +23,10 @@ export const authenticateServer = async (
     return;
   }
 
+  console.time("get apiKeyEdgeConfig");
   const apiKeyEdgeConfig = await get<string>(appId);
+  console.timeEnd("get apiKeyEdgeConfig");
+
   if (!apiKeyEdgeConfig) {
     res.status(401).json({ message: "Unauthorized" });
     return;
@@ -64,18 +67,21 @@ export const authenticateJWT = async (
         res.status(401).json({ message: "Unauthorized" });
         return;
       }
-      const snapshot = await database
-        .ref(`sessions/${sessionId}`)
-        .once("value");
-      if (!snapshot.exists()) {
+      const sessionRef = firestore.collection("sessions").doc(sessionId);
+      const snapshot = await sessionRef.get();
+      if (!snapshot.exists) {
         res.status(401).json({ message: "Unauthorized" });
         return;
       }
-      const sessionData = snapshot.val();
+      const sessionData = snapshot.data();
+      if (!sessionData) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
       const now = new Date(Date.now());
       const expiresAt = new Date(sessionData.expiresAt);
       if (now > expiresAt) {
-        database.ref(`sessions/${sessionId}`).remove();
+        sessionRef.delete();
         res.status(401).json({ message: "Unauthorized" });
         return;
       }

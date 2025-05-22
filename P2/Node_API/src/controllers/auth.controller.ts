@@ -24,9 +24,8 @@ const createSession = async (
       createdAt: now.toISOString(),
       expiresAt: expirationDate.toISOString(),
     };
-    const sessionsRef = database.ref("sessions");
-    const newSessionRef = await sessionsRef.push(sessionData);
-    const sessionId = newSessionRef.key;
+    const sessionsRef = await firestore.collection("sessions").add(sessionData);
+    const sessionId = sessionsRef.id;
     if (!sessionId) {
       return { message: "Failed to create session" };
     }
@@ -133,8 +132,8 @@ export const logoutUser = async (
   }
   const decoded: any = jwtDecode(token);
   const { sessionId } = decoded;
-  const sessionRef = database.ref(`sessions/${sessionId}`);
-  await sessionRef.remove();
+  const sessionRef = firestore.collection("sessions").doc(sessionId);
+  await sessionRef.delete();
 
   res.clearCookie("token", {
     sameSite: "none",
