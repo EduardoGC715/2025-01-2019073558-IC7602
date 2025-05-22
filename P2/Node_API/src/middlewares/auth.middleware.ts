@@ -64,29 +64,29 @@ export const authenticateJWT = async (
         res.status(401).json({ message: "Unauthorized" });
         return;
       }
-      const snapshot = await database
-        .ref(`sessions/${sessionId}`)
-        .once("value");
-      if (!snapshot.exists()) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-      const sessionData = snapshot.val();
-      const now = new Date(Date.now());
-      const expiresAt = new Date(sessionData.expiresAt);
-      if (now > expiresAt) {
-        database.ref(`sessions/${sessionId}`).remove();
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-      if (domain !== sessionData.domain) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-      if (user !== sessionData.user) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
+      // const snapshot = await database
+      //   .ref(`sessions/${sessionId}`)
+      //   .once("value");
+      // if (!snapshot.exists()) {
+      //   res.status(401).json({ message: "Unauthorized" });
+      //   return;
+      // }
+      // const sessionData = snapshot.val();
+      // const now = new Date(Date.now());
+      // const expiresAt = new Date(sessionData.expiresAt);
+      // if (now > expiresAt) {
+      //   database.ref(`sessions/${sessionId}`).remove();
+      //   res.status(401).json({ message: "Unauthorized" });
+      //   return;
+      // }
+      // if (domain !== sessionData.domain) {
+      //   res.status(401).json({ message: "Unauthorized" });
+      //   return;
+      // }
+      // if (user !== sessionData.user) {
+      //   res.status(401).json({ message: "Unauthorized" });
+      //   return;
+      // }
       req.session = session;
       next();
     }
