@@ -3,6 +3,8 @@ import { database } from "../firebase";
 import jwt from "jsonwebtoken";
 import { JwtPayload } from "../../types/auth";
 import { jwtDecode } from "jwt-decode";
+import { get } from "@vercel/edge-config";
+
 export const authenticateServer = async (
   req: Request,
   res: Response,
@@ -21,13 +23,12 @@ export const authenticateServer = async (
     return;
   }
 
-  const snapshot = await database.ref(`apiKeys/${appId}`).once("value");
-  if (!snapshot.exists()) {
+  const apiKeyEdgeConfig = await get<string>(appId);
+  if (!apiKeyEdgeConfig) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
-  const apiKeyStored = snapshot.val();
-  const isValid = apiKeyStored === apiKey;
+  const isValid = apiKeyEdgeConfig === apiKey;
 
   if (!isValid) {
     res.status(401).json({ message: "Unauthorized" });

@@ -1,13 +1,15 @@
 # Código obtenido de https://www.freecodecamp.org/news/how-to-get-started-with-firebase-using-python/
 import firebase_admin
 from firebase_admin import credentials
-from firebase_admin import db
+from firebase_admin import db, firestore
 import base64
 
 cred = credentials.Certificate("dnsfire-8c6fd-firebase-adminsdk-fbsvc-0c1a5a0b20.json")
 firebase_admin.initialize_app(
     cred, {"databaseURL": "https://dnsfire-8c6fd-default-rtdb.firebaseio.com/"}
 )
+
+firestore_client = firestore.client()
 
 from flask import Flask, request, render_template_string, jsonify
 from flask_cors import CORS
@@ -176,145 +178,52 @@ def exists():
         ip_response = ""
         if ip_data:
             try:
-                match ip_data["routing_policy"]:
-                    case "single":
-                        if ip_data["ip"]["health"]:
-                            ip_response = ip_data["ip"]["address"]
+                if not ip_address:
+                    return jsonify({"error": "No se dio un IP address"}), 400
 
-                        else:
-                            ip_response = "Unhealthy"
-                    case "multi":
-                        retries = 0
-                        while retries < len(ip_data["ips"]):
-                            index = ip_data["counter"] % len(ip_data["ips"])
-                            ip = ip_data["ips"][index]
-                            if ip["health"]:
-                                ref.update({"counter": ip_data["counter"] + 1})
-                                ip_response = ip["address"]
-                                break
-                            else:
-                                ip_data["counter"] += 1
-                                retries += 1
-                                ip_response = "Unhealthy"
-                                time.sleep(0.5)
-                    case "weight":
-                        weights = [ip["weight"] for ip in ip_data["ips"]]
-                        indices = list(range(len(weights)))
-                        retries = 0
-                        while retries < 5:
-                            index = random.choices(indices, weights=weights, k=1)[0]
-                            ip = ip_data["ips"][index]
-                            if ip["health"]:
-                                ip_response = ip["address"]
-                                break
-                            else:
-                                retries += 1
-                                ip_response = "Unhealthy"
-                                time.sleep(0.5)
-                    case "geo":
-                        if not ip_address:
-                            return jsonify({"error": "No se dio un IP address"}), 400
+                ip_num = ip_to_int(ip_address)
+                snapshot = (
+                    ip_to_country_ref.order_by_key()
+                    .end_at(str(ip_num))
+                    .limit_to_last(1)
+                    .get()
+                )
 
-                        ip_num = ip_to_int(ip_address)
-                        snapshot = (
-                            ip_to_country_ref.order_by_key()
-                            .end_at(str(ip_num))
-                            .limit_to_last(1)
-                            .get()
+                if snapshot:
+                    for key, ip_record in snapshot.items():
+                        end_ip_num = ip_to_int(ip_record["end_ip"])
+                        if end_ip_num >= ip_num >= int(key):
+                            country_code = ip_record["country_iso_code"]
+                            break
+                else:
+                    return "No se encontró el país", 500
+
+                try:
+                    # Se busca el país en la base de datos
+                    cache_ref = firestore_client.collection("zonal_caches").document(
+                        country_code
+                    )
+                    cache_doc = cache_ref.get()
+                    if cache_doc.exists:
+                        cache_data = cache_doc.to_dict()
+                        ip_response = cache_data["ip"]
+                    else:
+                        cache_docs = list(
+                            firestore_client.collection("zonal_caches").stream()
                         )
-
-                        if snapshot:
-                            for key, ip_record in snapshot.items():
-                                end_ip_num = ip_to_int(ip_record["end_ip"])
-                                if end_ip_num >= ip_num >= int(key):
-                                    country_code = ip_record["country_iso_code"]
-                                    break
+                        if cache_docs:
+                            random_doc = random.choice(cache_docs)
+                            cache_data = random_doc.to_dict()
+                            ip_response = cache_data["ip"]
                         else:
                             return "No se encontró el país", 500
-
-                        try:
-                            ip = ip_data["ips"][country_code]
-                            if ip["health"]:
-                                ip_response = ip["address"]
-                            else:
-                                raise Exception("IP Unhealthy")
-                        except Exception:
-                            retries = 0
-                            while retries < 5:
-                                ip = random.choice(list(ip_data["ips"].values()))
-                                if ip["health"]:
-                                    ip_response = ip["address"]
-                                    break
-                                else:
-                                    retries += 1
-                                    ip_response = "Unhealthy"
-                                    time.sleep(0.5)
-                    case "round-trip":
-                        geo_request = requests.get(
-                            f"http://ip-api.com/json/{ip_address}"
-                        )
-                        location = geo_request.json()
-
-                        lat = location.get("lat")
-                        lon = location.get("lon")
-                        ip_location = (lat, lon)
-                        closest_hc = None
-                        closest_distance = float("inf")
-                        try:
-                            healthcheckers = healthcheckers_ref.get()
-                            for health_checker, checker_info in healthcheckers.items():
-                                # Código obtenido de https://www.geeksforgeeks.org/python-calculate-distance-between-two-places-using-geopy/
-                                distance = geodesic(
-                                    ip_location,
-                                    (
-                                        checker_info["latitude"],
-                                        checker_info["longitude"],
-                                    ),
-                                ).km
-                                if distance < closest_distance:
-                                    closest_distance = distance
-                                    closest_hc = health_checker
-                        except Exception as e:
-                            logger.debug(f"No se encontró el healthcheck: {e}")
-                            return "No se encontró el healthcheck", 500
-
-                        logger.debug(closest_hc)
-                        sorted_ips = sorted(
-                            (
-                                ip
-                                for ip in ip_data["ips"]
-                                if ip.get("healthcheck_results", {})
-                                .get(closest_hc, {})
-                                .get("success", False)
-                            ),
-                            key=lambda ip: ip["healthcheck_results"][closest_hc][
-                                "duration_ms"
-                            ],
-                        )
-
-                        logger.debug(sorted_ips)
-                        retries = 0
-                        while retries < 3:
-                            for ip in sorted_ips:
-                                if ip["health"]:
-
-                                    logger.debug(ip)
-                                    ip_response = ip["address"]
-                                    break
-                                else:
-                                    ip_response = "Unhealthy"
-                            if ip_response == "Unhealthy":
-                                retries += 1
-                                time.sleep(0.5)
-                            else:
-                                break
-                    case _:
-                        return "El routing policy no existe", 500
-
+                except Exception as e:
+                    logger.debug(f"Error al buscar el país: {e}")
+                    return "No se encontró el país", 500
             except Exception as e:
                 logger.debug(f"Ese dominio no existe: {e}")
                 return "Ese dominio no existe", 404
-        if ip_response != "Unhealthy" and ip_response != "":
+        if ip_response != "":
             logger.debug(ip_response)
             return str(ip_to_int(ip_response)), 200
         else:

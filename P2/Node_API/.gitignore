@@ -4,3 +4,4 @@
 *serviceAccount.json
 .vercel
 *.pem
+.env*.local
