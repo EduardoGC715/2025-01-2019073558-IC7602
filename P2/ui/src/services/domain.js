@@ -55,4 +55,30 @@ export const getUserDomains = async () => {
   }
 };
 
+export const deleteDomain = async (domainName) => {
+  try {
+    const response = await api.delete(`/domain/domains/${domainName}`, {
+      withCredentials: true,
+    });
+    
+    if (response.status === 200) {
+      return {
+        success: true,
+        message: "Dominio eliminado exitosamente",
+      };
+    }
+
+    return {
+      success: false,
+      message: response.data?.message || "Error al eliminar dominio",
+    };
+  } catch (error) {
+    console.error(`Error al eliminar dominio:`, error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Error de conexión al servidor",
+    };
+  }
+};
+
 

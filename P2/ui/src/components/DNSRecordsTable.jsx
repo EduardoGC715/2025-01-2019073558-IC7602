@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { dnsApi } from "../services/api";
-import { getUserDomains } from "../services/domain";
+import { getUserDomains, deleteDomain } from "../services/domain";
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
@@ -45,10 +45,39 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     });
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteModal.record) {
-      onDeleteRecord(deleteModal.record);
-      setDeleteModal({ isOpen: false, record: null });
+      setIsLoading(true);
+      try {
+        const result = await deleteDomain(deleteModal.record.domain);
+        if (result.success) {
+          await refreshDomains(); // Refresh the domains list after deletion
+        } else {
+          alert(result.message);
+        }
+      } catch (error) {
+        console.error("Error deleting domain:", error);
+        alert("Error al eliminar el dominio");
+      } finally {
+        setIsLoading(false);
+        setDeleteModal({ isOpen: false, record: null });
+      }
+    }
+  };
+
+  const refreshDomains = async () => {
+    setIsLoading(true);
+    try {
+      const { success, domains, message } = await getUserDomains();
+      if (success) {
+        setDomains(domains);
+      } else {
+        console.error("Error fetching domains:", message);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -76,7 +105,8 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                   <tr>
                     <th className="px-4 py-2">ID</th>
                     <th className="px-4 py-2">Dominio</th>
-                    <th className="px-4 py-2">Estado</th>
+                    <th className="px-4 py-2">Dirección</th>
+                    <th className="px-4 py-2">Ownership</th>
                     <th className="px-4 py-2">Acciones</th>
                   </tr>
                 </thead>
@@ -85,12 +115,24 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                     <tr key={domainName} className="border-b hover:bg-lightgrey1">
                       <td className="px-4 py-2">{index + 1}</td>
                       <td className="px-4 py-2">{domainName}</td>
+                      <td className="px-4 py-2">{domainData.validation?.subdomain || 'N/A'}</td>
                       <td className="px-4 py-2">
-                        {domainData.validated ? (
-                          <span className="text-green-600">Validado</span>
-                        ) : (
-                          <span className="text-yellow-600">Pendiente</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {domainData.validated ? (
+                            <span className="text-green-600">true</span>
+                          ) : (
+                            <>
+                              <span className="text-warning">false</span>
+                              <button
+                                onClick={refreshDomains}
+                                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                                disabled={isLoading}
+                              >
+                                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex gap-2">
