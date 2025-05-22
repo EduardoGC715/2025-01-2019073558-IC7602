@@ -28,10 +28,10 @@ export const registerDomain = async (domain) => {
 
 export const getUserDomains = async () => {
   try {
-    const response = await api.get("/domain/domains", {
+    const response = await api.get("/domain/all", {
       withCredentials: true,
     });
-    
+
     if (response.status === 200) {
       return {
         success: true,
@@ -57,10 +57,10 @@ export const getUserDomains = async () => {
 
 export const deleteDomain = async (domainName) => {
   try {
-    const response = await api.delete(`/domain/domains/${domainName}`, {
+    const response = await api.delete(`/domain/${domainName}`, {
       withCredentials: true,
     });
-    
+
     if (response.status === 200) {
       return {
         success: true,
@@ -80,5 +80,3 @@ export const deleteDomain = async (domainName) => {
     };
   }
 };
-
-

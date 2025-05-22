@@ -49,17 +49,13 @@ export const registerDomain = async (req: Request, res: Response) => {
       validated: false,
     };
     const updates: Record<string, any> = {};
-    updates[`domains/${flipped_domain}/_data`] = domainData;
+    updates[`domains/${flipped_domain}/_enabled`] = true;
 
     await database.ref().update(updates);
 
     const userDocRef = firestore.collection("users").doc(session.user);
-    await userDocRef.set(
-      {
-        domains: { [domain]: domainData },
-      },
-      { merge: true }
-    );
+    const domainDocRef = userDocRef.collection("domains").doc(domain);
+    await domainDocRef.set(domainData, { merge: true });
 
     res.status(201).json({
       message: "Domain registered successfully",
@@ -80,15 +76,21 @@ export const getUserDomains = async (req: Request, res: Response) => {
       return;
     }
 
-    const userDocRef = firestore.collection("users").doc(session.user);
-    const userDoc = await userDocRef.get();
+    const domainsSnapshot = await firestore
+      .collection("users")
+      .doc(session.user)
+      .collection("domains")
+      .get();
 
-    if (!userDoc.exists) {
-      res.status(404).json({ message: "Usuario no encontrado" });
+    if (domainsSnapshot.empty) {
+      res.status(200).json({ domains: [] });
       return;
     }
-    const userData = userDoc.data();
-    const domains = userData?.domains || {};
+    const domains: Record<string, any> = {};
+
+    domainsSnapshot.forEach((doc) => {
+      domains[doc.id] = doc.data();
+    });
 
     res.status(200).json({ domains });
   } catch (error) {
@@ -112,18 +114,15 @@ export const deleteDomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const userDocRef = firestore.collection("users").doc(session.user);
-    const userDoc = await userDocRef.get();
+    const userDomainRef = firestore
+      .collection("users")
+      .doc(session.user)
+      .collection("domains")
+      .doc(domain);
 
-    if (!userDoc.exists) {
-      res.status(404).json({ message: "Usuario no encontrado" });
-      return;
-    }
+    const userDomainDoc = await userDomainRef.get();
 
-    const userData = userDoc.data();
-    const userDomains = userData?.domains || {};
-
-    if (!userDomains[domain]) {
+    if (!userDomainDoc.exists) {
       res.status(404).json({ message: "Dominio no encontrado" });
       return;
     }
@@ -133,12 +132,7 @@ export const deleteDomain = async (req: Request, res: Response) => {
     await domainRef.remove();
 
     // Eliminar de Firestore
-    const updatedDomains = { ...userDomains };
-    delete updatedDomains[domain];
-
-    await userDocRef.update({
-      domains: updatedDomains,
-    });
+    await userDomainRef.delete();
 
     res.status(200).json({
       message: "Dominio eliminado exitosamente",

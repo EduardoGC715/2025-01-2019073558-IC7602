@@ -1,3 +1,5 @@
 import authRoutes from "./auth.routes";
 import domainRoutes from "./domain.routes";
-export { authRoutes, domainRoutes };
+import subdomainRoutes from "./subdomain.routes";
+
+export { authRoutes, domainRoutes, subdomainRoutes };

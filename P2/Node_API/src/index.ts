@@ -4,7 +4,7 @@ import logger from "morgan";
 import cors from "cors";
 import { apiKeyCache, initializeApiKeyListener } from "./utils/apiKeyCache";
 import { authenticateServer, authenticateJWT } from "./middlewares";
-import { authRoutes, domainRoutes } from "./routes";
+import { authRoutes, domainRoutes, subdomainRoutes } from "./routes";
 import fs from "fs";
 import https from "https";
 
@@ -30,6 +30,8 @@ app.get("/status", (req: Request, res: Response) => {
 app.use("/auth", authRoutes);
 
 app.use("/domain", authenticateJWT, domainRoutes);
+
+app.use("/subdomain", subdomainRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.listen(port, () => {

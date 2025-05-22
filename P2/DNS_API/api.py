@@ -209,7 +209,7 @@ def exists():
                         ip_response = cache_data["ip"]
                     else:
                         cache_docs = list(
-                            firestore_client.collection("zonal_caches").stream()
+                            firestore_client.collection("zonal_caches").get()
                         )
                         if cache_docs:
                             random_doc = random.choice(cache_docs)
