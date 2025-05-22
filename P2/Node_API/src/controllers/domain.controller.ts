@@ -96,3 +96,56 @@ export const getUserDomains = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const deleteDomain = async (req: Request, res: Response) => {
+  try {
+    const { session } = req;
+    const { domain } = req.params;
+
+    if (!session || !session.user) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    if (!domain) {
+      res.status(400).json({ message: "Dominio requerido" });
+      return;
+    }
+
+    const userDocRef = firestore.collection("users").doc(session.user);
+    const userDoc = await userDocRef.get();
+
+    if (!userDoc.exists) {
+      res.status(404).json({ message: "Usuario no encontrado" });
+      return;
+    }
+
+    const userData = userDoc.data();
+    const userDomains = userData?.domains || {};
+
+    if (!userDomains[domain]) {
+      res.status(404).json({ message: "Dominio no encontrado" });
+      return;
+    }
+
+    const flipped_domain = domain.trim().split(".").reverse().join("/");
+    const domainRef = database.ref(`domains/${flipped_domain}`);
+    await domainRef.remove();
+
+    // Eliminar de Firestore
+    const updatedDomains = { ...userDomains };
+    delete updatedDomains[domain];
+
+    await userDocRef.update({
+      domains: updatedDomains,
+    });
+
+    res.status(200).json({
+      message: "Dominio eliminado exitosamente",
+      domain,
+    });
+  } catch (error) {
+    console.error("Error deleting domain:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
