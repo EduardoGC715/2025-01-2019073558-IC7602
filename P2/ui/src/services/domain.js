@@ -25,3 +25,34 @@ export const registerDomain = async (domain) => {
     };
   }
 };
+
+export const getUserDomains = async () => {
+  try {
+    const response = await api.get("/domain/domains", {
+      withCredentials: true,
+    });
+    
+    if (response.status === 200) {
+      return {
+        success: true,
+        domains: response.data.domains || {},
+        message: "Dominios obtenidos exitosamente",
+      };
+    }
+
+    return {
+      success: false,
+      domains: {},
+      message: response.data?.message || "Error al obtener dominios",
+    };
+  } catch (error) {
+    console.error(`Error al obtener dominios:`, error);
+    return {
+      success: false,
+      domains: {},
+      message: "Error de conexión al servidor",
+    };
+  }
+};
+
+

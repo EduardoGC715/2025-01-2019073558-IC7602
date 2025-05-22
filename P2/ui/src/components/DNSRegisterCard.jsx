@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { registerDomain } from "../services/domain";
+import { ArrowLeft } from "lucide-react";
 
 // Zod schema for DNS domain validation
 const schema = z.object({
@@ -68,6 +69,12 @@ function DNSRegisterCard() {
 
   return (
     <div className="bg-lightgrey2 text-darkgrey max-w-md mx-auto mt-10 p-6 rounded-2xl shadow-lg">
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+      >
+        <ArrowLeft size={24} />
+      </button>
       <h2 className="text-2xl font-bold mb-6">Registro DNS</h2>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Dominio */}

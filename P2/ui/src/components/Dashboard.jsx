@@ -17,7 +17,7 @@ const Dashboard = () => {
           </h1>
           <button
             onClick={handleAddDomain}
-            className="px-4 py-2 bg-primary text-light rounded-md hover:bg-primary/80 transition-colors hover:cursor-pointer"
+            className="px-4 py-2 bg-primary text-secundary rounded-md hover:bg-primary/80 transition-colors hover:cursor-pointer"
           >
             Agregar Dominio
           </button>
