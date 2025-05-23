@@ -108,20 +108,22 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
                 </li>
               </>
             )}
-            <li>
-              <a href="/dashboard" className={getNavLinkClass("/dashboard")}>
-                Dashboard
-              </a>
-            </li>
             {isLoggedIn && (
-              <li>
-                <button
-                  onClick={handleLogout}
-                  className="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 dark:text-light md:dark:hover:text-primary dark:hover:bg-gray-700 dark:hover:text-light md:dark:hover:bg-transparent"
-                >
-                  Cerrar sesión
-                </button>
-              </li>
+              <>
+                <li>
+                <a href="/dashboard" className={getNavLinkClass("/dashboard")}>
+                  Dashboard
+                </a>
+                </li>
+                <li>
+                  <button
+                    onClick={handleLogout}
+                    className="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 dark:text-light md:dark:hover:text-primary dark:hover:bg-gray-700 dark:hover:text-light md:dark:hover:bg-transparent"
+                  >
+                    Cerrar sesión
+                  </button>
+                </li>
+              </>
             )}
           </ul>
         </div>

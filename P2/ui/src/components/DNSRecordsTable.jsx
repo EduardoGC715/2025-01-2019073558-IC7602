@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { dnsApi } from "../services/api";
 import { getUserDomains, deleteDomain, verifyDomainOwnership } from "../services/domain";
@@ -12,7 +13,7 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     isOpen: false,
     record: null
   });
-
+  const navigate = useNavigate();
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -144,6 +145,7 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                   <tr>
                     <th className="px-4 py-2">ID</th>
                     <th className="px-4 py-2">Dominio</th>
+                    <th className="px-4 py-2">Subdominios</th>
                     <th className="px-4 py-2">Dirección</th>
                     <th className="px-4 py-2">Ownership</th>
                     <th className="px-4 py-2">Acciones</th>
@@ -154,6 +156,11 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                     <tr key={domainName} className="border-b hover:bg-lightgrey1">
                       <td className="px-4 py-2">{index + 1}</td>
                       <td className="px-4 py-2">{domainName}</td>
+                      <td className="px-4 py-2">
+                        <button onClick={() => navigate(`/domains/${domainName}/subdomains`)}className="text-blue-600 hover:underline">
+                          Ver Subdominios
+                        </button>
+                      </td>
                       <td className="px-4 py-2">{domainData.validation?.subdomain || 'N/A'}</td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
