@@ -34,6 +34,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       authMethod,
       apiKeys,
       users,
+      destination,
     } = req.body;
 
     if (typeof subdomain !== "string" || !domain) {
@@ -168,6 +169,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       authMethod,
       apiKeys,
       users,
+      destination,
     };
     batch.set(subdomainRef, subdomainData);
     batch.set(domainRef, { enabled: true });
