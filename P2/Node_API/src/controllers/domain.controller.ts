@@ -27,15 +27,15 @@ export const registerDomain = async (req: Request, res: Response) => {
       return;
     }
     const { session } = req;
+    if (!session) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
     const flipped_domain = domain.trim().split(".").reverse().join("/");
     const domainRef = database.ref(`domains/${flipped_domain}`);
     const domainSnapshot = await domainRef.once("value");
     if (domainSnapshot.exists()) {
       res.status(400).json({ message: "El dominio ya está registrado" });
-      return;
-    }
-    if (!session) {
-      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
