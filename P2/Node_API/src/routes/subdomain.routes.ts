@@ -6,7 +6,7 @@ import {
 } from "../controllers/subdomain.controller";
 import { authenticateJWT } from "../middlewares";
 const router = Router();
-router.post("/all", getAllSubdomains);
+router.get("/all", getAllSubdomains);
 
 router.post("/register", authenticateJWT, registerSubdomain);
 export default router;
