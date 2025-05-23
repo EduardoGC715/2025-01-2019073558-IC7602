@@ -17,7 +17,7 @@ export const registerDomain = async (domain) => {
       success: false,
       message: response.data?.message || "Error al registrar dominio",
     };
-  } catch (error) {
+  } catch (error) {s
     console.error(`"Error al registrar dominio: ${error}`);
     return {
       success: false,
@@ -56,6 +56,8 @@ export const getUserDomains = async () => {
 };
 
 export const deleteDomain = async (domainName) => {
+  console.log("Dominio a eliminar:", domainName);
+
   try {
     const response = await api.delete(`/domain/${domainName}`, {
       withCredentials: true,
@@ -77,6 +79,53 @@ export const deleteDomain = async (domainName) => {
     return {
       success: false,
       message: error.response?.data?.message || "Error de conexión al servidor",
+    };
+  }
+};
+
+export const verifyDomainOwnership = async (domainName) => {
+  console.log("========= INICIO DE VERIFICACIÓN =========");
+  console.log("Dominio a verificar:", domainName);
+  
+  if (!domainName) {
+    console.error("Error: Nombre de dominio no proporcionado");
+    return {
+      success: false,
+      validated: false,
+      message: "Nombre de dominio requerido"
+    };
+  }
+
+  try {
+    console.log(`Verificando dominio: ${domainName}`);
+    const response = await api.get(`/domain/verify/${domainName}`, {
+      withCredentials: true,
+    });
+
+    console.log(`Respuesta para ${domainName}:`, response.data);
+
+    // Retornamos la respuesta con el nombre del dominio para identificación
+    return {
+      success: true,
+      domainName: domainName,
+      validated: response.data.validated,
+      message: response.data.message,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error(`Error verificando ${domainName}:`, {
+      name: error.name,
+      message: error.message,
+      response: error.response?.data
+    });
+    
+    return {
+      success: false,
+      domainName: domainName,
+      validated: false,
+      message: error.response?.data?.message || "Error de verificación",
+      timestamp: new Date().toISOString()
     };
   }
 };

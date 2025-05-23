@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { dnsApi } from "../services/api";
-import { getUserDomains, deleteDomain } from "../services/domain";
+import { getUserDomains, deleteDomain, verifyDomainOwnership } from "../services/domain";
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
@@ -70,12 +70,51 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     try {
       const { success, domains, message } = await getUserDomains();
       if (success) {
+        // Verificar ownership para cada dominio
+        const verificationPromises = Object.keys(domains).map(async (domainName) => {
+          if (!domains[domainName].validated) {
+            const verificationResult = await verifyDomainOwnership(domainName);
+            console.log("Resultado de verificación:", verificationResult);
+
+            if (verificationResult.success) {
+              domains[domainName].validated = verificationResult.validated;
+            }
+          }
+          return domains[domainName];
+        });
+
+        await Promise.all(verificationPromises);
         setDomains(domains);
       } else {
         console.error("Error fetching domains:", message);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyDomain = async (domainName) => {
+    setIsLoading(true);
+    try {
+      const result = await verifyDomainOwnership(domainName);
+      
+      if (result.success) {
+        // Actualizar solo el dominio específico en el estado
+        setDomains(prevDomains => ({
+          ...prevDomains,
+          [domainName]: {
+            ...prevDomains[domainName],
+            validated: result.validated,
+            lastChecked: result.timestamp
+          }
+        }));
+      } else {
+        console.error(`Error verificando ${domainName}:`, result.message);
+      }
+    } catch (error) {
+      console.error("Error en verificación:", error);
     } finally {
       setIsLoading(false);
     }
