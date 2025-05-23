@@ -84,7 +84,7 @@ export const getUserDomains = async (req: Request, res: Response) => {
       .get();
 
     if (domainsSnapshot.empty) {
-      res.status(200).json({ domains: [] });
+      res.status(200).json({});
       return;
     }
     const domains: Record<string, any> = {};

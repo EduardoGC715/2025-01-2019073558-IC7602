@@ -7,9 +7,18 @@ import ms from "ms";
 export const getAllSubdomains = async (req: Request, res: Response) => {
   try {
     const subdomainsRef = firestore.collection("subdomains");
-    const subdomains = subdomainsRef.get();
+    const subdomainsSnapshot = await subdomainsRef.get();
+    if (subdomainsSnapshot.empty) {
+      res.status(200).json({});
+      return;
+    }
+    const subdomains: Record<string, any> = {};
 
-    res.status(200).json({ subdomains });
+    subdomainsSnapshot.forEach((doc) => {
+      subdomains[doc.id] = doc.data();
+    });
+
+    res.status(200).json({ ...subdomains });
   } catch (error) {
     console.error("Error fetching user domains:", error);
     res.status(500).json({ message: "Internal server error" });
