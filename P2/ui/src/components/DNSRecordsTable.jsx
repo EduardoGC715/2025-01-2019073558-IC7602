@@ -102,13 +102,12 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
       const result = await verifyDomainOwnership(domainName);
       
       if (result.success) {
-        // Actualizar solo el dominio específico en el estado
         setDomains(prevDomains => ({
           ...prevDomains,
           [domainName]: {
             ...prevDomains[domainName],
-            validated: result.validated,
-            lastChecked: result.timestamp
+            validated: true, // Set to true if verification is successful
+            lastChecked: new Date().toISOString()
           }
         }));
       } else {
@@ -164,20 +163,21 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                       <td className="px-4 py-2">{domainData.validation?.subdomain || 'N/A'}</td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
-                          {domainData.validated ? (
-                            <span className="text-green-600">true</span>
-                          ) : (
-                            <>
-                              <span className="text-warning">false</span>
-                              <button
-                                onClick={refreshDomains}
-                                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                                disabled={isLoading}
-                              >
-                                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                              </button>
-                            </>
-                          )}
+                          <span className={domainData.validated ? "text-green-600" : "text-warning"}>
+                            {domainData.validated ? "true" : "false"}
+                          </span>
+                          <button
+                            onClick={() => handleVerifyDomain(domainName)}
+                            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                            disabled={isLoading}
+                          >
+                            <RefreshCw 
+                              size={16} 
+                              className={`${isLoading ? 'animate-spin' : ''} ${
+                                domainData.validated ? 'text-gray-400 hover:text-gray-600' : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                            />
+                          </button>
                         </div>
                       </td>
                       <td className="px-4 py-2">
