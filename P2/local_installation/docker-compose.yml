@@ -2,7 +2,7 @@ services:
   interceptor:
     image: "dandiego235/dns-interceptor:latest"
     ports:
-      - "6000:53/udp"
+      - "6053:53/udp"
     container_name: dns_interceptor
     networks:
       - shared-network
@@ -13,24 +13,13 @@ services:
   api:
     image: "dandiego235/dns-api:latest"
     ports:
-      - "443:443"
+      - "40443:443"
     container_name: dns_api
     networks:
       - shared-network
     environment:
       - DNS_SERVER=8.8.8.8
       - DNS_PORT=53
-    restart: unless-stopped
-  ui:
-    image: "davfer20/p1-ui:latest"
-    container_name: dns_ui
-    ports:
-      - "3000:80"
-    networks:
-      - shared-network
-    environment:
-      - REACT_APP_DNS_API=localhost
-      - REACT_APP_DNS_API_PORT=443
     restart: unless-stopped
 
 networks:
