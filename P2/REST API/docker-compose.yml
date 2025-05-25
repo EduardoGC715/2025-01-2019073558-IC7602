@@ -1,0 +1,9 @@
+version: "3.8"
+services:
+  pokemon-api:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./pokedex.json:/app/pokedex.json
+    restart: unless-stopped

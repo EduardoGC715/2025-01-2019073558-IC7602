@@ -1,0 +1,7 @@
+services:
+  apache1:
+    build:
+      context: .
+      dockerfile: Dockerfile1
+      tags:
+        - dandiego235/apache-po:1.0
