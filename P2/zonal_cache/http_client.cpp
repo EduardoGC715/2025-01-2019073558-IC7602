@@ -100,6 +100,8 @@ memory_struct *send_https_request(const char *url, const char * data, int length
     return NULL;
 }
 
+// Función para convertir una cadena a minúsculas
+// Obtenida de https://www.geeksforgeeks.org/conversion-whole-string-uppercase-lowercase-using-stl-c/
 std::string to_lowercase(const std::string& input) {
     std::string result = input;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
