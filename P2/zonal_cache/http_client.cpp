@@ -25,17 +25,18 @@ using namespace httpparser;
 static size_t write_callback(void * contents, size_t size, size_t nmemb, void * userp) {
     size_t realsize = size * nmemb;
     memory_struct *mem = (memory_struct *)userp;
-
+    // Asegurarse de que hay suficiente memoria para almacenar la respuesta
     char *ptr = (char *) realloc(mem->memory, mem->size + realsize + 1);
     if(ptr == NULL) {
-        printf("Not enough memory (realloc returned NULL)\n");
-        return 0; // Out of memory
+        printf("Not enough memory\n");
+        return 0; // Sin memoria
     }
 
+    // Asignar la memoria nueva y copiar los datos
     mem->memory = ptr;
     memcpy(&(mem->memory[mem->size]), contents, realsize);
     mem->size += realsize;
-    mem->memory[mem->size] = '\0'; // Null terminate the string
+    mem->memory[mem->size] = '\0'; // Null terminate el string
 
     return realsize;
 }
@@ -45,11 +46,13 @@ static size_t write_callback(void * contents, size_t size, size_t nmemb, void * 
 // https://curl.se/libcurl/c/http-post.html
 // https://curl.se/libcurl/c/https.html
 memory_struct *send_https_request(const char *url, const char * data, int length, unordered_map<string, string> headers_map) {
+    // Inicializar CURL
     CURL *curl;
     CURLcode res;
 
     curl = curl_easy_init();
     if(curl) {
+        // Estructura para almacenar la respuesta
         memory_struct * resp_mem = (memory_struct *) malloc(sizeof(memory_struct));
         if (!resp_mem) {
             perror("malloc failed");
@@ -59,6 +62,7 @@ memory_struct *send_https_request(const char *url, const char * data, int length
         resp_mem->memory = (char *) malloc(1); // Allocar memoria para la respuesta
         resp_mem->size = 0;
 
+        // Crear una lista de headers para la solicitud
         struct curl_slist *headers = NULL;
         for (const auto &header : headers_map) {
             string header_str = header.first + ": " + header.second;
@@ -81,7 +85,7 @@ memory_struct *send_https_request(const char *url, const char * data, int length
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
-        
+        // Realizar la solicitud
         res = curl_easy_perform(curl);
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
 
@@ -110,8 +114,10 @@ std::string to_lowercase(const std::string& input) {
 
 // Parser de HTTP es la biblioteca https://github.com/nekipelov/httpparser
 HttpRequest parse_http_request(const char * request_buffer, size_t size) {
+    // Header para acceder a headres más fácilmente
     unordered_map<string, string> headers = {};
     
+    // Crear un objeto request y un parser
     Request request;
     HttpRequestParser parser;
 
@@ -119,6 +125,8 @@ HttpRequest parse_http_request(const char * request_buffer, size_t size) {
     if (result == HttpRequestParser::ParsingCompleted) {
         std::cout << request.inspect() << std::endl;
         for (const auto &header : request.headers) {
+            // Convertir el nombre del header a minúsculas para un acceso más fácil y estándar
+            // El protocolo HTTP es case-insensitive.
             headers[to_lowercase(header.name)] = header.value;
         }
     } else {
@@ -131,6 +139,7 @@ HttpRequest parse_http_request(const char * request_buffer, size_t size) {
     return http_request;
 }
 
+// Enviar una respuesta HTTP de error al cliente
 void send_http_error_response (int client_socket, const std::string &error_message, int status_code) {
     std::string response = "HTTP/1.1 " + std::to_string(status_code) + " Error\r\n"
                            "Content-Type: text/plain\r\n"

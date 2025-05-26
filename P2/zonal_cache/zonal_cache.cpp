@@ -20,7 +20,7 @@
 using namespace std;
 using namespace rapidjson;
 
-#define HTTPS_PORT 443
+#define HTTP_PORT 80
 #define REQUEST_BUFFER_SIZE 8192
 
 // Referencias para threads:
@@ -32,6 +32,8 @@ Document subdomains;
 shared_mutex subdomain_mutex;
 
 
+// Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
+// Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
 void fetch_subdomains(const string &rest_api, const string &app_id, const string &api_key, const int &fetch_interval) {
     string url = rest_api + "/subdomain/all";
     unordered_map<string, string> headers_map = {
@@ -40,15 +42,21 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
         {"x-api-key", api_key}
     };
 
+    // Hilo que se ejecuta indefinidamente para obtener los subdominios.
     while (true) {
+        // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
         memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
         if (response && response->status_code == 200) {
+            // Documento temporal para almacenar la respuesta JSON.
             Document temp;
             if (!temp.Parse(response->memory).HasParseError()) {
+                // Si la respuesta es válida, intercambiar el objeto Document subdomains con el temporal.
+                // Esto asegura que el objeto subdomains se actualice de manera segura en un entorno multihilo.
                 unique_lock<shared_mutex> lock(subdomain_mutex);
                 subdomains.Swap(temp);
                 lock.unlock();
 
+                // Escribir los subdominios. Para debugging.
                 StringBuffer buffer;
                 Writer<StringBuffer> writer(buffer);
                 subdomains.Accept(writer);
@@ -69,23 +77,28 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
     }
 }
 
+// Función para procesar una solicitud HTTP entrante.
 void handle_http_request(const int client_socket, const string &rest_api, const string &app_id, const string &api_key) {
     cout << "Handling HTTP request on socket: " << client_socket << endl;
+    // Buffer para almacenar la solicitud HTTP entrante.
     char * request_buffer = (char *) malloc(REQUEST_BUFFER_SIZE * sizeof(char));
     if (!request_buffer) {
         perror("malloc failed");
         close(client_socket);
         return;
     }
+    // Variable para determinar si la conexión debe mantenerse viva.
+    // Se establece con el header de Connection: keep-alive
+    // Si no se encuentra el header, se cierra la conexión después de enviar la respuesta.
     bool keep_alive = false;
     do {
-        // Receive the HTTP request
+        // Recibir la solicitud HTTP del cliente.
         ssize_t bytes_received = recv(client_socket, request_buffer, REQUEST_BUFFER_SIZE - 1, 0);
         if (bytes_received > 0){
-            request_buffer[bytes_received] = '\0'; // Null-terminate the request
+            request_buffer[bytes_received] = '\0'; // Null-terminate la request
             cout << "Received request: " << request_buffer << endl;
 
-            // Parse the HTTP request
+            // Parsear la HTTP request
             HttpRequest request;
             try {
                 request = parse_http_request(request_buffer, bytes_received);
@@ -102,6 +115,8 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             } else {
                 keep_alive = false;
             }
+            
+            // Enviar respuesta HTTP 200 OK
             string response = "HTTP/1.1 200 OK\r\n"
                                 "Content-Type: application/json\r\n"
                                 "Content-Length: " + to_string(37) + "\r\n"
@@ -125,6 +140,7 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
 
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
+    // Leer variables de entorno
     const char* rest_api_env = getenv("REST_API");
     const char* app_id_env = getenv("APP_ID");
     const char* api_key_env = getenv("API_KEY");
@@ -143,12 +159,14 @@ int main() {
             fetch_subdomains(rest_api, app_id, api_key, fetch_interval);
         }).detach();
 
+    
+    // Abrir socket para escuchar solicitudes HTTP
     int socket_fd;
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(HTTPS_PORT); // HTTPS port
+    server_addr.sin_port = htons(HTTP_PORT); // HTTP port
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
@@ -163,7 +181,7 @@ int main() {
         return 1;
     }
 
-    cout << "Zonal cache is running on port " << HTTPS_PORT << "...\n";
+    cout << "Zonal cache is running on port " << HTTP_PORT << "...\n";
 
     // Inicialización CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -171,13 +189,15 @@ int main() {
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-
+        
+        // Aceptar conexiones entrantes
         int client_socket = accept(socket_fd, (struct sockaddr *)&client_addr, &client_len);
         if (client_socket < 0) {
             perror("Accept failed");
             continue;
         }
 
+        // Crear un thread para manejar la solicitud HTTP
         thread([client_socket, &rest_api, &app_id, &api_key]() {
             handle_http_request(client_socket, rest_api, app_id, api_key);
         }).detach();
