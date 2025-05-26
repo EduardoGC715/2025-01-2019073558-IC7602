@@ -148,7 +148,7 @@ int main() {
     
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(HTTPS_PORT); // DNS port
+    server_addr.sin_port = htons(HTTPS_PORT); // HTTPS port
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {

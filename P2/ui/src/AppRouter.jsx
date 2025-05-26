@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useSearchParams,
 } from "react-router-dom";
 import NavBar from "./components/Navbar";
 import Login from "./components/Login";
@@ -16,53 +17,62 @@ import SubdomainRegisterCard from "./components/SubdomainRegisterCard";
 
 function AppRouter() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-
+  const [searchParams] = useSearchParams();
+  const subdomain = searchParams.get("subdomain");
+  console.log("Subdomain:", subdomain);
   return (
-    <Router>
-      <div className="min-h-screen bg-light">
+    <div className="min-h-screen bg-light">
+      {!subdomain && (
         <NavBar isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
+      )}
 
-        <div className="py-10">
-          <main>
-            <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-              <Routes>
+      <div className="py-10">
+        <main>
+          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  isLoggedIn ? (
+                    <Navigate to="/dashboard" />
+                  ) : (
+                    <Login
+                      isLoggedIn={isLoggedIn}
+                      setIsLoggedIn={setIsLoggedIn}
+                      subdomain={subdomain}
+                    />
+                  )
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  isLoggedIn ? <Navigate to="/dashboard" /> : <Register />
+                }
+              />
+              <Route
+                path="/change-password"
+                element={<Register title="Cambiar contraseña" />}
+              />
+              <Route element={<ProtectedRoutes />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/register-dns" element={<DNSRegisterCard />} />
+              </Route>
+              <Route element={<ProtectedRoutes />}>
                 <Route
-                  path="/"
-                  element={
-                    isLoggedIn ? (
-                      <Navigate to="/dashboard" />
-                    ) : (
-                      <Login
-                        isLoggedIn={isLoggedIn}
-                        setIsLoggedIn={setIsLoggedIn}
-                      />
-                    )
-                  }
+                  path="/domains/:domain/subdomains"
+                  element={<SubdomainsDashboard />}
                 />
                 <Route
-                  path="/register"
-                  element={
-                    isLoggedIn ? <Navigate to="/dashboard" /> : <Register />
-                  }
+                  path="/domains/:domain/subdomains/register"
+                  element={<SubdomainRegisterCard />}
                 />
-                <Route
-                  path="/change-password"
-                  element={<Register title="Cambiar contraseña" />}
-                />
-                <Route element={<ProtectedRoutes />}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/register-dns" element={<DNSRegisterCard />} />
-                </Route>
-                <Route element={<ProtectedRoutes />}>
-                  <Route path="/domains/:domain/subdomains" element={<SubdomainsDashboard />}/>
-                  <Route path="/domains/:domain/subdomains/register" element={<SubdomainRegisterCard />}/>
-                </Route>
-              </Routes>
-            </div>
-          </main>
-        </div>
+              </Route>
+            </Routes>
+          </div>
+        </main>
       </div>
-    </Router>
+    </div>
   );
 }
 

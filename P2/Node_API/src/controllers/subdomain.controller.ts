@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { firestore, database } from "../firebase";
 import { WriteBatch } from "firebase-admin/firestore";
 import validator from "validator";
-import ms from "ms";
+import ms, { StringValue } from "ms";
+import bcrypt from "bcryptjs";
 
 export const getAllSubdomains = async (req: Request, res: Response) => {
   try {
@@ -25,6 +26,19 @@ export const getAllSubdomains = async (req: Request, res: Response) => {
   }
 };
 
+interface registerSubdomainRequestBody {
+  subdomain: string;
+  domain: string;
+  cacheSize: number;
+  fileTypes: string[];
+  ttl: StringValue; // Duration in ms format
+  replacementPolicy: string; // e.g., "LRU", "LFU", etc.
+  authMethod: string; // e.g., "api-keys", "user-password", "none"
+  apiKeys?: Record<string, boolean>; // apiKey: true
+  users?: Record<string, string>; // username: password
+  destination: string; // e.g., "https://example.com"
+}
+
 export const registerSubdomain = async (req: Request, res: Response) => {
   try {
     const session = req.session;
@@ -44,7 +58,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       apiKeys,
       users,
       destination,
-    } = req.body;
+    }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
 
     if (typeof subdomain !== "string" || !domain) {
       res
@@ -131,6 +145,23 @@ export const registerSubdomain = async (req: Request, res: Response) => {
         });
         return;
       }
+      Object.entries(users).forEach(([username, password]) => {
+        if (
+          username ||
+          typeof username !== "string" ||
+          password ||
+          password !== "string"
+        ) {
+          res.status(400).json({
+            message:
+              'Cada usuario debe tener un "username" y un "password" válidos',
+          });
+          return;
+        }
+        const salt = bcrypt.genSaltSync(10);
+        const hashedPassword = bcrypt.hashSync(password, salt);
+        users[username] = hashedPassword;
+      });
     } else if (!authMethod || authMethod === "none") {
       if (
         (Array.isArray(apiKeys) && apiKeys.length > 0) ||

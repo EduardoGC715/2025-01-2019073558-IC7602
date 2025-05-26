@@ -13,7 +13,7 @@ const createSession = async (
   try {
     const expirationMs = ms(expiration);
     if (isNaN(expirationMs)) {
-      return { message: "Invalid expiration time" };
+      return "";
     }
 
     const now = new Date(Date.now());
@@ -27,7 +27,7 @@ const createSession = async (
     const sessionsRef = await firestore.collection("sessions").add(sessionData);
     const sessionId = sessionsRef.id;
     if (!sessionId) {
-      return { message: "Failed to create session" };
+      return "";
     }
     const token = jwt.sign(
       { user, domain, sessionId },
@@ -38,7 +38,7 @@ const createSession = async (
     return token;
   } catch (error) {
     console.error("Error creating session:", error);
-    return null;
+    return "";
   }
 };
 
@@ -66,7 +66,7 @@ export const registerUser = async (
     const expiration = "1h";
     const token = await createSession(username, "domain_ui", expiration);
     if (!token) {
-      res.status(500).json({ message: "Error creating session" });
+      res.status(500).json({ message: "Error al crear la sesión" });
       return;
     }
     res.cookie("token", token, {
@@ -74,7 +74,7 @@ export const registerUser = async (
       sameSite: "none",
       secure: true,
     });
-    res.status(201).json({ message: "User registered successfully", token });
+    res.status(201).json({ message: "Usuario registrado exitosamente", token });
   } catch (error) {
     console.error("Error al registrar el usuario:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -105,7 +105,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     const expiration = "1h";
     const token = await createSession(username, "domain_ui", expiration);
     if (!token) {
-      res.status(500).json({ message: "Failed to create session" });
+      res.status(500).json({ message: "Error al crear sesión" });
       return;
     }
     res.cookie("token", token, {
@@ -114,6 +114,79 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       secure: true,
     });
     res.status(200).json({ token });
+  } catch (error) {
+    console.error("Error logging in user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const loginSubdomainUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { username, password, subdomain } = req.body;
+    console.log(username, password, subdomain);
+    let subdomainURL: URL;
+    try {
+      subdomainURL = new URL(subdomain);
+    } catch (error) {
+      console.error("Invalid subdomain URL:", error);
+      res.status(400).json({ message: "URL del subdominio inválido" });
+      return;
+    }
+    const docRef = firestore
+      .collection("subdomains")
+      .doc(subdomainURL.hostname);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      res.status(401).json({ message: "Unauthorized. No domain." });
+      return;
+    }
+
+    const subdomainData = doc.data();
+    if (!subdomainData) {
+      res.status(500).json({ message: "Internal server error" });
+      return;
+    }
+
+    if (subdomainData.authMethod != "user-password") {
+      res.status(401).json({
+        message:
+          "Unauthorized, subdominio requiere autenticación con usuario y contraseña",
+      });
+      return;
+    }
+
+    console.log("Subdomain data:", subdomainData);
+    const userPassword = subdomainData.users?.[username];
+    if (!userPassword) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+    const isPasswordValid = bcrypt.compareSync(password, userPassword);
+    if (!isPasswordValid) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const expiration = "1h";
+    const token = await createSession(username, subdomain, expiration);
+    if (!token) {
+      res.status(500).json({ message: "Error al crear sesión" });
+      return;
+    }
+    // res.cookie("token", token, {
+    //   maxAge: ms(expiration),
+    //   sameSite: "none",
+    //   secure: true,
+    //   httpOnly: true,
+    //   domain: subdomainData.domain,
+    // });
+    const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
+    redirectURL.searchParams.set("token", token);
+    redirectURL.searchParams.set("next", subdomain);
+    res.status(200).json({ url: redirectURL.toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -140,6 +213,18 @@ export const logoutUser = async (
     secure: true,
   });
   res.status(200).json({ message: "Session removed" });
+};
+
+export const validateSubdomainSession = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const session = req.session;
+  if (!session || !session.user || !session.domain) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+  res.status(200).send("OK");
 };
 
 /* Referencias:
