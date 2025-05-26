@@ -149,6 +149,10 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
   const { session } = req;
   const { domain } = req.params;
 
+  if (!session || !session.user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
   try {
     const domainRef = firestore
       .collection("users")
@@ -169,10 +173,12 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
     const txtRecords: string[][] = await dns.resolveTxt(fullDomain);
 
     if (!txtRecords.length) {
-      return res.status(404).json({ message: "No se encontró el registro TXT" });
+      return res
+        .status(404)
+        .json({ message: "No se encontró el registro TXT" });
     }
 
-    const receivedToken = txtRecords[0][0].replace(/"/g, '');
+    const receivedToken = txtRecords[0][0].replace(/"/g, "");
 
     if (receivedToken !== token) {
       return res.status(400).json({ message: "Token no coincide" });
@@ -180,12 +186,8 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
     console.log("=== Token válido ===");
     res.status(200).json({ message: "Dominio verificado correctamente" });
-
   } catch (err) {
     console.error("Error al verificar dominio:", err);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
-
-
-
