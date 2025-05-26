@@ -223,7 +223,7 @@ export const loginSubdomainUser = async (
     const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
     redirectURL.searchParams.set("token", token);
     redirectURL.searchParams.set("next", subdomain);
-    redirectURL.searchParams.set("type", "user");
+    redirectURL.searchParams.set("exp", ms(expiration).toString());
     res.status(200).json({ url: redirectURL.toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
@@ -288,7 +288,7 @@ export const loginSubdomainApiKey = async (req: Request, res: Response) => {
     const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
     redirectURL.searchParams.set("token", token);
     redirectURL.searchParams.set("next", subdomain);
-    redirectURL.searchParams.set("type", "api-key");
+    redirectURL.searchParams.set("exp", ms(expiration).toString());
     res.status(200).json({ url: redirectURL.toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
@@ -323,7 +323,7 @@ export const validateSubdomainSession = async (
   res: Response
 ): Promise<void> => {
   const session = req.session;
-  if (!session || !session.user || !session.domain) {
+  if (!session) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
