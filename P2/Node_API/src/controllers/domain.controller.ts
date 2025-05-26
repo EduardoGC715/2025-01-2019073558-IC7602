@@ -8,7 +8,7 @@ import {
 } from "unique-names-generator";
 import { randomUUID } from "crypto";
 import validator from "validator";
-import { promises as dns } from 'dns';
+import * as dns from "dns/promises";
 
 const customConfig: Config = {
   dictionaries: [adjectives, animals],
@@ -146,105 +146,46 @@ export const deleteDomain = async (req: Request, res: Response) => {
 };
 
 export const verifyDomainOwnership = async (req: Request, res: Response) => {
+  const { session } = req;
+  const { domain } = req.params;
+
   try {
-    const { session } = req;
-    const { domain } = req.params;
-
-    console.log('Dominio a verificar:', domain);
-
-    if (!session || !session.user) {
-      console.log('Error: Usuario no autenticado');
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
-
-    if (!domain) {
-      console.log('Error: Dominio no proporcionado');
-      res.status(400).json({ message: "Dominio requerido" });
-      return;
-    }
-
-    const userDomainRef = firestore
+    const domainRef = firestore
       .collection("users")
       .doc(session.user)
       .collection("domains")
       .doc(domain);
 
-    const domainDoc = await userDomainRef.get();
+    const domainSnap = await domainRef.get();
+    const data = domainSnap.data();
 
-    if (!domainDoc.exists) {
-      console.log('Error: Documento no encontrado en Firestore');
-      res.status(404).json({ message: "Dominio no encontrado" });
-      return;
+    if (!data?.validation) {
+      return res.status(400).json({ message: "Faltan datos de validación" });
     }
 
-    const domainData = domainDoc.data();
-    const { validation, validated } = domainData!;
+    const { subdomain, token } = data.validation;
+    const fullDomain = `${subdomain}.${domain}`;
 
-    console.log('Datos del dominio en Firebase:', {
-      validation,
-      validated,
-      fullData: domainData
-    });
+    const txtRecords: string[][] = await dns.resolveTxt(fullDomain);
 
-    if (validated) {
-      console.log('Dominio ya validado previamente');
-      res.status(200).json({
-        message: "Dominio ya está validado",
-        validated: true
-      });
-      return;
+    if (!txtRecords.length) {
+      return res.status(404).json({ message: "No se encontró el registro TXT" });
     }
 
-    const fullDomain = `${validation.subdomain}.${domain}`;
-    console.log('\n=== Verificación DNS ===');
-    console.log('Dominio completo a verificar:', fullDomain);
-    console.log('Token esperado:', validation.token);
+    const receivedToken = txtRecords[0][0].replace(/"/g, '');
 
-    try {
-      const txtRecords = await dns.resolveTxt(fullDomain);
-
-      console.log('\nRegistros TXT encontrados:', JSON.stringify(txtRecords, null, 2));
-
-      txtRecords.forEach((records, index) => {
-        console.log(`\nRegistro TXT #${index + 1}:`, records);
-        records.forEach((record, i) => {
-          console.log(`  Valor ${i + 1}:`, record);
-          console.log(`  ¿Coincide con token?:`, record === validation.token);
-        });
-      });
-
-      const hasValidToken = txtRecords.some(records =>
-        records.some(record => record === validation.token)
-      );
-      console.log('Token válido encontrado:', hasValidToken);
-
-      if (hasValidToken) {
-        console.log('Actualizando estado en Firestore...');
-        await userDomainRef.update({ validated: true });
-        console.log('Estado actualizado exitosamente');
-
-        res.status(200).json({
-          message: "Dominio validado exitosamente",
-          validated: true
-        });
-      } else {
-        res.status(400).json({
-          message: "Token de validación no encontrado en registros TXT",
-          validated: false
-        });
-      }
-    } catch (dnsError) {
-      console.error('\nError al consultar DNS:', dnsError);
-      res.status(400).json({
-        message: "No se pudo verificar los registros TXT del dominio",
-        validated: false,
-      });
+    if (receivedToken !== token) {
+      return res.status(400).json({ message: "Token no coincide" });
     }
 
-  } catch (error) {
-    console.error("\n=== Error general ===");
-    console.error(error);
-    res.status(500).json({ message: "Internal server error" });
+    console.log("=== Token válido ===");
+    res.status(200).json({ message: "Dominio verificado correctamente" });
+
+  } catch (err) {
+    console.error("Error al verificar dominio:", err);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
+
+
