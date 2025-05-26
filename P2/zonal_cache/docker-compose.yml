@@ -17,7 +17,7 @@ services:
     working_dir: /app
     tty: true # Keep container open for interactive shell
     ports:
-      - "443:443"
+      - "80:80"
     environment:
       REST_API: "https://host.docker.internal:3000"
       APP_ID: "zonal_cache_dev"
