@@ -6,7 +6,7 @@ import {
   Navigate,
   useSearchParams,
 } from "react-router-dom";
-import NavBar from "./components/Navbar";
+import NavBar from "./components/NavBar";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import Dashboard from "./components/Dashboard";
@@ -61,10 +61,18 @@ function AppRouter() {
                 <Route path="/register-dns" element={<DNSRegisterCard />} />
               </Route>
               <Route element={<ProtectedRoutes />}>
-                  <Route path="/domains/:domain/subdomains" element={<SubdomainsDashboard />}/>
-                  <Route path="/domains/:domain/subdomains/register" element={<SubdomainForm />}/>
-                  <Route path="/domains/:domain/subdomains/:subdomain" element={<SubdomainForm />}/>
-
+                <Route
+                  path="/domains/:domain/subdomains"
+                  element={<SubdomainsDashboard />}
+                />
+                <Route
+                  path="/domains/:domain/subdomains/register"
+                  element={<SubdomainForm />}
+                />
+                <Route
+                  path="/domains/:domain/subdomains/:subdomain"
+                  element={<SubdomainForm />}
+                />
               </Route>
             </Routes>
           </div>
