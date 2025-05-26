@@ -31,6 +31,9 @@ Document subdomains;
 // https://en.cppreference.com/w/cpp/thread/shared_mutex
 shared_mutex subdomain_mutex;
 
+Document cache;
+cache.SetObject();
+Document::AllocatorType& allocator = cache.GetAllocator();
 
 // Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
 // Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
@@ -75,6 +78,16 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
             this_thread::sleep_for(chrono::seconds(20));
         }
     }
+}
+
+string get_response(HttpRequest request){  
+    string method = request.method;
+    string uri = request.uri;
+    // Check caches for requests
+    Value httpRequestKey(kObjectType);
+    
+
+    // If not found, fetch the real domain or IP address
 }
 
 // Función para procesar una solicitud HTTP entrante.
