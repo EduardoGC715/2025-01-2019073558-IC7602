@@ -1,14 +1,15 @@
 import React from 'react';
 
-function DeleteConfirmationModal({ isOpen, onClose, onConfirm, domain }) {
+function DeleteConfirmationModal({ isOpen, onClose, onConfirm, name, type }) {
   if (!isOpen) return null;
 
+  const typeText = type === 'subdomain' ? 'subdominio' : 'dominio';
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
         <h3 className="text-lg font-semibold mb-4">Confirmar Eliminación</h3>
         <p className="mb-6">
-          ¿Estás seguro que deseas eliminar el dominio <span className="font-semibold">{domain}</span>?
+          ¿Estás seguro que deseas eliminar el {typeText} <span className="font-semibold">{name}</span>?
         </p>
         <div className="flex justify-end gap-4">
           <button

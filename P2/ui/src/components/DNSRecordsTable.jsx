@@ -126,7 +126,8 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, record: null })}
         onConfirm={handleConfirmDelete}
-        domain={deleteModal.record?.domain}
+        name={deleteModal.record?.domain}
+        type="dominio"
       />
       <div className="bg-light shadow-md rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b">

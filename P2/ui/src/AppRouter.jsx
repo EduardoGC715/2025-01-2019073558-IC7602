@@ -13,7 +13,7 @@ import Dashboard from "./components/Dashboard";
 import DNSRegisterCard from "./components/DNSRegisterCard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 import SubdomainsDashboard from "./components/SubdomainsDashboard";
-import SubdomainRegisterCard from "./components/SubdomainRegisterCard";
+import SubdomainForm from "./components/SubdomainForms";
 
 function AppRouter() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -61,14 +61,10 @@ function AppRouter() {
                 <Route path="/register-dns" element={<DNSRegisterCard />} />
               </Route>
               <Route element={<ProtectedRoutes />}>
-                <Route
-                  path="/domains/:domain/subdomains"
-                  element={<SubdomainsDashboard />}
-                />
-                <Route
-                  path="/domains/:domain/subdomains/register"
-                  element={<SubdomainRegisterCard />}
-                />
+                  <Route path="/domains/:domain/subdomains" element={<SubdomainsDashboard />}/>
+                  <Route path="/domains/:domain/subdomains/register" element={<SubdomainForm />}/>
+                  <Route path="/domains/:domain/subdomains/:subdomain" element={<SubdomainForm />}/>
+
               </Route>
             </Routes>
           </div>

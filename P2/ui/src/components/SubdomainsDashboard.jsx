@@ -17,13 +17,33 @@ function SubdomainsDashboard() {
     const fetchSubdomains = async () => {
         setIsLoading(true);
         try {
-        const records = await getSubdomainsByDomain(domain);
-        setSubdomains(records);
+          const dataObj = await getSubdomainsByDomain(domain);
+          const records = Object.entries(dataObj).map(([full, info]) => {
+            const suffix = `.${domain}`;
+            const sub = full.endsWith(suffix)
+              ? full.slice(0, full.length - suffix.length)
+              : full;
+            return { subdomain: sub, domain, ...info };
+          });
+          setSubdomains(records);
         } catch (err) {
         console.error('Error fetching subdomains:', err);
         } finally {
         setIsLoading(false);
         }
+    };
+
+    const handleDelete = async (rec) => {
+    const confirm = window.confirm(`¿Estás seguro de eliminar ${rec.subdomain}.${rec.domain}?`);
+    if (!confirm) return;
+
+    const result = await deleteSubdomainAPI(rec.domain, rec.subdomain);
+    if (result.success) {
+        alert(result.message);
+        setSubdomains((prev) => prev.filter(s => s.subdomain !== rec.subdomain));
+    } else {
+        alert(result.message);
+    }
     };
 
     return (
@@ -54,7 +74,7 @@ function SubdomainsDashboard() {
                     <div className="animate-spin h-8 w-8 border-b-2 rounded-full"></div>
                     </div>
                 ) : (
-                    <SubdomainsRecordsTable subdomains={subdomains} />
+                    <SubdomainsRecordsTable subdomains={subdomains}   onDelete={handleDelete} />
                 )}
             </div>
         </div>
