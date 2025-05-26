@@ -48,14 +48,22 @@ export const loginUser = async (userData) => {
   }
 };
 
-export const loginSubdomainUser = async (userData) => {
+export const loginSubdomain = async (userData, authMethod) => {
   try {
-    const response = await api.post("/auth/login/subdomain", userData, {
-      withCredentials: true,
-    });
-    console.log("Response from loginSubdomainUser:", response);
+    let response;
+    if (authMethod === "user") {
+      response = await api.post("/auth/login/subdomain/user", userData, {
+        withCredentials: true,
+      });
+    } else if (authMethod === "apiKey") {
+      response = await api.post("/auth/login/subdomain/apikey", userData, {
+        withCredentials: true,
+      });
+    } else {
+      throw new Error("Tipo de autenticación no soportado");
+    }
+    console.log("Response from loginSubdomain", response);
     if (response.status === 200 && response.data.url) {
-      console.log("HERE2");
       // setAuthToken(response.data.token);
       window.location.href = response.data.url;
       // Esto redirige al usuario a la URL proporcionada por el backend

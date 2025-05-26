@@ -19,7 +19,8 @@ function AppRouter() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchParams] = useSearchParams();
   const subdomain = searchParams.get("subdomain");
-  console.log("Subdomain:", subdomain);
+  const authMethod = searchParams.get("authMethod");
+  console.log("Subdomain:", subdomain, "Auth Method:", authMethod);
   return (
     <div className="min-h-screen bg-light">
       {!subdomain && (
@@ -40,6 +41,7 @@ function AppRouter() {
                       isLoggedIn={isLoggedIn}
                       setIsLoggedIn={setIsLoggedIn}
                       subdomain={subdomain}
+                      authMethod={authMethod}
                     />
                   )
                 }
