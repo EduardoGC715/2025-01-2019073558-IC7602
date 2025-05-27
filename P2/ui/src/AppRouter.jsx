@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import Login from "./components/Login";
+import LoginSubdomain from "./components/LoginSubdomain";
 import Register from "./components/Register";
 import Dashboard from "./components/Dashboard";
 import DNSRegisterCard from "./components/DNSRegisterCard";
@@ -20,7 +21,6 @@ function AppRouter() {
   const [searchParams] = useSearchParams();
   const subdomain = searchParams.get("subdomain");
   const authMethod = searchParams.get("authMethod");
-  console.log("Subdomain:", subdomain, "Auth Method:", authMethod);
   return (
     <div className="min-h-screen bg-light">
       {!subdomain && (
@@ -40,10 +40,17 @@ function AppRouter() {
                     <Login
                       isLoggedIn={isLoggedIn}
                       setIsLoggedIn={setIsLoggedIn}
-                      subdomain={subdomain}
-                      authMethod={authMethod}
                     />
                   )
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <LoginSubdomain
+                    subdomain={subdomain}
+                    authMethod={authMethod}
+                  />
                 }
               />
               <Route

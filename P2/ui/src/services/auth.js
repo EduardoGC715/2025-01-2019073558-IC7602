@@ -51,11 +51,11 @@ export const loginUser = async (userData) => {
 export const loginSubdomain = async (userData, authMethod) => {
   try {
     let response;
-    if (authMethod === "user") {
+    if (authMethod === "user-password") {
       response = await api.post("/auth/login/subdomain/user", userData, {
         withCredentials: true,
       });
-    } else if (authMethod === "apiKey") {
+    } else if (authMethod === "api-keys") {
       response = await api.post("/auth/login/subdomain/apikey", userData, {
         withCredentials: true,
       });

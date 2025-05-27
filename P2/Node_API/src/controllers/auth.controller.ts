@@ -273,7 +273,7 @@ export const loginSubdomainApiKey = async (req: Request, res: Response) => {
     }
 
     const expiration = "1h";
-    const token = await createSessionUser(apiKey, subdomain, expiration);
+    const token = await createSessionApiKey(apiKey, subdomain, expiration);
     if (!token) {
       res.status(500).json({ message: "Error al crear sesión" });
       return;

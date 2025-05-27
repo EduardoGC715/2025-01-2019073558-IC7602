@@ -2,9 +2,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
-import { loginUser, loginSubdomain } from "../services/auth";
+import { loginUser } from "../services/auth";
 import { useNavigate } from "react-router-dom";
-function Login({ isLoggedIn, setIsLoggedIn, subdomain, authMethod }) {
+function Login({ isLoggedIn, setIsLoggedIn }) {
   const navigate = useNavigate();
   const schema = z.object({
     username: z.string().min(4, "El nombre de usuario es requerido"),
@@ -26,20 +26,12 @@ function Login({ isLoggedIn, setIsLoggedIn, subdomain, authMethod }) {
     console.log("Datos de inicio de sesión:", data);
 
     try {
-      if (!subdomain) {
-        const result = await loginUser(data);
-        if (result.success) {
-          setIsLoggedIn(true);
-          navigate("/dashboard");
-        } else {
-          alert(result.message);
-        }
+      const result = await loginUser(data);
+      if (result.success) {
+        setIsLoggedIn(true);
+        navigate("/dashboard");
       } else {
-        data.subdomain = subdomain;
-        const result = await loginSubdomain(data, authMethod);
-        if (!result.success) {
-          alert(result.message);
-        }
+        alert(result.message);
       }
     } catch (error) {
       console.log(error);

@@ -23,3 +23,4 @@ services:
       APP_ID: "zonal_cache_dev"
       API_KEY: "12345"
       FETCH_INTERVAL: "1"
+      VERCEL_UI: "http://localhost:5173"

@@ -51,35 +51,35 @@ module "dns_instance" {
   subnet_id = module.networking.public_subnet_id
 }
 
-data "template_file" "ui_docker_compose" {
-  template = file("${path.module}/scripts/docker-compose-ui.tpl.yml")
-  vars = {
-    dns_api_host = coalesce(var.api_host, module.dns_instance.public_ip)
-    dns_api_port = var.api_port
-  }
-}
-# https://developer.hashicorp.com/terraform/language/functions/coalesce
+# data "template_file" "ui_docker_compose" {
+#   template = file("${path.module}/scripts/docker-compose-ui.tpl.yml")
+#   vars = {
+#     dns_api_host = coalesce(var.api_host, module.dns_instance.public_ip)
+#     dns_api_port = var.api_port
+#   }
+# }
+# # https://developer.hashicorp.com/terraform/language/functions/coalesce
 
-module "ui_instance" {
-  source  = "./modules/ui_instance"
-  aws_ami = var.aws_ami
+# module "ui_instance" {
+#   source  = "./modules/ui_instance"
+#   aws_ami = var.aws_ami
 
-  user_data = templatefile("${path.module}/scripts/install_ui.tftpl", {
-    DOCKER_COMPOSE_YML = data.template_file.ui_docker_compose.rendered
-  })
+#   user_data = templatefile("${path.module}/scripts/install_ui.tftpl", {
+#     DOCKER_COMPOSE_YML = data.template_file.ui_docker_compose.rendered
+#   })
 
-  vpc_id    = module.networking.vpc_id
-  subnet_id = module.networking.public_subnet_id
-}
+#   vpc_id    = module.networking.vpc_id
+#   subnet_id = module.networking.public_subnet_id
+# }
 
-module "checker_instance" {
-  source  = "./modules/checker_instance"
-  aws_ami = var.aws_ami
+# module "checker_instance" {
+#   source  = "./modules/checker_instance"
+#   aws_ami = var.aws_ami
 
-  user_data = templatefile("${path.module}/scripts/install_checkers.tftpl", {
-    checkers = var.checkers
-  })
+#   user_data = templatefile("${path.module}/scripts/install_checkers.tftpl", {
+#     checkers = var.checkers
+#   })
 
-  vpc_id    = module.networking.vpc_id
-  subnet_id = module.networking.public_subnet_id
-}
+#   vpc_id    = module.networking.vpc_id
+#   subnet_id = module.networking.public_subnet_id
+# }
