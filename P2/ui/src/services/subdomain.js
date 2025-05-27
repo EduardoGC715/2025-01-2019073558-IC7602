@@ -26,7 +26,6 @@ export const createSubdomain = async (domain, subdomainData) => {
         message: "Subdominio registrado exitosamente",
       };
     }
-
     return {
       success: false,
       message: response.data?.message || "Error al registrar subdominio",

@@ -90,15 +90,9 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     }
 
     // Validar que ttl sea compatible con ms
-    try {
-      const ttlMs = ms(ttl);
-      if (typeof ttlMs !== "number" || ttlMs <= 0) {
-        throw new Error();
-      }
-    } catch {
+    if (typeof ttl !== "number" || Number.isNaN(ttl) || ttl <= 0) {
       res.status(400).json({
-        message:
-          'El Time to Live debe ser una duración válida (por ejemplo, "5m", "1h")',
+        message: "El Time to Live debe ser un número de milisegundos positivo",
       });
       return;
     }
@@ -116,14 +110,14 @@ export const registerSubdomain = async (req: Request, res: Response) => {
 
     // Validar lógica de authMethod
     if (authMethod === "api-keys") {
-      if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
+      if (typeof apiKeys !== 'object' ||  apiKeys === null || Array.isArray(apiKeys) || Object.keys(apiKeys).length === 0) {
         res.status(400).json({
           message:
             'Debe proporcionar llaves de autenticación cuando el método de autenticación sea por API keys"',
         });
         return;
       }
-      if (Array.isArray(users) && users.length > 0) {
+      if (typeof users === "object" && users !== null && !Array.isArray(users) && Object.keys(users).length > 0) {
         res.status(400).json({
           message:
             "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys",
@@ -131,7 +125,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
         return;
       }
     } else if (authMethod === "user-password") {
-      if (!Array.isArray(users) || users.length === 0) {
+      if (typeof users !== 'object' || users === null || Array.isArray(users) || Object.keys(users).length === 0) {
         res.status(400).json({
           message:
             'Debe proporcionar usuarios cuando el método de autenticación sea por usuario y password"',
@@ -145,23 +139,17 @@ export const registerSubdomain = async (req: Request, res: Response) => {
         });
         return;
       }
-      Object.entries(users).forEach(([username, password]) => {
-        if (
-          username ||
-          typeof username !== "string" ||
-          password ||
-          password !== "string"
-        ) {
+      for (const [username, password] of Object.entries(users)) {
+        if (!username || typeof password !== "string") {
           res.status(400).json({
-            message:
-              'Cada usuario debe tener un "username" y un "password" válidos',
+            message: 'Cada usuario debe tener un "username" y un "password" válidos',
           });
-          return;
+          return
         }
+      
         const salt = bcrypt.genSaltSync(10);
-        const hashedPassword = bcrypt.hashSync(password, salt);
-        users[username] = hashedPassword;
-      });
+        users[username] = bcrypt.hashSync(password, salt);
+      }
     } else if (!authMethod || authMethod === "none") {
       if (
         (Array.isArray(apiKeys) && apiKeys.length > 0) ||
@@ -283,14 +271,14 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       apiKeys,
       users,
       destination,
-    } = req.body;
+    }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;  
 
-    if (!subdomain || !domain) {
+    if (typeof subdomain !== "string" || !domain) {
       res.status(400).json({ message: "El subdominio y el dominio son requeridos" });
       return
     }
 
-    if (!validator.isFQDN(subdomain, { require_tld: false })) {
+    if (subdomain !== "" && !validator.isFQDN(subdomain, { require_tld: false })) {
       res.status(400).json({ message: "Subdominio inválido" });
       return
     }
@@ -306,14 +294,11 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return
     }
 
-    try {
-      const ttlMs = ms(ttl);
-      if (typeof ttlMs !== "number" || ttlMs <= 0) throw new Error();
-    } catch {
+    if (typeof ttl !== "number" || Number.isNaN(ttl) || ttl <= 0) {
       res.status(400).json({
-        message: 'El Time to Live debe ser una duración válida (por ejemplo, "5m", "1h")',
+        message: "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)",
       });
-      return
+      return;
     }
 
     const allowedPolicies = ["LRU", "LFU", "FIFO", "MRU", "Random"];
@@ -325,7 +310,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
     }
 
     if (authMethod === "api-keys") {
-      if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
+      if (typeof apiKeys !== 'object' ||  apiKeys === null || Array.isArray(apiKeys) || Object.keys(apiKeys).length === 0) {
         res.status(400).json({
           message: "Debe proporcionar llaves de autenticación con el método API keys",
         });
@@ -338,20 +323,21 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         return
       }
     } else if (authMethod === "user-password") {
-      if (!Array.isArray(users) || users.length === 0) {
+      if (typeof users !== 'object' || users === null || Array.isArray(users) || Object.keys(users).length === 0) {
         res.status(400).json({
           message: "Debe proporcionar usuarios con el método usuario/password",
         });
         return
       }
-      if (Array.isArray(apiKeys) && apiKeys.length > 0) {
+      if (typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys) && Object.keys(apiKeys).length > 0) {
         res.status(400).json({
           message: "La lista de API keys debe estar vacía cuando el método es usuario/password",
         });
         return
       }
     } else if (!authMethod || authMethod === "none") {
-      if ((Array.isArray(apiKeys) && apiKeys.length > 0) || (Array.isArray(users) && users.length > 0)) {
+      if ((typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys) && Object.keys(apiKeys).length > 0) ||
+          (typeof users === "object" && users !== null && !Array.isArray(users) && Object.keys(users).length > 0)) {
         res.status(400).json({
           message: "Las listas de usuarios y API keys deben estar vacías si no se requiere autenticación",
         });
@@ -362,6 +348,17 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         message: 'El método de autenticación debe ser "api-keys", "user-password" o "none"',
       });
       return
+    }
+
+    const usersMap = users as Record<string,string>;
+
+    if (authMethod === "user-password") {
+      for (const [username, password] of Object.entries(usersMap)) {
+        if (!password.startsWith('$2')) {
+          const salt = bcrypt.genSaltSync(10);
+          usersMap[username] = bcrypt.hashSync(password, salt);
+        }
+      }
     }
 
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");

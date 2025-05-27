@@ -2,29 +2,17 @@
 import { Edit2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AuthModal from './AuthModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { deleteSubdomain } from '../services/subdomain'; 
+import ms from 'ms';
 
 export default function SubdomainsRecordsTable({
   subdomains,
   onDelete
 }) {
-    const [authModal, setAuthModal] = useState({
-      isOpen: false,
-      type: '',
-      items: [],
-      revealed: false
-    });
     const [deletionTarget, setDeletionTarget] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const navigate = useNavigate();
-
-    const openAuthModal = (type, items) => setAuthModal({ isOpen: true, type, items, revealed: false });
-    
-    const closeAuthModal = () => setAuthModal({ isOpen: false, type: '', items: [], revealed: false });
-    
-    const toggleReveal = () => setAuthModal(m => ({ ...m, revealed: !m.revealed }));
 
     const confirmDelete = async () => {
       if (!deletionTarget) return;
@@ -58,7 +46,7 @@ export default function SubdomainsRecordsTable({
               <th className="px-4 py-2">TTL</th>
               <th className="px-4 py-2">Política</th>
               <th className="px-4 py-2">Destino</th>
-              <th className="px-4 py-2">Auth</th>
+              <th className="px-4 py-2">Autenticación</th>
               <th className="px-4 py-2">Acciones</th>
           </tr>
         </thead>
@@ -67,22 +55,12 @@ export default function SubdomainsRecordsTable({
             <tr key={rec.subdomain} className="border-b hover:bg-lightgrey1">
               <td className="px-4 py-2">{idx + 1}</td>
               <td className="px-4 py-2">{rec.subdomain}</td>
-              <td className="px-4 py-2">{rec.cacheSize}</td>
+              <td className="px-4 py-2">{(rec.cacheSize / (1024 * 1024)).toFixed(2)} MB</td>
               <td className="px-4 py-2">{rec.fileTypes?.join(', ')}</td>
-              <td className="px-4 py-2">{rec.ttl}</td>
+              <td className="px-4 py-2">{ms(rec.ttl)}</td>
               <td className="px-4 py-2">{rec.replacementPolicy}</td>
               <td className="px-4 py-2">{rec.destination}</td>
-              <td className="px-4 py-2">
-                <button
-                  onClick={() => openAuthModal(
-                    rec.authMethod,
-                    rec.authMethod === 'api-keys' ? rec.apiKeys : rec.users
-                  )}
-                  className="text-blue-600 hover:underline"
-                >
-                  {rec.authMethod}
-                </button>
-              </td>
+              <td className="px-4 py-2">{rec.authMethod || 'N/A'}</td>
               <td className="px-4 py-2 flex gap-2">
                   <button onClick={() => navigate(`/domains/${rec.domain}/subdomains/${rec.subdomain}`)} className="p-1 text-gray-600 hover:text-black" title="Editar">
                     <Edit2 className="text-indigo-600" size={16} />
@@ -96,14 +74,6 @@ export default function SubdomainsRecordsTable({
         </tbody>
       </table>
     </div>
-    <AuthModal
-      isOpen={authModal.isOpen}
-      type={authModal.type}
-      items={authModal.items}
-      revealed={authModal.revealed}
-      onToggleReveal={toggleReveal}
-      onClose={closeAuthModal}
-    />
     <DeleteConfirmationModal
       isOpen={!!deletionTarget}
       name={deletionTarget ? `${deletionTarget.subdomain}.${deletionTarget.domain}` : ''}

@@ -15,6 +15,8 @@ import DNSRegisterCard from "./components/DNSRegisterCard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 import SubdomainsDashboard from "./components/SubdomainsDashboard";
 import SubdomainForm from "./components/SubdomainForms";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function AppRouter() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -30,6 +32,7 @@ function AppRouter() {
       <div className="py-10">
         <main>
           <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <ToastContainer position="top-right" autoClose={5000} />
             <Routes>
               <Route
                 path="/"
