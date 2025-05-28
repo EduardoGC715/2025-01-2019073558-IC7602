@@ -182,62 +182,134 @@ std::string urlEncode(const std::string& str) {
 // Referencia para Regex en C++: https://www.geeksforgeeks.org/regex-regular-expression-in-c/
 // Referencia para Regex de cookie: https://www.regex-tutorial.com/getCookieWithRegex.html
 bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
-    auto it = request.headers.find("cookie");
-    if (it != request.headers.end()) {
-        const string &cookies = it->second;
-        string token = get_token_from_cookies(cookies);
-        if (!token.empty()) {
-            string url = rest_api + "/auth/validate";
-            unordered_map<string, string> headers_map = {
-                {"Content-Type", "application/json"},
-                {"x-app-id", app_id},
-                {"x-api-key", api_key},
-                {"Cookie", "token=" + token}
-            };
-
-            // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-            memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
-            if (response && response->status_code == 200) {
-                // Si la respuesta es válida, se autentica la solicitud.
-                cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
-                free(response->memory);
-                free(response);
-                return true;
+    auto host_it = request.headers.find("host");
+    if (host_it != request.headers.end()) {
+        // Obtener el host
+        const string &host = host_it->second;
+        shared_lock<shared_mutex> lock(subdomain_mutex);
+        string authMethod;
+        // Verificar si el host es un subdominio registrado en el objeto subdomains.
+        if (subdomains.HasMember(host.c_str()) && subdomains[host.c_str()].IsObject()) {
+            const Value& subdomainObj = subdomains[host.c_str()];
+            if (subdomainObj.HasMember("authMethod") && subdomainObj["authMethod"].IsString()) {
+                // Obtener el método de autenticación del subdominio.
+                authMethod = subdomainObj["authMethod"].GetString();
+            } else {
+                cerr << "\033[1;31mAuth method not found in subdomain object.\033[0m" << endl;
+                // Enviar respuesta HTTP 401 Unauthorized
+                send_http_error_response(client_socket, "Not Found", 404);
+                return false;
             }
-            free(response->memory);
-            free(response);
+        } else {
+            cerr << "\033[1;31mSubdomain not found.\033[0m" << endl;
+            // Enviar respuesta HTTP 401 Unauthorized
+            send_http_error_response(client_socket, "Not Found", 404);
+            return false;
         }
-    } else if (request.request.uri.find("/_auth/callback") != string::npos) {
-        string token = get_query_parameter(request.request.uri, "token");
-        string next = get_query_parameter(request.request.uri, "next");
-        string exp = get_query_parameter(request.request.uri, "exp");
-        cout << "Token: " << token << endl;
-        cout << "Next: " << next << endl;
-        cout << "Exp: " << exp << endl;
-        // Enviar la respuesta con el Cookie al cliente por el socket.
-        string response = "HTTP/1.1 302 Found\r\n"
-                        "Location: " + next + "\r\n"
-                        "Set-Cookie: token=" + token + "; HttpOnly; SameSite=Lax; Expires=" + exp + "\r\n"
-                        "Connection: close\r\n"
-                        "Content-Length: 0\r\n"
-                        "\r\n";
-        send(client_socket, response.c_str(), response.size(), 0);
-    }
-    // Hay que autenticar. Se redirige al usuario a la página de login.
-    string scheme = https ? "https://" : "http://";
-    string host = request.headers.at("host");
-    shared_lock<shared_mutex> lock(subdomain_mutex);
-    const string &authMethod = subdomains[host.c_str()]["authMethod"].GetString();
-    lock.unlock();
-    string url = scheme + host + request.request.uri;
-    string url_encoded = urlEncode(url);
-    string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod;
-    string response = "HTTP/1.1 302 Found\r\n"
-                        "Location: " + redirect_url + "\r\n"
-                        "Connection: close\r\n"
-                        "Content-Length: 0\r\n"
-                        "\r\n";
-    send(client_socket, response.c_str(), response.size(), 0);
+        lock.unlock();
+        if (authMethod == "none") {
+            // Si no hay autenticación, se permite la solicitud.
+            return true;
+        } else if (authMethod == "user-password") {
+            // Si el método de autenticación es user-password, se verifica si hay un cookie con el token de autenticación.
+            auto it = request.headers.find("cookie");
+            if (it != request.headers.end()) {
+                const string &cookies = it->second;
+                string token = get_token_from_cookies(cookies);
+                if (!token.empty()) {
+                    // Si se encuentra el token, se envía una solicitud al Rest API para validarlo.
+                    string url = rest_api + "/auth/validate";
+                    unordered_map<string, string> headers_map = {
+                        {"Content-Type", "application/json"},
+                        {"x-app-id", app_id},
+                        {"x-api-key", api_key},
+                        {"Cookie", "token=" + token}
+                    };
+
+                    // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
+                    memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
+                    if (response && response->status_code == 200) {
+                        // Si la respuesta es válida, se autentica la solicitud.
+                        cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
+                        free(response->memory);
+                        free(response);
+                        return true;
+                    }
+                    free(response->memory);
+                    free(response);
+                }
+            } else if (request.request.uri.find("/_auth/callback") != string::npos) {
+                string token = get_query_parameter(request.request.uri, "token");
+                string next = get_query_parameter(request.request.uri, "next");
+                string exp = get_query_parameter(request.request.uri, "exp");
+                cout << "Token: " << token << endl;
+                cout << "Next: " << next << endl;
+                cout << "Exp: " << exp << endl;
+                // Enviar la respuesta con el Cookie al cliente por el socket.
+                string response = "HTTP/1.1 302 Found\r\n"
+                                "Location: " + next + "\r\n"
+                                "Set-Cookie: token=" + token + "; HttpOnly; SameSite=Lax; Expires=" + exp + "\r\n"
+                                "Connection: close\r\n"
+                                "Content-Length: 0\r\n"
+                                "\r\n";
+                send(client_socket, response.c_str(), response.size(), 0);
+                return false;
+            }
+            // Hay que autenticar. Se redirige al usuario a la página de login.
+            string scheme = https ? "https://" : "http://";
+            string url = scheme + host + request.request.uri;
+            string url_encoded = urlEncode(url);
+            string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod;
+            string response = "HTTP/1.1 302 Found\r\n"
+                                "Location: " + redirect_url + "\r\n"
+                                "Connection: close\r\n"
+                                "Content-Length: 0\r\n"
+                                "\r\n";
+            send(client_socket, response.c_str(), response.size(), 0);
+            return false;
+        } else if (authMethod == "api-keys") {
+            auto it = request.headers.find("x-api-key");
+            if (it != request.headers.end()) {
+                const string &api_key = it->second;
+                string url = rest_api + "/auth/validate";
+                unordered_map<string, string> headers_map = {
+                    {"Content-Type", "application/json"},
+                    {"x-app-id", app_id},
+                    {"x-api-key", api_key}
+                };
+
+                // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
+                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map);
+                if (response && response->status_code == 200) {
+                    // Si la respuesta es válida, se autentica la solicitud.
+                    cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
+                    free(response->memory);
+                    free(response);
+                    return true;
+                } else {
+                    cerr << "\033[1;31mAuthentication failed with API key.\033[0m" << endl;
+                    // Enviar respuesta HTTP 401 Unauthorized
+                    send_http_error_response(client_socket, "Unauthorized", 401);
+                    free(response->memory);
+                    free(response);
+                    return false;
+                }
+            } else {
+                cerr << "\033[1;31mAPI key not found in request headers.\033[0m" << endl;
+                // Enviar respuesta HTTP 401 Unauthorized
+                send_http_error_response(client_socket, "Unauthorized", 401);
+                return false;
+            }
+        } else {
+            cerr << "\033[1;31mUnknown authentication method: " << authMethod << "\033[0m" << endl;
+            // Enviar respuesta HTTP 500 Internal Server Error
+            send_http_error_response(client_socket, "Internal Server Error", 500);
+            return false;
+        }
+    } 
+    cerr << "\033[1;31mHost not found.\033[0m" << endl;
+    // Enviar respuesta HTTP 401 Unauthorized
+    send_http_error_response(client_socket, "Bad Request", 400);
     return false;
 }
 
@@ -269,9 +341,7 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             } catch (const exception &e) {
                 cerr << "Error parsing HTTP request: " << e.what() << endl;
                 send_http_error_response(client_socket, "Bad Request", 400);
-                close(client_socket);
-                free(request_buffer);
-                return;
+                break;
             }
             bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
             if (!authenticated) {

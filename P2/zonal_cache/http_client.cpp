@@ -147,6 +147,5 @@ void send_http_error_response (int client_socket, const std::string &error_messa
                            "\r\n" +
                            error_message;
     send(client_socket, response.c_str(), response.size(), 0);
-    close(client_socket);
 }
 #endif
