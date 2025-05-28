@@ -381,11 +381,8 @@ void addToCacheByHost(Document& cache, const string& host, const string& uri, co
 }
 
 string get_response(HttpRequest request){
-    if (subdomains.HasMember(request.headers["host"].c_str())) {
-        Value& subdomain_object = subdomains[request.headers["host"].c_str()];
-        string destination = subdomain_Object["destination"].GetString();
-        cout << destination << endl;
-        Value& host_object = cache[destination.c_str()];
+    if (cache.HasMember(request.headers["host"].c_str())) {
+        Value& host_object = cache[request.headers["host"].c_str()];
         if (host_object.HasMember((request.request.method + request.request.uri).c_str())) {
             Value& entry = host_object[(request.request.method + request.request.uri).c_str()];
             
@@ -433,6 +430,9 @@ string get_response(HttpRequest request){
             memory_struct response = send_https_request(request.headers["host"].c_str(), request.request.method.c_str(), request.request.uri.c_str(), request.headers);
             
             cout << "Ese request no está en el cache: " << request.headers["host"] << request.request.method << request.request.uri << endl;
+            Value& subdomain_object = subdomains[request.headers["host"].c_str()];
+            string destination = subdomain_Object["destination"].GetString();
+            cout << destination << endl;
             auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
             string currentTimestamp = ctime(&now);
             currentTimestamp.pop_back(); 
