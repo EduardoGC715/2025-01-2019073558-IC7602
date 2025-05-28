@@ -12,6 +12,7 @@ typedef struct {
     char *memory;
     size_t size;
     long status_code;
+    unordered_map<string, string> headers;
 } memory_struct;
 
 
@@ -22,5 +23,5 @@ struct HttpRequest {
 
 memory_struct *send_https_request( const string &host, const char *data, int length, unordered_map<string, string> headers_map, bool use_https, const string& method);
 HttpRequest parse_http_request(const char *request_buffer, size_t request_size);
-void send_http_error_response (int client_socket, const std::string &error_message, int status_code);
+void send_http_error_response (int client_socket, const string &error_message, int status_code);
 #endif // HTTP_CLIENT_H

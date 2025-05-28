@@ -38,6 +38,9 @@ Document subdomains;
 shared_mutex subdomain_mutex;
 
 Document cache;
+cache.SetObject();
+shared_mutex cache_mutex;
+
 
 // Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
 // Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
