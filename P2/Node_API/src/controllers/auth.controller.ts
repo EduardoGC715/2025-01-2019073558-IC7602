@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { jwtDecode } from "jwt-decode";
 
-const createSession = async (
+const createSessionUser = async (
   user: string,
   domain: string,
   expiration: ms.StringValue
@@ -30,7 +30,44 @@ const createSession = async (
       return "";
     }
     const token = jwt.sign(
-      { user, domain, sessionId },
+      { user, domain, sessionId, type: "user" },
+      process.env.JWT_SECRET || "defaultsecret",
+      { expiresIn: expiration }
+    );
+
+    return token;
+  } catch (error) {
+    console.error("Error creating session:", error);
+    return "";
+  }
+};
+
+const createSessionApiKey = async (
+  apiKey: string,
+  domain: string,
+  expiration: ms.StringValue
+) => {
+  try {
+    const expirationMs = ms(expiration);
+    if (isNaN(expirationMs)) {
+      return "";
+    }
+
+    const now = new Date(Date.now());
+    const expirationDate = new Date(now.getTime() + expirationMs);
+    const sessionData = {
+      apiKey,
+      domain,
+      createdAt: now.toISOString(),
+      expiresAt: expirationDate.toISOString(),
+    };
+    const sessionsRef = await firestore.collection("sessions").add(sessionData);
+    const sessionId = sessionsRef.id;
+    if (!sessionId) {
+      return "";
+    }
+    const token = jwt.sign(
+      { apiKey, domain, sessionId, type: "api-key" },
       process.env.JWT_SECRET || "defaultsecret",
       { expiresIn: expiration }
     );
@@ -64,7 +101,7 @@ export const registerUser = async (
     });
 
     const expiration = "1h";
-    const token = await createSession(username, "domain_ui", expiration);
+    const token = await createSessionUser(username, "domain_ui", expiration);
     if (!token) {
       res.status(500).json({ message: "Error al crear la sesión" });
       return;
@@ -103,7 +140,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     const expiration = "1h";
-    const token = await createSession(username, "domain_ui", expiration);
+    const token = await createSessionUser(username, "domain_ui", expiration);
     if (!token) {
       res.status(500).json({ message: "Error al crear sesión" });
       return;
@@ -171,7 +208,7 @@ export const loginSubdomainUser = async (
     }
 
     const expiration = "1h";
-    const token = await createSession(username, subdomain, expiration);
+    const token = await createSessionUser(username, subdomain, expiration);
     if (!token) {
       res.status(500).json({ message: "Error al crear sesión" });
       return;
@@ -186,6 +223,72 @@ export const loginSubdomainUser = async (
     const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
     redirectURL.searchParams.set("token", token);
     redirectURL.searchParams.set("next", subdomain);
+    redirectURL.searchParams.set("exp", ms(expiration).toString());
+    res.status(200).json({ url: redirectURL.toString() });
+  } catch (error) {
+    console.error("Error logging in user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const loginSubdomainApiKey = async (req: Request, res: Response) => {
+  try {
+    const { apiKey, subdomain } = req.body;
+    console.log(apiKey, subdomain);
+    let subdomainURL: URL;
+    try {
+      subdomainURL = new URL(subdomain);
+    } catch (error) {
+      console.error("Invalid subdomain URL:", error);
+      res.status(400).json({ message: "URL del subdominio inválido" });
+      return;
+    }
+    const docRef = firestore
+      .collection("subdomains")
+      .doc(subdomainURL.hostname);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      res.status(401).json({ message: "Unauthorized. No domain." });
+      return;
+    }
+
+    const subdomainData = doc.data();
+    if (!subdomainData) {
+      res.status(500).json({ message: "Internal server error" });
+      return;
+    }
+
+    if (subdomainData.authMethod != "api-keys") {
+      res.status(401).json({
+        message: "Unauthorized, subdominio requiere autenticación con api-keys",
+      });
+      return;
+    }
+
+    console.log("Subdomain data:", subdomainData);
+    const apiKeys = subdomainData.apiKeys;
+    if (!apiKeys || !apiKeys.hasOwnProperty(apiKey)) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const expiration = "1h";
+    const token = await createSessionApiKey(apiKey, subdomain, expiration);
+    if (!token) {
+      res.status(500).json({ message: "Error al crear sesión" });
+      return;
+    }
+    // res.cookie("token", token, {
+    //   maxAge: ms(expiration),
+    //   sameSite: "none",
+    //   secure: true,
+    //   httpOnly: true,
+    //   domain: subdomainData.domain,
+    // });
+    const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
+    redirectURL.searchParams.set("token", token);
+    redirectURL.searchParams.set("next", subdomain);
+    redirectURL.searchParams.set("exp", ms(expiration).toString());
     res.status(200).json({ url: redirectURL.toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
@@ -220,7 +323,7 @@ export const validateSubdomainSession = async (
   res: Response
 ): Promise<void> => {
   const session = req.session;
-  if (!session || !session.user || !session.domain) {
+  if (!session) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }

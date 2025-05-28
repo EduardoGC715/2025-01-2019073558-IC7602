@@ -17,7 +17,6 @@ export const authenticateServer = async (
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
-
   if (typeof appId !== "string" || typeof apiKey !== "string") {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -37,7 +36,6 @@ export const authenticateServer = async (
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
-
   next();
 };
 
@@ -47,7 +45,9 @@ export const authenticateJWT = async (
   next: NextFunction
 ) => {
   const token = req.cookies.token;
+  console.log("token", token);
   if (!token) {
+    console.error("No token provided");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -59,14 +59,12 @@ export const authenticateJWT = async (
     process.env.JWT_SECRET || "defaultsecret",
     async (err: any, session: any) => {
       if (err) {
+        console.error("JWT verification error:", err);
         res.status(401).json({ message: "Unauthorized" });
         return;
       }
-      const { user, domain, sessionId } = session as JwtPayload;
-      if (!user || !domain || !sessionId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
+      const { sessionId, domain, type } = session as JwtPayload;
+      console.log("sessionId, domain, type", sessionId, domain, type);
       const sessionRef = firestore.collection("sessions").doc(sessionId);
       const snapshot = await sessionRef.get();
       if (!snapshot.exists) {
@@ -89,10 +87,25 @@ export const authenticateJWT = async (
         res.status(401).json({ message: "Unauthorized" });
         return;
       }
-      if (user !== sessionData.user) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
+      console.log("type", type);
+      if (type == "user") {
+        const { user } = session as JwtPayload;
+        if (!user || !domain || !sessionId) {
+          res.status(401).json({ message: "Unauthorized" });
+          return;
+        }
+        if (user !== sessionData.user) {
+          res.status(401).json({ message: "Unauthorized" });
+          return;
+        }
+      } else {
+        const { apiKey } = session as JwtPayload;
+        if (!apiKey || sessionData.apiKey !== apiKey) {
+          res.status(401).json({ message: "Unauthorized" });
+          return;
+        }
       }
+
       req.session = session;
       next();
     }

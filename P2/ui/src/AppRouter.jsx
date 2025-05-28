@@ -6,20 +6,23 @@ import {
   Navigate,
   useSearchParams,
 } from "react-router-dom";
-import NavBar from "./components/Navbar";
+import NavBar from "./components/NavBar";
 import Login from "./components/Login";
+import LoginSubdomain from "./components/LoginSubdomain";
 import Register from "./components/Register";
 import Dashboard from "./components/Dashboard";
 import DNSRegisterCard from "./components/DNSRegisterCard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 import SubdomainsDashboard from "./components/SubdomainsDashboard";
-import SubdomainRegisterCard from "./components/SubdomainRegisterCard";
+import SubdomainForm from "./components/SubdomainForms";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function AppRouter() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchParams] = useSearchParams();
   const subdomain = searchParams.get("subdomain");
-  console.log("Subdomain:", subdomain);
+  const authMethod = searchParams.get("authMethod");
   return (
     <div className="min-h-screen bg-light">
       {!subdomain && (
@@ -29,6 +32,7 @@ function AppRouter() {
       <div className="py-10">
         <main>
           <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <ToastContainer position="top-right" autoClose={5000} />
             <Routes>
               <Route
                 path="/"
@@ -39,9 +43,17 @@ function AppRouter() {
                     <Login
                       isLoggedIn={isLoggedIn}
                       setIsLoggedIn={setIsLoggedIn}
-                      subdomain={subdomain}
                     />
                   )
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <LoginSubdomain
+                    subdomain={subdomain}
+                    authMethod={authMethod}
+                  />
                 }
               />
               <Route
@@ -65,7 +77,11 @@ function AppRouter() {
                 />
                 <Route
                   path="/domains/:domain/subdomains/register"
-                  element={<SubdomainRegisterCard />}
+                  element={<SubdomainForm />}
+                />
+                <Route
+                  path="/domains/:domain/subdomains/:subdomain"
+                  element={<SubdomainForm />}
                 />
               </Route>
             </Routes>

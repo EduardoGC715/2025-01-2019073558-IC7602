@@ -3,9 +3,19 @@ import { api } from "./api";
 
 export const createSubdomain = async (domain, subdomainData) => {
   try {
+    console.log("Creating subdomain:", domain, subdomainData);
+    if (!subdomainData.subdomain) {
+      throw new Error("El campo 'subdomain' es requerido.");
+    }
+
+    const payload = {
+      domain,
+      ...subdomainData,
+    };
+
     const response = await api.post(
       "/subdomain/register",
-      { domain, ...subdomainData },
+      payload,
       { withCredentials: true }
     );
 
@@ -16,7 +26,6 @@ export const createSubdomain = async (domain, subdomainData) => {
         message: "Subdominio registrado exitosamente",
       };
     }
-
     return {
       success: false,
       message: response.data?.message || "Error al registrar subdominio",
@@ -33,31 +42,55 @@ export const createSubdomain = async (domain, subdomainData) => {
 
 export const getSubdomainsByDomain = async (domain) => {
   try {
-    const response = await api.get(`/subdomain/all/${domain}`, {
+    const response = await api.get("/subdomain/subdomains", {
+      params: { domain },
       withCredentials: true,
     });
 
-    if (response.status === 200 && Array.isArray(response.data.subdomains)) {
-      return response.data.subdomains;
+    if (response.status === 200 && typeof response.data === "object") {
+      return response.data; 
+    }
+    console.error("Unexpected response:", response.status, response.data);
+    return {};
+  } catch (error) {
+    console.error("Error fetching subdomains:", error);
+    return {};
+  }
+};
+
+export const getSubdomainByName = async (domain, subdomainName) => {
+  try {
+    const response = await api.get(
+      `/subdomain/${domain}/${subdomainName}`,
+      { withCredentials: true }
+    );
+
+    if (response.status === 200) {
+      console.log("Subdomain data:", response.data);  
+      return response.data;
     } else {
-      console.error(
-        "Unexpected response fetching subdomains:",
-        response.status,
-        response.data
+      throw new Error(
+        response.data?.message || "Error fetching subdomain data"
       );
-      return [];
     }
   } catch (error) {
-    console.error("Error al obtener subdominios:", error);
-    return [];
+    console.error("Error in getSubdomainByName:", error);
+    throw error;
   }
 };
 
 export const updateSubdomain = async (domain, subdomainName, updateData) => {
   try {
+    console.log("Updating subdomain:", domain, subdomainName, updateData);
+    const payload = {
+      ...updateData,
+      domain,
+      subdomain: subdomainName,
+    };
+
     const response = await api.put(
       `/subdomain/${domain}/${subdomainName}`,
-      updateData,
+      payload,
       { withCredentials: true }
     );
 
@@ -83,11 +116,14 @@ export const updateSubdomain = async (domain, subdomainName, updateData) => {
   }
 };
 
+
 export const deleteSubdomain = async (domain, subdomainName) => {
   try {
     const response = await api.delete(
       `/subdomain/${domain}/${subdomainName}`,
-      { withCredentials: true }
+      {
+        withCredentials: true
+      }
     );
 
     if (response.status === 200) {
