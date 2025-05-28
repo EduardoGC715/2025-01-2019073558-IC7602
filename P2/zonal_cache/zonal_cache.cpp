@@ -38,6 +38,9 @@ Document subdomains;
 shared_mutex subdomain_mutex;
 
 Document cache;
+cache.SetObject();
+shared_mutex cache_mutex;
+
 
 // Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
 // Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
@@ -375,8 +378,11 @@ void addToCacheByHost(Document& cache, const string& host, const string& uri, co
 }
 
 string get_response(HttpRequest request){
-    if (cache.HasMember(request.headers["host"].c_str())) {
-        Value& host_object = cache[request.headers["host"].c_str()];
+    const string &host = request.headers.at("host");
+    Document::AllocatorType& allocator = cache.GetAllocator();
+
+    if (cache.HasMember(host.c_str())) {
+        Value& host_object = cache[host.c_str()];
         if (host_object.HasMember((request.request.method + request.request.uri).c_str())) {
             Value& entry = host_object[(request.request.method + request.request.uri).c_str()];
             

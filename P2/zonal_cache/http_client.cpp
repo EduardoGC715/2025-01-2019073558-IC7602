@@ -46,7 +46,7 @@ static size_t write_callback(void * contents, size_t size, size_t nmemb, void * 
 // https://curl.se/libcurl/c/http-post.html
 // https://curl.se/libcurl/c/https.html
 memory_struct *send_https_request(const string &url, const char *data, int length,
-                                  unordered_map<string, string> headers_map, bool use_https, const string& method) {
+                                  unordered_map<string, string> headers_map, bool use_https, const string& method, bool write_headers = false) {
     CURL *curl;
     CURLcode res;
 
@@ -100,7 +100,12 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)resp_mem);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
+        if (write_headers) {
+            curl_easy_setopt(curl, CURLOPT_HEADER, 1L); // Incluir headers en la respuesta
+        } else {
+            curl_easy_setopt(curl, CURLOPT_HEADER, 0L); // No incluir headers en la respuesta
+        }
+        
         if (use_https) {
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);  // use 0L to skip verification (not recommended)
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -108,6 +113,17 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
 
         res = curl_easy_perform(curl);
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
+
+        struct curl_header *header;
+        size_t i = 0;
+        while (curl_easy_header(curl, NULL, i++, &header) == CURLHE_OK) {
+            if (header->name && header->value) {
+                string header_name(header->name);
+                string header_value(header->value);
+                resp_mem->headers[header_name] = header_value;
+            }
+        }
+        
 
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
