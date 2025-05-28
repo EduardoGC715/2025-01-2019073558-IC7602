@@ -16,7 +16,6 @@
 #include "rapidjson/stringbuffer.h"
 #include "http_client.h"
 #include "zonal_cache.h"
-#include <regex>
 #include <iomanip>
 #include <fstream>
 #include <openssl/sha.h>
@@ -202,9 +201,7 @@ string hashString(const string& input) {
     return ss.str();
 }
 
-
-// Referencia para Regex en C++: https://www.geeksforgeeks.org/regex-regular-expression-in-c/
-// Referencia para Regex de cookie: https://www.regex-tutorial.com/getCookieWithRegex.html
+// Función que autentica una solicitud HTTP entrante.
 bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
     auto host_it = request.headers.find("host");
     if (host_it != request.headers.end()) {
@@ -214,10 +211,10 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         string authMethod;
         // Verificar si el host es un subdominio registrado en el objeto subdomains.
         if (subdomains.HasMember(host.c_str()) && subdomains[host.c_str()].IsObject()) {
-            const Value& subdomainObj = subdomains[host.c_str()];
-            if (subdomainObj.HasMember("authMethod") && subdomainObj["authMethod"].IsString()) {
+            const Value& subdomain_obj = subdomains[host.c_str()];
+            if (subdomain_obj.HasMember("authMethod") && subdomain_obj["authMethod"].IsString()) {
                 // Obtener el método de autenticación del subdominio.
-                authMethod = subdomainObj["authMethod"].GetString();
+                authMethod = subdomain_obj["authMethod"].GetString();
             } else {
                 cerr << "\033[1;31mAuth method not found in subdomain object.\033[0m" << endl;
                 // Enviar respuesta HTTP 401 Unauthorized
@@ -337,6 +334,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
     return false;
 }
 
+// 
 void addToCacheByHost(Document& cache, const string& host, const string& uri, const string& filename, int time_to_live) {
     Document::AllocatorType& allocator = cache.GetAllocator();
 
