@@ -45,53 +45,73 @@ static size_t write_callback(void * contents, size_t size, size_t nmemb, void * 
 // Basado en:
 // https://curl.se/libcurl/c/http-post.html
 // https://curl.se/libcurl/c/https.html
-memory_struct *send_https_request(const char *url, const char * data, int length, unordered_map<string, string> headers_map) {
-    // Inicializar CURL
+memory_struct *send_https_request(const char *host, const char *path, const char *data, int length,
+                                  unordered_map<string, string> headers_map, bool use_https, const string& method) {
     CURL *curl;
     CURLcode res;
 
     curl = curl_easy_init();
-    if(curl) {
-        // Estructura para almacenar la respuesta
-        memory_struct * resp_mem = (memory_struct *) malloc(sizeof(memory_struct));
+    if (curl) {
+        memory_struct *resp_mem = (memory_struct *) malloc(sizeof(memory_struct));
         if (!resp_mem) {
             perror("malloc failed");
             return NULL;
         }
 
-        resp_mem->memory = (char *) malloc(1); // Allocar memoria para la respuesta
+        resp_mem->memory = (char *) malloc(1);
         resp_mem->size = 0;
 
-        // Crear una lista de headers para la solicitud
         struct curl_slist *headers = NULL;
         for (const auto &header : headers_map) {
             string header_str = header.first + ": " + header.second;
             headers = curl_slist_append(headers, header_str.c_str());
         }
-        
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        if (data != NULL && length > 0) {
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, length);
+
+        string protocol = use_https ? "https://" : "http://";
+        string url = protocol + string(host) + string(path);
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+
+        // Set the HTTP method
+        if (method == "POST") {
             curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        } else {
+            if (data != NULL && length > 0) {
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, length);
+            }
+        } else if (method == "PUT") {
+            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+            if (data != NULL && length > 0) {
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, length);
+            }
+        } else if (method == "DELETE") {
+            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+        } else if (method == "GET") {
             curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+        } else {
+            cerr << "Unsupported HTTP method: " << method << endl;
+            free(resp_mem->memory);
+            free(resp_mem);
+            return NULL;
         }
-        
+
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)resp_mem);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
-        // Realizar la solicitud
+        if (use_https) {
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);  // use 0L to skip verification (not recommended)
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+        }
+
         res = curl_easy_perform(curl);
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
 
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
-        if(res != CURLE_OK) {
+
+        if (res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             free(resp_mem->memory);
             free(resp_mem);
@@ -100,9 +120,11 @@ memory_struct *send_https_request(const char *url, const char * data, int length
 
         return resp_mem;
     }
+
     perror("curl_easy_init failed");
     return NULL;
 }
+
 
 // Función para convertir una cadena a minúsculas
 // Obtenida de https://www.geeksforgeeks.org/conversion-whole-string-uppercase-lowercase-using-stl-c/
