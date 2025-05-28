@@ -377,10 +377,14 @@ void addToCacheByHost(Document& cache, const string& host, const string& uri, co
 string get_response(HttpRequest request){
     if (cache.HasMember(request.headers["host"].c_str())) {
         Value& host_object = cache[request.headers["host"].c_str()];
-        if (host_object.HasMember((request.request.method + request.request.uri).c_str())) {
-            Value& entry = host_object[(request.request.method + request.request.uri).c_str()];
+        cout << "Host object found in cache." << endl;
+        cout << "Request URI: " << request.request.method << request.request.uri << endl;
+        
+        if (host_object.HasMember((request.request.method + "-" + request.request.uri).c_str())) {
+            cout << "URI object found in cache." << endl;
+            Value& entry = host_object[(request.request.method + "-" + request.request.uri).c_str()];
             
-                // Revisar la cache para ver si el request está en el cache.
+            // Revisar la cache para ver si el request está en el cache.
                 
             string filepath = std::string("sub_domains_caches/")  + entry["filename"].GetString();
             ifstream file(filepath, ios::binary | ios::ate);
@@ -436,12 +440,12 @@ string get_response(HttpRequest request){
             // addToCacheByHost(cache, request.headers["host"], request.request.uri, filename, 60); // 60 seconds TTL
             // cout << "Añadido: " << filename << endl;
             // return filename;
-            return "hola";
+            return "hol1a";
         }
     } else { // El objeto no está en el cache
         // // Se fetchea al subdominio correspondiente.
         // cout << "Cache miss for key: " << key << endl;
-        return "hola";
+        return "hol2a";
     }
     // Value httpRequestKey(kObjectType);
     
@@ -610,7 +614,7 @@ int main() {
 
     httpparser::Request request;
     request.method = "GET";
-    request.uri = "GET-index.html";
+    request.uri = "index.html";
     request.versionMajor = 1;
     request.versionMinor = 1;
     request.headers = {}; // Empty headers
