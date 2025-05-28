@@ -19,6 +19,10 @@
 #include <regex>
 #include <iomanip>
 #include <fstream>
+#include <openssl/sha.h>
+#include <iomanip>
+#include <sstream>
+
 
 using namespace std;
 using namespace rapidjson;
@@ -184,6 +188,20 @@ std::string urlEncode(const std::string& str) {
 
     return encodedStream.str();
 }
+
+// Referencia para SHA256 en C++: https://terminalroot.com/how-to-generate-sha256-hash-with-cpp-and-openssl/
+string hashString(const string& input) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)input.c_str(), input.size(), hash);
+
+    // Convert the hash to a hexadecimal string
+    stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    }
+    return ss.str();
+}
+
 
 // Referencia para Regex en C++: https://www.geeksforgeeks.org/regex-regular-expression-in-c/
 // Referencia para Regex de cookie: https://www.regex-tutorial.com/getCookieWithRegex.html
@@ -364,54 +382,52 @@ void addToCacheByHost(Document& cache, const string& host, const string& uri, co
 
 string get_response(HttpRequest request){
     if (subdomains.HasMember(request.headers["host"].c_str())) {
-        Value& subdomain_Object = subdomains[request.headers["host"].c_str()];
+        Value& subdomain_object = subdomains[request.headers["host"].c_str()];
         string destination = subdomain_Object["destination"].GetString();
         cout << destination << endl;
-        Value& hostObject = cache[destination.c_str()];
-        if (hostObject.HasMember((request.request.method + request.request.uri).c_str())) {
-            Value& uriObject = hostObject[request.request.method.c_str()];
+        Value& host_object = cache[destination.c_str()];
+        if (host_object.HasMember((request.request.method + request.request.uri).c_str())) {
+            Value& entry = host_object[(request.request.method + request.request.uri).c_str()];
             
-            if (uriObject.HasMember(request.request.uri.c_str())) {
-                Value& entry = uriObject[request.request.uri.c_str()];
                 // Revisar la cache para ver si el request está en el cache.
                 
-                string filepath = "sub_domains_caches/" + filename;
-                ifstream file(filepath, ios::binary | ios::ate);
-                
-                if (!file.is_open()) {
-                    cerr << "No se pudo abrir el archivo: " << filepath << endl;
-                    return "";
-                }
-
-                streamsize size = file.tellg();
-                file.seekg(0, ios::beg);
-
-                string content;
-                content.resize(size);
-                
-                if (file.read(&content[0], size)) {
-                    cout << "Se pudieron leer " << size << " bytes de " << filepath << endl;
-                    // Check if the entry is still valid based on time_to_live
-                    auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
-                    string currentTimestamp = ctime(&now);
-                    currentTimestamp.pop_back(); // Remove the newline character
-
-                    // Update the most_recent_use field
-                    entry["most_recent_use"].SetString(currentTimestamp.c_str(), allocator);
-
-                    // Increment the times_used field
-                    if (entry.HasMember("times_used") && entry["times_used"].IsInt()) {
-                        entry["times_used"].SetInt(entry["times_used"].GetInt() + 1);
-                    } else {
-                        // If times_used doesn't exist or is not an integer, initialize it
-                        entry.AddMember("times_used", 1, allocator);
-                    }
-                    return content;
-                } else {
-                    cerr << "Failed to read cache file: " << filepath << endl;
-                    return "";
-                }
+            string filepath = "sub_domains_caches/" + entry['filename'].GetString();
+            ifstream file(filepath, ios::binary | ios::ate);
+            
+            if (!file.is_open()) {
+                cerr << "No se pudo abrir el archivo: " << filepath << endl;
+                return "";
             }
+
+            streamsize size = file.tellg();
+            file.seekg(0, ios::beg);
+
+            string content;
+            content.resize(size);
+            
+            if (file.read(&content[0], size)) {
+                cout << "Se pudieron leer " << size << " bytes de " << filepath << endl;
+                // Check if the entry is still valid based on time_to_live
+                auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+                string currentTimestamp = ctime(&now);
+                currentTimestamp.pop_back(); // Remove the newline character
+
+                // Update the most_recent_use field
+                entry["most_recent_use"].SetString(currentTimestamp.c_str(), allocator);
+
+                // Increment the times_used field
+                if (entry.HasMember("times_used") && entry["times_used"].IsInt()) {
+                    entry["times_used"].SetInt(entry["times_used"].GetInt() + 1);
+                } else {
+                    // If times_used doesn't exist or is not an integer, initialize it
+                    entry.AddMember("times_used", 1, allocator);
+                }
+                return content;
+            } else {
+                cerr << "Failed to read cache file: " << filepath << endl;
+                return "";
+            }
+            
         } else {
             // El objeto URI no está en el cache, se agrega.
             memory_struct response = send_https_request(request.headers["host"].c_str(), request.request.method.c_str(), request.request.uri.c_str(), request.headers);
