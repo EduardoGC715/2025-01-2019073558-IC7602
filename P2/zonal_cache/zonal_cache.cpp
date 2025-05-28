@@ -38,10 +38,6 @@ Document subdomains;
 shared_mutex subdomain_mutex;
 
 Document cache;
-cache.SetObject();
-Document::AllocatorType& allocator = cache.GetAllocator();
-
-
 
 // Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
 // Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
@@ -56,7 +52,7 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
     // Hilo que se ejecuta indefinidamente para obtener los subdominios.
     while (true) {
         // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-        memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
+        memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET");
         if (response && response->status_code == 200) {
             // Documento temporal para almacenar la respuesta JSON.
             Document temp;
@@ -248,7 +244,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                     };
 
                     // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-                    memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
+                    memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET");
                     if (response && response->status_code == 200) {
                         // Si la respuesta es válida, se autentica la solicitud.
                         cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
@@ -300,7 +296,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 };
 
                 // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map);
+                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map, true, request.request.method.c_str());
                 if (response && response->status_code == 200) {
                     // Si la respuesta es válida, se autentica la solicitud.
                     cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
@@ -386,7 +382,7 @@ string get_response(HttpRequest request){
             
                 // Revisar la cache para ver si el request está en el cache.
                 
-            string filepath = "sub_domains_caches/" + entry['filename'].GetString();
+            string filepath = std::string("sub_domains_caches/")  + entry["filename"].GetString();
             ifstream file(filepath, ios::binary | ios::ate);
             
             if (!file.is_open()) {
@@ -406,7 +402,8 @@ string get_response(HttpRequest request){
                 auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
                 string currentTimestamp = ctime(&now);
                 currentTimestamp.pop_back(); // Remove the newline character
-
+                
+                Document::AllocatorType& allocator = cache.GetAllocator();
                 // Update the most_recent_use field
                 entry["most_recent_use"].SetString(currentTimestamp.c_str(), allocator);
 
@@ -417,6 +414,7 @@ string get_response(HttpRequest request){
                     // If times_used doesn't exist or is not an integer, initialize it
                     entry.AddMember("times_used", 1, allocator);
                 }
+                cout << content << endl;
                 return content;
             } else {
                 cerr << "Failed to read cache file: " << filepath << endl;
@@ -425,25 +423,27 @@ string get_response(HttpRequest request){
             
         } else {
             // El objeto URI no está en el cache, se agrega.
-            memory_struct response = send_https_request(request.headers["host"].c_str(), request.request.method.c_str(), request.request.uri.c_str(), request.headers);
+            // memory_struct response = send_https_request(request.headers["host"].c_str(), request.request.method.c_str(), request.request.uri.c_str(), request.headers);
             
-            cout << "Ese request no está en el cache: " << request.headers["host"] << request.request.method << request.request.uri << endl;
-            Value& subdomain_object = subdomains[request.headers["host"].c_str()];
-            string destination = subdomain_Object["destination"].GetString();
-            cout << destination << endl;
-            auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
-            string currentTimestamp = ctime(&now);
-            currentTimestamp.pop_back(); 
-            string filename = request.request.method + request.request.uri + "_" + currentTimestamp;
-            addToCacheByHost(cache, request.headers["host"], request.request.uri, filename, 60); // 60 seconds TTL
-            cout << "Añadido: " << filename << endl;
-            return filename;
+            // cout << "Ese request no está en el cache: " << request.headers["host"] << request.request.method << request.request.uri << endl;
+            // Value& subdomain_object = subdomains[request.headers["host"].c_str()];
+            // string destination = subdomain_Object["destination"].GetString();
+            // cout << destination << endl;
+            // auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+            // string currentTimestamp = ctime(&now);
+            // currentTimestamp.pop_back(); 
+            // string filename = request.request.method + request.request.uri + "_" + currentTimestamp;
+            // addToCacheByHost(cache, request.headers["host"], request.request.uri, filename, 60); // 60 seconds TTL
+            // cout << "Añadido: " << filename << endl;
+            // return filename;
+            return "hola";
         }
     } else { // El objeto no está en el cache
-        // Se fetchea al subdominio correspondiente.
-        cout << "Cache miss for key: " << key << endl;
+        // // Se fetchea al subdominio correspondiente.
+        // cout << "Cache miss for key: " << key << endl;
+        return "hola";
     }
-    Value httpRequestKey(kObjectType);
+    // Value httpRequestKey(kObjectType);
     
     
 
@@ -526,6 +526,10 @@ int main() {
         std::cerr << "Environment variables REST_API, APP_ID, API_KEY, and VERCEL_UI must be set\n";
         return 1;
     }
+
+    
+    cache.SetObject();
+    Document::AllocatorType& allocator = cache.GetAllocator();
     
     const string rest_api(rest_api_env);
     const string app_id(app_id_env);
@@ -561,6 +565,68 @@ int main() {
 
     cout << "Zonal cache is running on port " << HTTP_PORT << "...\n";
 
+    // Define the host and URI
+    string host = "hola2.test.com";
+    string uri = "GET-index.html";
+
+    // Get the current timestamp
+    auto now = chrono::system_clock::now();
+    auto now_time_t = chrono::system_clock::to_time_t(now);
+    string currentTimestamp = ctime(&now_time_t);
+    currentTimestamp.pop_back(); // Remove the newline character
+
+    // Calculate the time-to-live (TTL) as 1 hour from now
+    auto ttl_time_t = chrono::system_clock::to_time_t(now + chrono::hours(1));
+    string ttlTimestamp = ctime(&ttl_time_t);
+    ttlTimestamp.pop_back(); // Remove the newline character
+
+    // Generate a hashed filename
+    string filename = hashString(uri) + ".bin";
+
+    // Add the object to the cache
+    if (!cache.HasMember(host.c_str())) {
+        Value hostObj(kObjectType);
+        cache.AddMember(Value().SetString(host.c_str(), allocator), hostObj, allocator);
+    }
+
+    Value& hostObject = cache[host.c_str()];
+    if (!hostObject.HasMember(uri.c_str())) {
+        Value uriObj(kObjectType);
+        uriObj.AddMember("received", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("most_recent_use", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("times_used", Value().SetInt(0), allocator);
+        uriObj.AddMember("time_to_live", Value().SetString(ttlTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
+
+        hostObject.AddMember(Value().SetString(uri.c_str(), allocator), uriObj, allocator);
+    }
+
+    // Debug: Print the cache to verify the object was added
+    StringBuffer buffer;
+    Writer<StringBuffer> writer(buffer);
+    cache.Accept(writer);
+    cout << "Cache after adding object: " << buffer.GetString() << endl;
+
+
+    httpparser::Request request;
+    request.method = "GET";
+    request.uri = "GET-index.html";
+    request.versionMajor = 1;
+    request.versionMinor = 1;
+    request.headers = {}; // Empty headers
+    request.content = {}; // Empty content
+    request.keepAlive = true;
+
+    string response = get_response(HttpRequest{
+        {
+            {"host", "hola2.test.com"},
+            {"cookie", ""},
+            {"x-api-key", api_key},
+            {"Connection", "keep-alive"},
+        },
+        request
+    });
+    cout << "Response: " << response << endl;
     // Inicialización CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
 

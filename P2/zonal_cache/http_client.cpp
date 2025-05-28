@@ -45,7 +45,7 @@ static size_t write_callback(void * contents, size_t size, size_t nmemb, void * 
 // Basado en:
 // https://curl.se/libcurl/c/http-post.html
 // https://curl.se/libcurl/c/https.html
-memory_struct *send_https_request(const char *host, const char *path, const char *data, int length,
+memory_struct *send_https_request(const string &url, const char *data, int length,
                                   unordered_map<string, string> headers_map, bool use_https, const string& method) {
     CURL *curl;
     CURLcode res;
@@ -68,8 +68,9 @@ memory_struct *send_https_request(const char *host, const char *path, const char
         }
 
         string protocol = use_https ? "https://" : "http://";
-        string url = protocol + string(host) + string(path);
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        string url_req = protocol + url;
+        cout << url_req << endl;
+        curl_easy_setopt(curl, CURLOPT_URL, url_req.c_str());
 
         // Set the HTTP method
         if (method == "POST") {
@@ -101,8 +102,8 @@ memory_struct *send_https_request(const char *host, const char *path, const char
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
         if (use_https) {
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);  // use 0L to skip verification (not recommended)
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);  // use 0L to skip verification (not recommended)
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         }
 
         res = curl_easy_perform(curl);
