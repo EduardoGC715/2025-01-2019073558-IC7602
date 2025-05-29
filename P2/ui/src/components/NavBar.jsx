@@ -33,8 +33,8 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
   const getNavLinkClass = (path) => {
     const isActive = location.pathname === path;
     return isActive
-      ? "block py-2 px-3 text-light bg-primary rounded-sm md:bg-transparent md:text-primary md:p-0 dark:text-light md:dark:text-primary"
-      : "block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 dark:text-light md:dark:hover:text-primary dark:hover:bg-gray-700 dark:hover:text-light md:dark:hover:bg-transparent";
+      ? "block py-2 px-3 text-light bg-primary rounded-sm md:bg-transparent md:text-primary md:p-0"
+      : "block py-2 px-3 text-secondary rounded-sm hover:bg-lightgrey2 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 transition-colors";
   };
 
   const handleLogout = async () => {
@@ -56,18 +56,18 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-light border-gray-200 dark:bg-gray-900 shadow-md">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-light border-lightgrey2 shadow-md">
       <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
         <a href="/" className="flex items-center space-x-3 rtl:space-x-reverse">
-          <img src="domainIcon.png" className="h-8" alt="Flowbite Logo" />
-          <span className="self-center text-2xl font-semibold whitespace-nowrap dark:text-light">
+          <img src="/domainIcon.png" className="h-8" alt="Domain Icon" />
+          <span className="self-center text-2xl font-semibold whitespace-nowrap text-secondary">
             UI Domain Resolver
           </span>
         </a>
         <button
           data-collapse-toggle="navbar-default"
           type="button"
-          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
+          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-lightgrey rounded-lg md:hidden hover:bg-lightgrey2 focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
           aria-controls="navbar-default"
           aria-expanded="false"
         >
@@ -89,15 +89,11 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
           </svg>
         </button>
         <div className="hidden w-full md:block md:w-auto" id="navbar-default">
-          <ul className="font-medium flex flex-col p-4 md:p-0 mt-4 borderrounded-lg md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-light dark:bg-gray-800 md:dark:bg-gray-900 dark:border-gray-700">
+          <ul className="font-medium flex flex-col p-4 md:p-0 mt-4 rounded-lg md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-light">
             {!isLoggedIn && (
               <>
                 <li>
-                  <a
-                    href="/"
-                    className={getNavLinkClass("/")}
-                    aria-current="page"
-                  >
+                  <a href="/" className={getNavLinkClass("/")} aria-current="page">
                     Log In
                   </a>
                 </li>
@@ -111,14 +107,14 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
             {isLoggedIn && (
               <>
                 <li>
-                <a href="/dashboard" className={getNavLinkClass("/dashboard")}>
-                  Dashboard
-                </a>
+                  <a href="/dashboard" className={getNavLinkClass("/dashboard")}>
+                    Dashboard
+                  </a>
                 </li>
                 <li>
                   <button
                     onClick={handleLogout}
-                    className="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 dark:text-light md:dark:hover:text-primary dark:hover:bg-gray-700 dark:hover:text-light md:dark:hover:bg-transparent"
+                    className="block py-2 px-3 text-secondary rounded-sm hover:bg-lightgrey2 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 transition-colors"
                   >
                     Cerrar sesión
                   </button>

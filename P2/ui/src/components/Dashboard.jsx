@@ -12,7 +12,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-light p-4 pt-16">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-3xl font-bold text-darkgray">
             UI Domains Resolver
           </h1>
           <button
