@@ -21,8 +21,8 @@
 #include <openssl/sha.h>
 #include <iomanip>
 #include <sstream>
-#include <boost/algorithm/string.hpp>
-
+#include <cerrno>
+#include <cstring>
 
 using namespace std;
 using namespace rapidjson;
@@ -87,6 +87,71 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
             cout << "\033[1;34mFailed to fetch subdomains. Status code: " << (response ? response->status_code : -1) << "\033[0m" << endl;
             this_thread::sleep_for(chrono::seconds(20));
         }
+    }
+}
+
+void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
+    while (true) {
+        {
+            // Acquire a shared lock for reading
+            shared_lock<shared_mutex> read_lock(cache_mutex);
+
+            // Get the current time
+            auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+            string currentTimestamp = ctime(&now);
+            currentTimestamp.pop_back(); // Remove the newline character
+
+            // Iterate over the hosts in the cache
+            for (auto host_itr = cache.MemberBegin(); host_itr != cache.MemberEnd(); ) {
+                Value& hostObject = host_itr->value;
+
+                // Iterate over the URIs for the current host
+                for (auto uri_itr = hostObject.MemberBegin(); uri_itr != hostObject.MemberEnd(); ) {
+                    Value& uriObj = uri_itr->value;
+
+                    cout << "Checking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\n";
+                    
+                    // Check if the TTL has expired
+                    if (uriObj.HasMember("time_to_live") && uriObj["time_to_live"].IsString()) {
+                        string ttlTimestamp = uriObj["time_to_live"].GetString();
+                        if (ttlTimestamp <= currentTimestamp) {
+                            // Release the shared lock and acquire a unique lock for writing
+                            read_lock.unlock();
+                            unique_lock<shared_mutex> write_lock(cache_mutex);
+
+                            // Remove the expired URI
+                            cout << "Removing expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << endl;
+                            uri_itr = hostObject.RemoveMember(uri_itr);
+
+                            // Release the write lock and reacquire the shared lock
+                            write_lock.unlock();
+                            read_lock.lock();
+                            continue;
+                        }
+                    }
+                    ++uri_itr;
+                }
+
+                // If the host has no more URIs, remove the host
+                if (hostObject.MemberCount() == 0) {
+                    // Release the shared lock and acquire a unique lock for writing
+                    read_lock.unlock();
+                    unique_lock<shared_mutex> write_lock(cache_mutex);
+
+                    cout << "Removing empty host: " << host_itr->name.GetString() << endl;
+                    host_itr = cache.RemoveMember(host_itr);
+
+                    // Release the write lock and reacquire the shared lock
+                    write_lock.unlock();
+                    read_lock.lock();
+                } else {
+                    ++host_itr;
+                }
+            }
+        }
+
+        // Sleep for a short interval before checking again
+        this_thread::sleep_for(chrono::seconds(30));
     }
 }
 
@@ -393,11 +458,15 @@ string get_response(const int &client_socket, HttpRequest request){
             
             // Revisar la cache para ver si el request está en el cache.
                 
-            string filepath = std::string("sub_domains_caches/")  + entry["filename"].GetString();
+            string filepath = "sub_domain_caches/" + request.headers["host"] + "/" + entry["filename"].GetString();
             ifstream file(filepath, ios::binary | ios::ate);
             
             if (!file.is_open()) {
-                cerr << "No se pudo abrir el archivo: " << filepath << endl;
+                cerr << "Failed to open file: " << filepath << endl;
+                if (file.fail()) {
+                    cerr << "File stream failed. Possible reasons: file does not exist, insufficient permissions, or invalid path." << endl;
+                }
+                cerr << "Error: " << strerror(errno) << endl; // Prints the specific error message
                 return "";
             }
 
@@ -591,6 +660,8 @@ int main() {
             fetch_subdomains(rest_api, app_id, api_key, fetch_interval);
         }).detach();
 
+    // Crea un thread que revisa la cache y elimina los objetos expirados.
+    thread(cleanup_expired_cache, ref(cache), ref(subdomain_mutex)).detach();
     
     // Abrir socket para escuchar solicitudes HTTP
     int socket_fd;
@@ -631,7 +702,7 @@ int main() {
     ttlTimestamp.pop_back(); // Remove the newline character
 
     // Generate a hashed filename
-    string filename = hashString(uri) + ".bin";
+    string filename = "85ec3b1da48dab40828fe44f8f1030876ea1de3ee95be8182797ddd03ebe5194.bin";
 
     // Add the object to the cache
     if (!cache.HasMember(host.c_str())) {
