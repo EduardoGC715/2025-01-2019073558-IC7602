@@ -152,7 +152,7 @@ export default function SubdomainForm() {
           subdomain: subParam,
           destination: data.destination || '',
           cacheSize: data.cacheSize
-            ? String(data.cacheSize / 1024 / 1024)
+            ? String(data.cacheSize / 1000000)
             : '',
           fileTypes: data.fileTypes,
           ttl: ms(data.ttl),
@@ -187,7 +187,7 @@ export default function SubdomainForm() {
     if (mb <= 0) {
       return toast.error('Cache Size debe ser mayor que 0.');
     }
-    const cacheBytes = mb * 1024 * 1024;
+    const cacheBytes = mb * 1000000;
 
     // 2. TTL: parseable, > 0
     const ttlMs = ms(form.ttl);
