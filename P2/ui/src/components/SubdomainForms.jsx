@@ -242,7 +242,7 @@ export default function SubdomainForm() {
     setSaving(true);
     try {
       let payloadApiKeys = {};
-      let payloadUsers    = {};
+      let payloadUsers = {};
 
       if (form.authMethod === 'api-keys') {
         payloadApiKeys = form.apiKeys.reduce((m, { rawKey, name }) => {
@@ -268,15 +268,15 @@ export default function SubdomainForm() {
         users: payloadUsers,
         https: form.protocol === 'https'
       };
+      
+      const result = isEdit ? await updateSubdomain(domain, subParam, payload): await createSubdomain(domain, payload);
 
-      if (isEdit) {
-        await updateSubdomain(domain, subParam, payload);
-        toast.success('Subdominio actualizado correctamente.');
+      if (result.success) {
+        toast.success(result.message);
+        navigate(`/domains/${domain}/subdomains`);
       } else {
-        await createSubdomain(domain, payload);
-        toast.success('Subdominio creado correctamente.');
+        toast.error(result.message);
       }
-      navigate(`/domains/${domain}/subdomains`);
     } catch (err) {
       console.error(err);
       toast.error(isEdit ? 'Error al actualizar subdominio.' : 'Error al crear subdominio.');

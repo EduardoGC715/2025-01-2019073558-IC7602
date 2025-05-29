@@ -69,16 +69,18 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     if (
       subdomain !== "" &&
-      !validator.isFQDN(subdomain, { require_tld: false })
+      !validator.isFQDN(subdomain, { require_tld: false }) && 
+      !wildcardRe.test(subdomain)
     ) {
       res.status(400).json({ message: "Subdominio inválido" });
       return;
     }
 
     const fullDomain = subdomain + "." + domain;
-    if (!validator.isFQDN(fullDomain)) {
+    if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
     }
