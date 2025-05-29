@@ -8,6 +8,7 @@ RUN apt-get update && \
       gcc \
       g++ \
       check \
+      curl \
       libcurl4 \
       libcurl4-openssl-dev \
       libssl-dev \

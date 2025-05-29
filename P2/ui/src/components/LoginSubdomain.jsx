@@ -3,10 +3,15 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { loginSubdomain } from "../services/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 
-function LoginSubdomain({ subdomain, authMethod }) {
+function LoginSubdomain() {
+  const [searchParams] = useSearchParams();
+  const subdomain = searchParams.get("subdomain");
+  const authMethod = searchParams.get("authMethod");
+
   const navigate = useNavigate();
   const [subdomainUrl, setSubdomainUrl] = useState(null);
   // Redirect if no subdomain or authMethod
@@ -48,12 +53,24 @@ function LoginSubdomain({ subdomain, authMethod }) {
       data.subdomain = subdomain;
       const result = await loginSubdomain(data, authMethod);
       if (!result.success) {
-        alert(result.message);
+        toast.error("Seleccione un método de autenticación.", {
+          position: "top-center",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+        });
       }
     } catch (error) {
       console.log(error);
       console.error("Error de red al iniciar sesión:", error);
-      alert("Error de red al iniciar sesión");
+      toast.error("Seleccione un método de autenticación.", {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+      });
     }
     reset();
     console.log("Formulario reiniciado después del envío");
