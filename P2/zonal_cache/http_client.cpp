@@ -12,6 +12,8 @@
 #include "http_client.h"
 #include "httpparser/request.h"
 #include "httpparser/httprequestparser.h"
+#include "httpparser/response.h"
+#include "httpparser/httpresponseparser.h"
 #include <unordered_map>
 #include <cctype>
 #include <stdexcept>
@@ -46,7 +48,7 @@ static size_t write_callback(void * contents, size_t size, size_t nmemb, void * 
 // https://curl.se/libcurl/c/http-post.html
 // https://curl.se/libcurl/c/https.html
 memory_struct *send_https_request(const string &url, const char *data, int length,
-                                  unordered_map<string, string> headers_map, bool use_https, const string& method, bool write_headers = false) {
+                                  unordered_map<string, string> headers_map, bool use_https, const string& method, bool write_headers) {
     CURL *curl;
     CURLcode res;
 
@@ -114,17 +116,6 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
         res = curl_easy_perform(curl);
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
 
-        struct curl_header *header;
-        size_t i = 0;
-        while (curl_easy_header(curl, NULL, i++, &header) == CURLHE_OK) {
-            if (header->name && header->value) {
-                string header_name(header->name);
-                string header_value(header->value);
-                resp_mem->headers[header_name] = header_value;
-            }
-        }
-        
-
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
 
@@ -153,7 +144,7 @@ std::string to_lowercase(const std::string& input) {
 
 // Parser de HTTP es la biblioteca https://github.com/nekipelov/httpparser
 HttpRequest parse_http_request(const char * request_buffer, size_t size) {
-    // Header para acceder a headres más fácilmente
+    // Header para acceder a headers más fácilmente
     unordered_map<string, string> headers = {};
     
     // Crear un objeto request y un parser
@@ -176,6 +167,32 @@ HttpRequest parse_http_request(const char * request_buffer, size_t size) {
     http_request.request = request;
     http_request.headers = headers;
     return http_request;
+}
+
+// Parser de HTTP es la biblioteca https://github.com/nekipelov/httpparser
+HttpResponse parse_http_response(const char * response_buffer, size_t size) {
+    // Header para acceder a headers más fácilmente
+    unordered_map<string, string> headers = {};
+    
+    // Crear un objeto response y un parser
+    Response response;
+    HttpResponseParser parser;
+
+    HttpResponseParser::ParseResult result = parser.parse(response, response_buffer, response_buffer + size);
+    if (result == HttpResponseParser::ParsingCompleted) {
+        for (const auto &header : response.headers) {
+            // Convertir el nombre del header a minúsculas para un acceso más fácil y estándar
+            // El protocolo HTTP es case-insensitive.
+            headers[to_lowercase(header.name)] = header.value;
+        }
+    } else {
+        std::cerr << "Error parsing HTTP request: " << result << std::endl;
+        throw std::runtime_error("Failed to parse HTTP request");
+    }
+    HttpResponse http_response;
+    http_response.response = response;
+    http_response.headers = headers;
+    return http_response;
 }
 
 // Enviar una respuesta HTTP de error al cliente
