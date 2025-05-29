@@ -62,10 +62,10 @@ export default function SubdomainsRecordsTable({
               <td className="px-4 py-2">{rec.destination}</td>
               <td className="px-4 py-2">{rec.authMethod || 'N/A'}</td>
               <td className="px-4 py-2 flex gap-2">
-                  <button onClick={() => navigate(`/domains/${rec.domain}/subdomains/${rec.subdomain}`)} className="p-1 text-gray-600 hover:text-black" title="Editar">
+                  <button onClick={() => navigate(`/domains/${rec.domain}/subdomains/${rec.subdomain}`)} className="p-1 text-gray-600 hover:text-black cursor-pointer" title="Editar">
                     <Edit2 className="text-indigo-600" size={16} />
                   </button>
-                  <button   onClick={() => setDeletionTarget(rec)} className="p-1 text-red-600 hover:text-red-800" title="Eliminar">
+                  <button   onClick={() => setDeletionTarget(rec)} className="p-1 text-red-600 hover:text-red-800 cursor-pointer" title="Eliminar">
                     <Trash2 className="text-red-600" size={16} />
                   </button>
               </td>

@@ -297,7 +297,7 @@ export default function SubdomainForm() {
     <div className="bg-lightgrey2 text-darkgrey max-w-xl mx-auto mt-10 p-6 rounded-2xl shadow-lg">
       <button
         onClick={() => navigate(-1)}
-        className="mb-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+        className="mb-4 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
       >
         <ArrowLeft size={24} />
       </button>
@@ -430,7 +430,7 @@ export default function SubdomainForm() {
           <div>
             <label>API Keys</label>
             {form.apiKeys.map(item => (
-              <div key={item.id} className="flex gap-4 items-center">
+              <div key={item.id} className="flex gap-4 items-center mb-2">
                 <input
                   type="text"
                   value={item.name}
@@ -474,13 +474,13 @@ export default function SubdomainForm() {
                 <button
                   type="button"
                   onClick={() => deleteApiKey(item.id)}
-                  className="p-2 text-red-600"
+                  className="p-2 text-red-600 cursor-pointer"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             ))}
-            <button type="button" onClick={addApiKey} className="text-blue-600">
+            <button type="button" onClick={addApiKey} className="text-blue-600 cursor-pointer">
               + Agregar otra API Key
             </button>
           </div>
@@ -490,7 +490,7 @@ export default function SubdomainForm() {
           <div>
             <label>Usuarios</label>
             {form.users.map(item => (
-              <div key={item.id} className="flex gap-4 items-center">
+              <div key={item.id} className="flex gap-4 items-center mb-2">
                 <input
                   type="text"
                   defaultValue={item.username}
@@ -528,13 +528,13 @@ export default function SubdomainForm() {
                 <button
                   type="button"
                   onClick={() => deleteUser(item.id)}
-                  className="p-2 text-red-600"
+                  className="p-2 text-red-600 cursor-pointer"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             ))}
-            <button type="button" onClick={addUser} className="text-blue-600">
+            <button type="button" onClick={addUser} className="text-blue-600 cursor-pointer">
               + Agregar otro usuario
             </button>
           </div>
@@ -545,14 +545,14 @@ export default function SubdomainForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 border rounded"
+            className="px-4 py-2 border rounded cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="w-full px-4 py-2 bg-secondary text-light rounded-md hover:bg-black transition-colors"
+            className="w-full px-4 py-2 bg-secondary text-light rounded-md hover:bg-black transition-colors cursor-pointer"
           >
             {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear'}
           </button>
