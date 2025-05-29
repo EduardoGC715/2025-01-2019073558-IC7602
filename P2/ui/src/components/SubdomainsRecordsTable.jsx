@@ -37,7 +37,7 @@ export default function SubdomainsRecordsTable({
     <>
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm text-left">
-        <thead className="bg-primary text-s uppercase text-darkgrey">
+        <thead className="bg-primary text-s uppercase text-light">
           <tr>
               <th className="px-4 py-2">#</th>
               <th className="px-4 py-2">Subdominio</th>
@@ -52,21 +52,21 @@ export default function SubdomainsRecordsTable({
         </thead>
         <tbody>
           {subdomains.map((rec, idx) => (
-            <tr key={rec.subdomain} className="border-b hover:bg-lightgrey1">
+            <tr key={rec.subdomain} className="border-b hover:bg-lightgrey2 transition-colors">
               <td className="px-4 py-2">{idx + 1}</td>
-              <td className="px-4 py-2">{rec.subdomain}</td>
-              <td className="px-4 py-2">{(rec.cacheSize / 1000000).toFixed(2)} MB</td>
-              <td className="px-4 py-2">{rec.fileTypes?.join(', ')}</td>
-              <td className="px-4 py-2">{ms(rec.ttl)}</td>
-              <td className="px-4 py-2">{rec.replacementPolicy}</td>
-              <td className="px-4 py-2">{rec.destination}</td>
-              <td className="px-4 py-2">{rec.authMethod || 'N/A'}</td>
+              <td className="px-4 py-2 text-secondary">{rec.subdomain}</td>
+              <td className="px-4 py-2 text-secondary">{(rec.cacheSize / 1000000).toFixed(2)} MB</td>
+              <td className="px-4 py-2 text-secondary">{rec.fileTypes?.join(', ')}</td>
+              <td className="px-4 py-2 text-secondary">{ms(rec.ttl)}</td>
+              <td className="px-4 py-2 text-secondary">{rec.replacementPolicy}</td>
+              <td className="px-4 py-2 text-secondary">{rec.destination}</td>
+              <td className="px-4 py-2 text-secondary">{rec.authMethod || 'N/A'}</td>
               <td className="px-4 py-2 flex gap-2">
-                  <button onClick={() => navigate(`/domains/${rec.domain}/subdomains/${rec.subdomain}`)} className="p-1 text-gray-600 hover:text-black" title="Editar">
-                    <Edit2 className="text-indigo-600" size={16} />
+                  <button onClick={() => navigate(`/domains/${rec.domain}/subdomains/${rec.subdomain}`)} className="p-1 text-accentBlue hover:text-secondary transition-colors" title="Editar">
+                    <Edit2 size={16} />
                   </button>
-                  <button   onClick={() => setDeletionTarget(rec)} className="p-1 text-red-600 hover:text-red-800" title="Eliminar">
-                    <Trash2 className="text-red-600" size={16} />
+                  <button   onClick={() => setDeletionTarget(rec)} className="p-1 text-warning hover:text-secondary transition-colors" title="Eliminar">
+                    <Trash2 size={16} />
                   </button>
               </td>
             </tr>

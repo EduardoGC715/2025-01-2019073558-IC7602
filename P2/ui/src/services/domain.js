@@ -32,6 +32,7 @@ export const getUserDomains = async () => {
       withCredentials: true,
     });
 
+    console.log("Response:", response);
     if (response.status === 200) {
       return {
         success: true,

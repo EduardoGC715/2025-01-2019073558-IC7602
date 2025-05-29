@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { loginUser } from "../services/auth";
 import { useNavigate } from "react-router-dom";
+
 function Login({ isLoggedIn, setIsLoggedIn }) {
   const navigate = useNavigate();
   const schema = z.object({
@@ -58,8 +59,8 @@ function Login({ isLoggedIn, setIsLoggedIn }) {
                 type="text"
                 placeholder="Nombre de usuario"
                 className={`appearance-none rounded-t-md relative block w-full px-3 py-2 border ${
-                  errors.username ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                  errors.username ? "border-warning" : "border-lightgrey2"
+                } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
               />
               {errors.username && (
                 <p className="text-warning text-xs mt-1">
@@ -74,8 +75,8 @@ function Login({ isLoggedIn, setIsLoggedIn }) {
                 type="password"
                 placeholder="Contraseña"
                 className={`appearance-none rounded-b-md relative block w-full px-3 py-2 border ${
-                  errors.password ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                  errors.password ? "border-warning" : "border-lightgrey2"
+                } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
               />
               {errors.password && (
                 <p className="text-warning text-xs mt-1">
@@ -91,7 +92,7 @@ function Login({ isLoggedIn, setIsLoggedIn }) {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 text-primary focus:ring-primary/80 border-gray-300 rounded"
+                className="h-4 w-4 text-primary focus:ring-primary border-lightgrey2 rounded"
               />
               <label
                 htmlFor="remember-me"
@@ -103,7 +104,7 @@ function Login({ isLoggedIn, setIsLoggedIn }) {
 
             <Link
               to="/change-password"
-              className="text-sm text-primary hover:text-primary-700"
+              className="text-sm text-primary hover:text-secondary transition-colors"
             >
               ¿Olvidaste tu contraseña?
             </Link>
@@ -112,7 +113,7 @@ function Login({ isLoggedIn, setIsLoggedIn }) {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-light bg-primary hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/80 "
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-light bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
             >
               Iniciar sesión
             </button>

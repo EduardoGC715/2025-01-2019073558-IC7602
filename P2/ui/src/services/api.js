@@ -52,22 +52,6 @@ api.interceptors.response.use(
 
 // DNS Records API
 export const dnsApi = {
-  // Toma todos los DNS records
-  getAllRecords: async () => {
-    try {
-      const { status, data } = await api.get("/all-domains");
-      console.log("getAllRecords response:", { status, data });
-      if (status === 200) {
-        return data;
-      } else {
-        console.warn(`Unexpected status ${status} when fetching domains`);
-        return [];
-      }
-    } catch (error) {
-      console.error("Error fetching domains:", error);
-      return [];
-    }
-  },
 
   checkHealth: async (domain, direction) => {
     try {

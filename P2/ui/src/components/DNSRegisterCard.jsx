@@ -59,7 +59,7 @@ function DNSRegisterCard() {
 
   return (
     <>
-      <div className="bg-lightgrey2 text-darkgrey max-w-md mx-auto mt-10 p-6 rounded-2xl shadow-lg">
+      <div className="bg-dark text-darkgrey max-w-md mx-auto mt-10 p-6 rounded-2xl shadow-lg">
         <button
           onClick={() => navigate(-1)}
           className="mb-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
