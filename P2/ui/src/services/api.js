@@ -40,9 +40,11 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     if (status === 401 || status === 403) {
+      const requestUrl = error.config.url;
       console.error("Token expirado o inválido");
-      delete api.defaults.headers.common.Authorization;
-      window.location.href = "/";
+      if (!requestUrl.includes("/auth/login/subdomain")) {
+        window.location.href = "/";
+      }
     }
     return Promise.reject(error);
   }
