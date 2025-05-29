@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Eye } from 'lucide-react';
 import {
   createSubdomain,
   updateSubdomain,
@@ -9,11 +9,12 @@ import {
 } from '../services/subdomain';
 import ms from 'ms';
 
-
 export default function SubdomainForm() {
   const { domain, subdomain: subParam } = useParams();
   const isEdit = Boolean(subParam);
   const navigate = useNavigate();
+
+  const genKey = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
   const [form, setForm] = useState({
     subdomain: '',
@@ -23,8 +24,9 @@ export default function SubdomainForm() {
     ttl: '',
     replacementPolicy: '',
     authMethod: '',
-    apiKeys: [{ id: 0, key: '', enabled: true, isExisting: false }],
+    apiKeys: [{ id: 0, name: '', rawKey: genKey(), isExisting: false, showRaw: false },],
     users:   [{ id: 0, username: '', password: '', isExisting: false }],
+    protocol: 'https',
   });
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -45,24 +47,41 @@ export default function SubdomainForm() {
   ];
 
   const addApiKey = () => {
+    const newRawKey = genKey();
     setForm(f => ({
       ...f,
-      apiKeys: [...f.apiKeys, { id: nextApiKeyId, key: '', enabled: true }],
+      apiKeys: [
+        ...f.apiKeys, { 
+          id: nextApiKeyId,
+          name: '',
+          rawKey: newRawKey,
+          isExisting: false,
+          showRaw: true,
+        }
+      ],
     }));
     setNextApiKeyId(id => id + 1);
   };
 
   const deleteApiKey = idToRemove => {
     setForm(f => {
-      const apiKeys = f.apiKeys.filter(item => item.id !== idToRemove);
+      const rest = f.apiKeys.filter(k => k.id !== idToRemove);
       return {
         ...f,
-        apiKeys: apiKeys.length
-          ? apiKeys
-          : [ { id: nextApiKeyId, key: '', enabled: true } ],
+        apiKeys: rest.length
+          ? rest
+          : [
+              {
+                id: nextApiKeyId,
+                name: '',
+                rawKey: genKey(),
+                isExisting: false,
+                showRaw: false,
+              },
+            ],
       };
     });
-    setNextApiKeyId(id => id + 1);
+    setNextApiKeyId(i => i + 1);
   };
   
   const addUser = () => {
@@ -91,46 +110,59 @@ export default function SubdomainForm() {
       return;
     }
 
-    const load = async () => {
+    (async () => {
       setLoading(true);
       try {
         const data = await getSubdomainByName(domain, subParam);
 
-        // normalize apiKeys
-        const rawApiKeys = data.apiKeys || {};
-        let apiKeys = Array.isArray(rawApiKeys)
-          ? rawApiKeys.map((item, i) => {
-              const k = Object.keys(item)[0];
-              return { id: i, key: k, enabled: item[k], isExisting: true };
-            })
-          : Object.entries(rawApiKeys).map(([k, v], i) => ({
-              id: i,
-              key: k,
-              enabled: v,
-              isExisting: true,
-            }));
-        if (!apiKeys.length) apiKeys = [{ id: 0, key: '', enabled: true, isExisting: false }];
+        const apiKeys = Object.entries(data.apiKeys || {}).map(
+          ([hashedKey, name], i) => ({
+            id: i,
+            name,
+            rawKey: '',            
+            isExisting: true,
+            showRaw: false,
+            outputKey: hashedKey,   
+          })
+        );
+        if (!apiKeys.length) {
+          apiKeys.push({
+            id: 0,
+            name: '',
+            rawKey: genKey(),
+            isExisting: false,
+            showRaw: false,
+          });
+        }
 
-        // normalize users
-        const rawUsers = data.users || {};
-        let users = Object.entries(rawUsers).map(([u, p], i) => ({
+        const users = Object.entries(data.users || {}).map(([u, p], i) => ({
           id: i,
           username: u,
           password: p,
           isExisting: true,
         }));
-        if (!users.length) users = [{ id: 0, username: '', password: '', isExisting: false }];
+        if (!users.length) {
+          users.push({
+            id: 0,
+            username: '',
+            password: '',
+            isExisting: false,
+          });
+        }
 
         setForm({
           subdomain: subParam,
           destination: data.destination || '',
-          cacheSize: data.cacheSize ? String(data.cacheSize / 1024 / 1024) : '',
+          cacheSize: data.cacheSize
+            ? String(data.cacheSize / 1024 / 1024)
+            : '',
           fileTypes: data.fileTypes,
           ttl: ms(data.ttl),
           replacementPolicy: data.replacementPolicy,
           authMethod: data.authMethod,
           apiKeys,
           users,
+          protocol: data.useHttps ? 'https' : 'http',
         });
       } catch (err) {
         console.error(err);
@@ -138,10 +170,9 @@ export default function SubdomainForm() {
       } finally {
         setLoading(false);
       }
-    };
-
-    load();
+    })();
   }, [domain, subParam, isEdit]);
+  
   const handleChange = e => {
     const { name, value } = e.target;
     setForm(f => ({ ...f, [name]: value }));
@@ -183,13 +214,17 @@ export default function SubdomainForm() {
 
     // 6. API-Keys
     if (form.authMethod === 'api-keys') {
-      const keys = form.apiKeys.map(k => k.key.trim());
-      if (keys.some(k => !k)) {
-        return toast.error('Todas las API Keys deben tener un valor.');
+      const names = form.apiKeys.map(k => k.name.trim());
+      if (names.some(n => !n)) {
+        return toast.error('Todos los nombres de API Key deben estar completos.');
       }
-      const dup = keys.find((k, i, arr) => arr.indexOf(k) !== i);
-      if (dup) {
-        return toast.error(`API Key duplicada detectada: "${dup}".`);
+      const dupName = names.find((n, i, arr) => arr.indexOf(n) !== i);
+      if (dupName) {
+        return toast.error(`Nombre de API Key duplicado detectado: "${dupName}".`);
+      }
+      const raws = form.apiKeys.map(k => k.rawKey);
+      if (raws.some(r => !r)) {
+        return toast.error('Ha ocurrido un error con la generación de las API Keys.');
       }
     }
 
@@ -212,28 +247,28 @@ export default function SubdomainForm() {
       let payloadUsers    = {};
 
       if (form.authMethod === 'api-keys') {
-        payloadApiKeys = form.apiKeys.reduce(
-          (m, { key, enabled }) => ({ ...m, [key.trim()]: enabled }),
-          {}
-        );
+        payloadApiKeys = form.apiKeys.reduce((m, { rawKey, name }) => {
+          m[rawKey] = name.trim();
+          return m;
+        }, {});
+      } else if (form.authMethod === 'user-password') {
+        payloadUsers = form.users.reduce((m, { username, password }) => {
+          m[username.trim()] = password;
+          return m;
+        }, {});
       }
-      else if (form.authMethod === 'user-password') {
-        payloadUsers = form.users.reduce(
-          (m, { username, password }) => ({ ...m, [username.trim()]: password }),
-          {}
-        );
-      }
-      
+
       const payload = {
-        subdomain:         form.subdomain,
-        destination:       form.destination,
-        cacheSize:         cacheBytes,
-        ttl:               ttlMs,
-        fileTypes:         form.fileTypes,
+        subdomain: form.subdomain,
+        destination: form.destination,
+        cacheSize: mb,
+        ttl: ttlMs,
+        fileTypes: form.fileTypes,
         replacementPolicy: form.replacementPolicy,
-        authMethod:        form.authMethod,
-        apiKeys:           payloadApiKeys,
-        users:             payloadUsers,
+        authMethod: form.authMethod,
+        apiKeys: payloadApiKeys,
+        users: payloadUsers,
+        https: form.protocol === 'https'
       };
 
       if (isEdit) {
@@ -289,14 +324,28 @@ export default function SubdomainForm() {
 
         {/* Destination */}
         <div>
-          <label>Destino (URL o IP)</label>
-          <input
-            name="destination"
-            value={form.destination}
-            onChange={handleChange}
-            required
-            className="w-full p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          <label className="block mb-1 font-medium">Destino (URL o IP)</label>
+          <div className="flex items-center gap-2">
+            <select
+              name="protocol"
+              value={form.protocol}
+              onChange={e =>
+                setForm(f => ({ ...f, protocol: e.target.value }))
+              }
+              className="p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="http">http://</option>
+              <option value="https">https://</option>
+            </select>
+            <input
+              name="destination"
+              value={form.destination}
+              onChange={handleChange}
+              required
+              placeholder="ej. ejemplo.com o 192.168.0.1"
+              className="flex-1 p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
         </div>
 
         {/* Cache size & TTL */}
@@ -387,33 +436,43 @@ export default function SubdomainForm() {
                 <input
                   type="text"
                   defaultValue={item.key}
-                  placeholder="API Key"
+                  placeholder="Nombre de la Key"
                   className="flex-1 p-2 border rounded"
-                  onBlur={e => {
-                    const newKey = e.target.value.trim();
+                  onChange={e => 
                     setForm(f => ({
                       ...f,
                       apiKeys: f.apiKeys.map(k =>
-                        k.id === item.id ? { ...k, key: newKey } : k
+                        k.id === item.id ? { ...k, name: e.target.value } : k
                       ),
-                    }));
-                  }}
+                    }))}
                   readOnly={item.isExisting}
                   disabled={item.isExisting}
                 />
-                <input
-                  type="checkbox"
-                  checked={item.enabled}
-                  onChange={e => {
-                    const enabled = e.target.checked;
-                    setForm(f => ({
-                      ...f,
-                      apiKeys: f.apiKeys.map(k =>
-                        k.id === item.id ? { ...k, enabled } : k
-                      ),
-                    }));
-                  }}
-                />
+
+                {!item.isExisting && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm(f => ({
+                        ...f,
+                        apiKeys: f.apiKeys.map(k =>
+                          k.id === item.id ? { ...k, showRaw: !k.showRaw } : k
+                        ),
+                      }))
+                    }
+                    className="p-2 border rounded text-sm flex items-center gap-1"
+                  >
+                    <Eye size={14} />
+                    {item.showRaw ? 'Ocultar' : 'Mostrar Key'}
+                  </button>
+                )}
+
+                {item.showRaw && (
+                  <code className="bg-gray-100 px-2 py-1 rounded break-all">
+                    {item.rawKey}
+                  </code>
+                )}
+
                 <button
                   type="button"
                   onClick={() => deleteApiKey(item.id)}
