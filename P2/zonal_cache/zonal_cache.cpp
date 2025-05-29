@@ -526,7 +526,7 @@ string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const s
 }
 
 // 
-void addToCacheByHost(const string& host, const string& key, const string& filename, size_t size) {
+void add_to_cache_by_host(const string& host, const string& key, const string& filename, size_t size) {
     // Acquire a unique lock for writing to the cache
      shared_lock<shared_mutex> read_lock(subdomain_mutex);
 
