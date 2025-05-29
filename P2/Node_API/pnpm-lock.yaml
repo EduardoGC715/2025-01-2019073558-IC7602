@@ -2313,7 +2313,7 @@ packages:
     engines: {node: '>=14'}
     requiresBuild: true
     dependencies:
-      '@grpc/grpc-js': 1.13.4
+      '@grpc/grpc-js': 1.13.3
       '@grpc/proto-loader': 0.7.15
       '@types/long': 4.0.2
       abort-controller: 3.0.0
@@ -3737,7 +3737,7 @@ packages:
       std-env: 3.9.0
       tinybench: 2.9.0
       tinyexec: 0.3.2
-      tinyglobby: 0.2.14
+      tinyglobby: 0.2.13
       tinypool: 1.0.2
       tinyrainbow: 2.0.0
       vite: 6.3.5(@types/node@22.15.20)(tsx@4.19.4)

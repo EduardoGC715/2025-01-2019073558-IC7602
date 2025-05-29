@@ -151,7 +151,7 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
   if (!session || !session.user) {
     res.status(401).json({ message: "Unauthorized" });
-    return 
+    return
   }
 
   try {
@@ -159,7 +159,7 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    
+
     const domainRef = firestore
       .collection("users")
       .doc(session.user)
@@ -171,7 +171,7 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
     if (!data?.validation) {
       res.status(400).json({ message: "Faltan datos de validación" });
-      return 
+      return
     }
 
     const { subdomain, token } = data.validation;
@@ -181,17 +181,16 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
     if (!txtRecords.length) {
       res.status(404).json({ message: "No se encontró el registro TXT" });
-      return 
+      return
     }
 
     const receivedToken = txtRecords[0][0].replace(/"/g, "");
 
     if (receivedToken !== token) {
       res.status(400).json({ message: "Token no coincide" });
-      return 
+      return
     }
 
-    console.log("=== Token válido ===");
     res.status(200).json({ message: "Dominio verificado correctamente" });
   } catch (err) {
     console.error("Error al verificar dominio:", err);
