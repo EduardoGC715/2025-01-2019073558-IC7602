@@ -427,7 +427,7 @@ export default function SubdomainForm() {
         {form.authMethod === 'api-keys' && (
           <div>
             {form.apiKeys.map(item => (
-              <div key={item.id} className="flex gap-4 items-center">
+              <div key={item.id} className="flex gap-4 items-center mb-2">
                 <input
                   type="text"
                   value={item.name}
@@ -491,7 +491,7 @@ export default function SubdomainForm() {
           <div>
             <label>Usuarios</label>
             {form.users.map(item => (
-              <div key={item.id} className="flex gap-4 items-center">
+              <div key={item.id} className="flex gap-4 items-center mb-2">
                 <input
                   type="text"
                   defaultValue={item.username}
@@ -529,13 +529,13 @@ export default function SubdomainForm() {
                 <button
                   type="button"
                   onClick={() => deleteUser(item.id)}
-                  className="p-2 text-red-600"
+                  className="p-2 text-red-600 cursor-pointer"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             ))}
-            <button type="button" onClick={addUser} className="text-blue-600">
+            <button type="button" onClick={addUser} className="text-blue-600 cursor-pointer">
               + Agregar otro usuario
             </button>
           </div>
