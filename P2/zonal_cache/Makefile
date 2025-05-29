@@ -4,12 +4,12 @@ UNIT_TEST = -DUNIT_TEST
 all: zonal_cache
 
 zonal_cache: zonal_cache.cpp http_client.cpp
-	$(CC) $(CFLAGS) -o zonal_cache zonal_cache.cpp http_client.cpp -pthread -lcurl
+	$(CC) $(CFLAGS) -o zonal_cache zonal_cache.cpp http_client.cpp -pthread -lcurl -lssl -lcrypto
 
 test: test_interceptor.c
 	$(CC) $(CFLAGS) $(UNIT_TEST) -o test_interceptor \
 	test_interceptor.c interceptor.c b64/cencode.c b64/cdecode.c \
-	-pthread -lcurl -lcheck -lsubunit -lm -lrt
+	-pthread -lcurl -lcheck -lsubunit -lm -lrt -lssl -lcrypto
 	./test_interceptor
 
 run: zonal_cache

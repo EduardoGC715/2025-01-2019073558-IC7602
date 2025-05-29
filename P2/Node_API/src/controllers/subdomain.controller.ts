@@ -34,8 +34,9 @@ interface registerSubdomainRequestBody {
   ttl: StringValue; // Duration in ms format
   replacementPolicy: string; // e.g., "LRU", "LFU", etc.
   authMethod: string; // e.g., "api-keys", "user-password", "none"
-  apiKeys?: Record<string, boolean>; // apiKey: true
+  apiKeys?: Record<string, string>; // apiKey: true
   users?: Record<string, string>; // username: password
+  https?: boolean; // Optional, true if HTTPS is enabled
   destination: string; // e.g., "https://example.com"
 }
 
@@ -57,6 +58,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       authMethod,
       apiKeys,
       users,
+      https,
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
 
@@ -67,16 +69,18 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     if (
       subdomain !== "" &&
-      !validator.isFQDN(subdomain, { require_tld: false })
+      !validator.isFQDN(subdomain, { require_tld: false }) && 
+      !wildcardRe.test(subdomain)
     ) {
       res.status(400).json({ message: "Subdominio inválido" });
       return;
     }
 
     const fullDomain = subdomain + "." + domain;
-    if (!validator.isFQDN(fullDomain)) {
+    if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
     }
@@ -97,6 +101,11 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    if (typeof https !== 'boolean') {
+      res.status(400).json({ message: 'El campo useHttps debe ser true o false' });
+      return;
+    }
+
     // Validar que replacementPolicy sea uno de los valores permitidos
     const allowedPolicies = ["LRU", "LFU", "FIFO", "MRU", "Random"];
     if (!allowedPolicies.includes(replacementPolicy)) {
@@ -107,6 +116,8 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       });
       return;
     }
+
+    const hashedApiKeys: Record<string, string> = {};
 
     // Validar lógica de authMethod
     if (authMethod === "api-keys") {
@@ -123,6 +134,19 @@ export const registerSubdomain = async (req: Request, res: Response) => {
             "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys",
         });
         return;
+      }
+      for (const [rawKey, nickname] of Object.entries(apiKeys)) {
+        if (!rawKey || typeof nickname !== "string") {
+          res.status(400).json({
+            message:
+              'Cada API Key debe tener una clave no vacía y un "nombre" válido',
+          });
+          return;
+        }
+      
+        const salt = bcrypt.genSaltSync(10);
+        const hashedKey = bcrypt.hashSync(rawKey, salt);
+        hashedApiKeys[hashedKey] = nickname;
       }
     } else if (authMethod === "user-password") {
       if (typeof users !== 'object' || users === null || Array.isArray(users) || Object.keys(users).length === 0) {
@@ -170,7 +194,9 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     }
 
     const flipped_domain = fullDomain.trim().split(".").reverse().join("/");
+
     const fullDomainRef = database.ref(`domains/${flipped_domain}`);
+ 
     const domainSnapshot = await fullDomainRef.once("value");
     if (domainSnapshot.exists()) {
       res.status(400).json({ message: "El subdominio ya está registrado" });
@@ -195,8 +221,9 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       ttl,
       replacementPolicy,
       authMethod,
-      apiKeys,
-      users,
+      apiKeys: authMethod === "api-keys" ? hashedApiKeys : {},
+      users: authMethod === "user-password" ? users : {},
+      https,
       destination,
     };
     batch.set(subdomainRef, subdomainData);
@@ -270,6 +297,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       authMethod,
       apiKeys,
       users,
+      https,
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;  
 
@@ -299,6 +327,11 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         message: "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)",
       });
       return;
+    }
+    
+    if (typeof https !== 'boolean') {
+      res.status(400).json({ message: 'El campo useHttps debe ser true o false' });
+      return
     }
 
     const allowedPolicies = ["LRU", "LFU", "FIFO", "MRU", "Random"];
@@ -350,7 +383,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return
     }
 
-    const usersMap = users as Record<string,string>;
+    const usersMap = (users as Record<string, string>);
 
     if (authMethod === "user-password") {
       for (const [username, password] of Object.entries(usersMap)) {
@@ -360,6 +393,18 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         }
       }
     }
+
+    const apiKeysMap = (apiKeys as Record<string, string>);
+    let hashedApiKeys: Record<string, string> = {};
+    if (authMethod === 'api-keys') {
+      for (const [rawKey, name] of Object.entries(apiKeysMap)) {
+        const finalKey = rawKey.startsWith('$2')
+          ? rawKey
+          : bcrypt.hashSync(rawKey, bcrypt.genSaltSync(10));
+        hashedApiKeys[finalKey] = name;
+      }
+    }
+
 
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
     const subdomainRef = firestore.collection("subdomains").doc(fullDomain);
@@ -379,8 +424,9 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       ttl,
       replacementPolicy,
       authMethod,
-      apiKeys,
-      users,
+      apiKeys:   authMethod === 'api-keys'      ? hashedApiKeys : {},
+      users:     authMethod === 'user-password' ? usersMap    : {},
+      https,
       destination,
     };
 

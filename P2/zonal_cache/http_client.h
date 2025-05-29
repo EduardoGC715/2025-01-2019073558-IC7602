@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include "httpparser/request.h"
-
+#include "httpparser/response.h"
 using namespace std;
 using namespace httpparser;
 
@@ -20,7 +20,13 @@ struct HttpRequest {
     Request request;
 };
 
-memory_struct *send_https_request(const char *url, const char *data, int length, unordered_map<string, string> headers_map);
+struct HttpResponse {
+    unordered_map<string, string> headers;
+    Response response;
+};   
+
+memory_struct *send_https_request( const string &url, const char *data, int length, unordered_map<string, string> headers_map, bool use_https, const string& method, bool write_headers = false);
 HttpRequest parse_http_request(const char *request_buffer, size_t request_size);
-void send_http_error_response (int client_socket, const std::string &error_message, int status_code);
+HttpResponse parse_http_response(const char *response_buffer, size_t response_size);
+void send_http_error_response (int client_socket, const string &error_message, int status_code);
 #endif // HTTP_CLIENT_H

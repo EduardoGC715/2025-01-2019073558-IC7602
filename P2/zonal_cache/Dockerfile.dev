@@ -1,5 +1,5 @@
 # Dockerfile.dev
-FROM debian:bullseye
+FROM ubuntu:noble
 
 # Install essential build tools and common dependencies
 RUN apt-get update && \
@@ -9,7 +9,9 @@ RUN apt-get update && \
       g++ \
       check \
       libcurl4 \
-      libcurl4-openssl-dev && \
+      libcurl4-openssl-dev \
+      libssl-dev \
+      openssl && \
     rm -rf /var/lib/apt/lists/*
 
 # Set default working directory

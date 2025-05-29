@@ -9,7 +9,9 @@ RUN apt-get update && \
       g++ \
       check \
       libcurl4 \
-      libcurl4-openssl-dev && \
+      libcurl4-openssl-dev \
+      libssl-dev \
+      openssl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -22,5 +24,6 @@ COPY Makefile /app
 
 RUN make test
 RUN make all
+
 
 CMD ["./interceptor"]

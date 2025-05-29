@@ -55,7 +55,7 @@ export default function SubdomainsRecordsTable({
             <tr key={rec.subdomain} className="border-b hover:bg-lightgrey1">
               <td className="px-4 py-2">{idx + 1}</td>
               <td className="px-4 py-2">{rec.subdomain}</td>
-              <td className="px-4 py-2">{(rec.cacheSize / (1024 * 1024)).toFixed(2)} MB</td>
+              <td className="px-4 py-2">{(rec.cacheSize / 1000000).toFixed(2)} MB</td>
               <td className="px-4 py-2">{rec.fileTypes?.join(', ')}</td>
               <td className="px-4 py-2">{ms(rec.ttl)}</td>
               <td className="px-4 py-2">{rec.replacementPolicy}</td>

@@ -16,8 +16,13 @@
 #include "rapidjson/stringbuffer.h"
 #include "http_client.h"
 #include "zonal_cache.h"
-#include <regex>
 #include <iomanip>
+#include <fstream>
+#include <openssl/sha.h>
+#include <iomanip>
+#include <sstream>
+#include <cerrno>
+#include <cstring>
 
 using namespace std;
 using namespace rapidjson;
@@ -33,6 +38,9 @@ Document subdomains;
 // https://en.cppreference.com/w/cpp/thread/shared_mutex
 shared_mutex subdomain_mutex;
 
+Document cache;
+shared_mutex cache_mutex;
+
 
 // Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
 // Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
@@ -47,7 +55,7 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
     // Hilo que se ejecuta indefinidamente para obtener los subdominios.
     while (true) {
         // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-        memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
+        memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
         if (response && response->status_code == 200) {
             // Documento temporal para almacenar la respuesta JSON.
             Document temp;
@@ -66,6 +74,9 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
                 cout << "\033[1;34mSubdomains fetched successfully.\033[0m" << endl;
                 cout << "\033[1;34mSubdomains: " << buffer.GetString() << "\033[0m" << endl;
                 cout << "\033[1;34mResponse code: " << response->status_code << "\033[0m" << endl;
+                for (auto &header : response->headers) {
+                    cout << "\033[1;34mHeader: " << header.first << ": " << header.second << "\033[0m" << endl;
+                }
             } else {
                 cout << "\033[1;34mFailed to parse JSON response.\033[0m" << endl;
             }
@@ -76,6 +87,71 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
             cout << "\033[1;34mFailed to fetch subdomains. Status code: " << (response ? response->status_code : -1) << "\033[0m" << endl;
             this_thread::sleep_for(chrono::seconds(20));
         }
+    }
+}
+
+void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
+    while (true) {
+        {
+            // Acquire a shared lock for reading
+            shared_lock<shared_mutex> read_lock(cache_mutex);
+
+            // Get the current time
+            auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+            string currentTimestamp = ctime(&now);
+            currentTimestamp.pop_back(); // Remove the newline character
+
+            // Iterate over the hosts in the cache
+            for (auto host_itr = cache.MemberBegin(); host_itr != cache.MemberEnd(); ) {
+                Value& hostObject = host_itr->value;
+
+                // Iterate over the URIs for the current host
+                for (auto uri_itr = hostObject.MemberBegin(); uri_itr != hostObject.MemberEnd(); ) {
+                    Value& uriObj = uri_itr->value;
+
+                    cout << "Checking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\n";
+                    
+                    // Check if the TTL has expired
+                    if (uriObj.HasMember("time_to_live") && uriObj["time_to_live"].IsString()) {
+                        string ttlTimestamp = uriObj["time_to_live"].GetString();
+                        if (ttlTimestamp <= currentTimestamp) {
+                            // Release the shared lock and acquire a unique lock for writing
+                            read_lock.unlock();
+                            unique_lock<shared_mutex> write_lock(cache_mutex);
+
+                            // Remove the expired URI
+                            cout << "Removing expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << endl;
+                            uri_itr = hostObject.RemoveMember(uri_itr);
+
+                            // Release the write lock and reacquire the shared lock
+                            write_lock.unlock();
+                            read_lock.lock();
+                            continue;
+                        }
+                    }
+                    ++uri_itr;
+                }
+
+                // If the host has no more URIs, remove the host
+                if (hostObject.MemberCount() == 0) {
+                    // Release the shared lock and acquire a unique lock for writing
+                    read_lock.unlock();
+                    unique_lock<shared_mutex> write_lock(cache_mutex);
+
+                    cout << "Removing empty host: " << host_itr->name.GetString() << endl;
+                    host_itr = cache.RemoveMember(host_itr);
+
+                    // Release the write lock and reacquire the shared lock
+                    write_lock.unlock();
+                    read_lock.lock();
+                } else {
+                    ++host_itr;
+                }
+            }
+        }
+
+        // Sleep for a short interval before checking again
+        this_thread::sleep_for(chrono::seconds(30));
     }
 }
 
@@ -179,66 +255,317 @@ std::string urlEncode(const std::string& str) {
     return encodedStream.str();
 }
 
-// Referencia para Regex en C++: https://www.geeksforgeeks.org/regex-regular-expression-in-c/
-// Referencia para Regex de cookie: https://www.regex-tutorial.com/getCookieWithRegex.html
-bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
-    auto it = request.headers.find("cookie");
-    if (it != request.headers.end()) {
-        const string &cookies = it->second;
-        string token = get_token_from_cookies(cookies);
-        if (!token.empty()) {
-            string url = rest_api + "/auth/validate";
-            unordered_map<string, string> headers_map = {
-                {"Content-Type", "application/json"},
-                {"x-app-id", app_id},
-                {"x-api-key", api_key},
-                {"Cookie", "token=" + token}
-            };
+// Referencia para SHA256 en C++: https://terminalroot.com/how-to-generate-sha256-hash-with-cpp-and-openssl/
+string hashString(const string& input) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)input.c_str(), input.size(), hash);
 
-            // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-            memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map);
-            if (response && response->status_code == 200) {
-                // Si la respuesta es válida, se autentica la solicitud.
-                cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
-                free(response->memory);
-                free(response);
-                return true;
-            }
-            free(response->memory);
-            free(response);
-        }
-    } else if (request.request.uri.find("/_auth/callback") != string::npos) {
-        string token = get_query_parameter(request.request.uri, "token");
-        string next = get_query_parameter(request.request.uri, "next");
-        string exp = get_query_parameter(request.request.uri, "exp");
-        cout << "Token: " << token << endl;
-        cout << "Next: " << next << endl;
-        cout << "Exp: " << exp << endl;
-        // Enviar la respuesta con el Cookie al cliente por el socket.
-        string response = "HTTP/1.1 302 Found\r\n"
-                        "Location: " + next + "\r\n"
-                        "Set-Cookie: token=" + token + "; HttpOnly; SameSite=Lax; Expires=" + exp + "\r\n"
-                        "Connection: close\r\n"
-                        "Content-Length: 0\r\n"
-                        "\r\n";
-        send(client_socket, response.c_str(), response.size(), 0);
+    // Convert the hash to a hexadecimal string
+    stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
     }
-    // Hay que autenticar. Se redirige al usuario a la página de login.
-    string scheme = https ? "https://" : "http://";
-    string host = request.headers.at("host");
-    shared_lock<shared_mutex> lock(subdomain_mutex);
-    const string &authMethod = subdomains[host.c_str()]["authMethod"].GetString();
-    lock.unlock();
-    string url = scheme + host + request.request.uri;
-    string url_encoded = urlEncode(url);
-    string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod;
-    string response = "HTTP/1.1 302 Found\r\n"
-                        "Location: " + redirect_url + "\r\n"
-                        "Connection: close\r\n"
-                        "Content-Length: 0\r\n"
-                        "\r\n";
-    send(client_socket, response.c_str(), response.size(), 0);
+    return ss.str();
+}
+
+// Función que autentica una solicitud HTTP entrante.
+bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
+    auto host_it = request.headers.find("host");
+    if (host_it != request.headers.end()) {
+        // Obtener el host
+        const string &host = host_it->second;
+        shared_lock<shared_mutex> lock(subdomain_mutex);
+        string authMethod;
+        // Verificar si el host es un subdominio registrado en el objeto subdomains.
+        if (subdomains.HasMember(host.c_str()) && subdomains[host.c_str()].IsObject()) {
+            const Value& subdomain_obj = subdomains[host.c_str()];
+            if (subdomain_obj.HasMember("authMethod") && subdomain_obj["authMethod"].IsString()) {
+                // Obtener el método de autenticación del subdominio.
+                authMethod = subdomain_obj["authMethod"].GetString();
+            } else {
+                cerr << "\033[1;31mAuth method not found in subdomain object.\033[0m" << endl;
+                // Enviar respuesta HTTP 401 Unauthorized
+                send_http_error_response(client_socket, "Not Found", 404);
+                return false;
+            }
+        } else {
+            cerr << "\033[1;31mSubdomain not found.\033[0m" << endl;
+            // Enviar respuesta HTTP 401 Unauthorized
+            send_http_error_response(client_socket, "Not Found", 404);
+            return false;
+        }
+        lock.unlock();
+        if (authMethod == "none") {
+            // Si no hay autenticación, se permite la solicitud.
+            return true;
+        } else if (authMethod == "user-password") {
+            // Si el método de autenticación es user-password, se verifica si hay un cookie con el token de autenticación.
+            auto it = request.headers.find("cookie");
+            if (it != request.headers.end()) {
+                const string &cookies = it->second;
+                string token = get_token_from_cookies(cookies);
+                if (!token.empty()) {
+                    // Si se encuentra el token, se envía una solicitud al Rest API para validarlo.
+                    string url = rest_api + "/auth/validate";
+                    unordered_map<string, string> headers_map = {
+                        {"Content-Type", "application/json"},
+                        {"x-app-id", app_id},
+                        {"x-api-key", api_key},
+                        {"Cookie", "token=" + token}
+                    };
+
+                    // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
+                    memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
+                    if (response && response->status_code == 200) {
+                        // Si la respuesta es válida, se autentica la solicitud.
+                        cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
+                        free(response->memory);
+                        free(response);
+                        return true;
+                    }
+                    free(response->memory);
+                    free(response);
+                }
+            } else if (request.request.uri.find("/_auth/callback") != string::npos) {
+                string token = get_query_parameter(request.request.uri, "token");
+                string next = get_query_parameter(request.request.uri, "next");
+                string exp = get_query_parameter(request.request.uri, "exp");
+                cout << "Token: " << token << endl;
+                cout << "Next: " << next << endl;
+                cout << "Exp: " << exp << endl;
+                // Enviar la respuesta con el Cookie al cliente por el socket.
+                string response = "HTTP/1.1 302 Found\r\n"
+                                "Location: " + next + "\r\n"
+                                "Set-Cookie: token=" + token + "; HttpOnly; SameSite=Lax; Expires=" + exp + "\r\n"
+                                "Connection: close\r\n"
+                                "Content-Length: 0\r\n"
+                                "\r\n";
+                send(client_socket, response.c_str(), response.size(), 0);
+                return false;
+            }
+            // Hay que autenticar. Se redirige al usuario a la página de login.
+            string scheme = https ? "https://" : "http://";
+            string url = scheme + host + request.request.uri;
+            string url_encoded = urlEncode(url);
+            string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod;
+            string response = "HTTP/1.1 302 Found\r\n"
+                                "Location: " + redirect_url + "\r\n"
+                                "Connection: close\r\n"
+                                "Content-Length: 0\r\n"
+                                "\r\n";
+            send(client_socket, response.c_str(), response.size(), 0);
+            return false;
+        } else if (authMethod == "api-keys") {
+            auto it = request.headers.find("x-api-key");
+            if (it != request.headers.end()) {
+                const string &api_key = it->second;
+                string url = rest_api + "/auth/validate";
+                unordered_map<string, string> headers_map = {
+                    {"Content-Type", "application/json"},
+                    {"x-app-id", app_id},
+                    {"x-api-key", api_key}
+                };
+
+                // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
+                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map, true, request.request.method.c_str(), false);
+                if (response && response->status_code == 200) {
+                    // Si la respuesta es válida, se autentica la solicitud.
+                    cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
+                    free(response->memory);
+                    free(response);
+                    return true;
+                } else {
+                    cerr << "\033[1;31mAuthentication failed with API key.\033[0m" << endl;
+                    // Enviar respuesta HTTP 401 Unauthorized
+                    send_http_error_response(client_socket, "Unauthorized", 401);
+                    free(response->memory);
+                    free(response);
+                    return false;
+                }
+            } else {
+                cerr << "\033[1;31mAPI key not found in request headers.\033[0m" << endl;
+                // Enviar respuesta HTTP 401 Unauthorized
+                send_http_error_response(client_socket, "Unauthorized", 401);
+                return false;
+            }
+        } else {
+            cerr << "\033[1;31mUnknown authentication method: " << authMethod << "\033[0m" << endl;
+            // Enviar respuesta HTTP 500 Internal Server Error
+            send_http_error_response(client_socket, "Internal Server Error", 500);
+            return false;
+        }
+    } 
+    cerr << "\033[1;31mHost not found.\033[0m" << endl;
+    // Enviar respuesta HTTP 401 Unauthorized
+    send_http_error_response(client_socket, "Bad Request", 400);
     return false;
+}
+
+// 
+void addToCacheByHost(Document& cache, const string& host, const string& uri, const string& filename, int time_to_live) {
+    Document::AllocatorType& allocator = cache.GetAllocator();
+
+    // Check if the host exists in the cache
+    if (!cache.HasMember(host.c_str())) {
+        // Create a new host object if it doesn't exist
+        Value hostObj(kObjectType);
+        cache.AddMember(Value().SetString(host.c_str(), allocator), hostObj, allocator);
+    }
+
+    // Get the host object
+    Value& hostObject = cache[host.c_str()];
+
+    // Check if the URI exists for this host
+    if (!hostObject.HasMember(uri.c_str())) {
+        // Create a new URI object if it doesn't exist
+        Value uriObj(kObjectType);
+
+        // Add fields to the URI object
+        auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+        string currentTimestamp = ctime(&now);
+        currentTimestamp.pop_back(); // Remove the newline character
+
+        uriObj.AddMember("received", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("most_recent_use", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("times_used", Value().SetInt(0), allocator);
+        uriObj.AddMember("time_to_live", Value().SetInt(time_to_live), allocator);
+        uriObj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
+
+        // Add the URI object to the host object
+        hostObject.AddMember(Value().SetString(uri.c_str(), allocator), uriObj, allocator);
+    } else {
+        // Update the existing URI object
+        Value& uriObj = hostObject[uri.c_str()];
+        auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+        string currentTimestamp = ctime(&now);
+        currentTimestamp.pop_back(); // Remove the newline character
+
+        uriObj["most_recent_use"].SetString(currentTimestamp.c_str(), allocator);
+        uriObj["times_used"].SetInt(uriObj["times_used"].GetInt() + 1);
+    }
+}
+
+string get_response(const int &client_socket, HttpRequest request){
+    if (cache.HasMember(request.headers.at("host").c_str())) {
+
+        Value& host_object = cache[request.headers["host"].c_str()];
+        cout << "Host object found in cache." << endl;
+        cout << "Request URI: " << request.request.method << request.request.uri << endl;
+        
+        if (host_object.HasMember((request.request.method + "-" + request.request.uri).c_str())) {
+            cout << "URI object found in cache." << endl;
+            Value& entry = host_object[(request.request.method + "-" + request.request.uri).c_str()];
+            
+            // Revisar la cache para ver si el request está en el cache.
+                
+            string filepath = "sub_domain_caches/" + request.headers["host"] + "/" + entry["filename"].GetString();
+            ifstream file(filepath, ios::binary | ios::ate);
+            
+            if (!file.is_open()) {
+                cerr << "Failed to open file: " << filepath << endl;
+                if (file.fail()) {
+                    cerr << "File stream failed. Possible reasons: file does not exist, insufficient permissions, or invalid path." << endl;
+                }
+                cerr << "Error: " << strerror(errno) << endl; // Prints the specific error message
+                return "";
+            }
+
+            streamsize size = file.tellg();
+            file.seekg(0, ios::beg);
+
+            string content;
+            content.resize(size);
+            
+            if (file.read(&content[0], size)) {
+                cout << "Se pudieron leer " << size << " bytes de " << filepath << endl;
+                // Check if the entry is still valid based on time_to_live
+                auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+                string currentTimestamp = ctime(&now);
+                currentTimestamp.pop_back(); // Remove the newline character
+                
+                Document::AllocatorType& allocator = cache.GetAllocator();
+                // Update the most_recent_use field
+                entry["most_recent_use"].SetString(currentTimestamp.c_str(), allocator);
+
+                // Increment the times_used field
+                if (entry.HasMember("times_used") && entry["times_used"].IsInt()) {
+                    entry["times_used"].SetInt(entry["times_used"].GetInt() + 1);
+                } else {
+                    // If times_used doesn't exist or is not an integer, initialize it
+                    entry.AddMember("times_used", 1, allocator);
+                }
+                cout << content << endl;
+                return content;
+            } else {
+                cerr << "Failed to read cache file: " << filepath << endl;
+                return "";
+            }
+            
+        } 
+    }
+    shared_lock<shared_mutex> lock(subdomain_mutex);
+    const Value& subdomain_obj = subdomains[host.c_str()];
+    if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
+        string destination = subdomain_obj["destination"].GetString();
+        cout << "Destination found: " << destination << endl;
+        bool https = subdomain_obj["https"].GetBool();
+        auto &fileTypes = subdomain_obj["fileTypes"].GetArray();
+
+        // Si no está en el cache, se hace una solicitud al destino.
+        string url = (https ? "https://" : "http://") + destination + request.request.uri;
+        cout << "Fetching from URL: " << url << endl;
+        unordered_map<string, string> headers_map = {
+            {"Content-Type", "application/json"},
+            {"x-app-id", app_id},
+            {"x-api-key", api_key}
+        };
+        
+        memory_struct * response = send_https_request(url, request.request.content.data(), request.request.content.size(), headers_map, https, request.request.method, true);
+        if (response) {
+            HttpResponse http_response = parse_http_response(response->memory, response->size);
+            auto it = http_response.headers.find("Content-Type");
+            if (it != http_response.headers.end()) {
+                string content_type_header = it->second;
+                cout << "Content-Type: " << content_type_header << endl;
+                size_t pos = content_type_header.find(';');
+                string content_type = content_type_header.substr(0, pos); // Extraer el content_type antes del punto y coma
+                content_type.erase(remove_if(content_type.begin(), content_type.end(), ::isspace), content_type.end()); // Quitar espacios
+
+                // Verificar si el Content-Type es uno de los tipos de archivo permitidos.
+                bool is_allowed = false;
+                for (const auto& fileType : fileTypes) {
+                    if (fileType.IsString() && content_type == fileType.GetString()) {
+                        is_allowed = true;
+                        break;
+                    }
+                }
+
+                if (is_allowed) {
+                    cout << "Content-Type is allowed." << endl;
+                    // Guardar la respuesta en el cache.
+                    string filename = hashString(url + to_string(time(nullptr))) + ".ksh";
+                    ofstream out_file("sub_domains_caches/" + filename, ios::binary);
+                    if (out_file) {
+                        out_file.write(response->memory, response->size);
+                        out_file.close();
+                        cout << "Response saved to cache as: " << filename << endl;
+
+                        // Agregar a la cache
+                        addToCacheByHost(cache, request.headers.at("host"), request.request.method + "-" + request.request.uri, filename, 60);
+
+                        return string(response->memory, response->size);
+                    } else {
+                        cerr << "Failed to open cache file for writing." << endl;
+                    }
+                } else {
+                    cerr << "Content-Type not allowed: " << content_type << endl;
+                }
+            } else {
+                cerr << "Content-Type header not found in response." << endl;
+            }
+            send(client_socket, response->memory, response->size, 0);
+        }
+    }
 }
 
 // Función para procesar una solicitud HTTP entrante.
@@ -269,9 +596,7 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             } catch (const exception &e) {
                 cerr << "Error parsing HTTP request: " << e.what() << endl;
                 send_http_error_response(client_socket, "Bad Request", 400);
-                close(client_socket);
-                free(request_buffer);
-                return;
+                break;
             }
             bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
             if (!authenticated) {
@@ -320,6 +645,10 @@ int main() {
         std::cerr << "Environment variables REST_API, APP_ID, API_KEY, and VERCEL_UI must be set\n";
         return 1;
     }
+
+    
+    cache.SetObject();
+    Document::AllocatorType& allocator = cache.GetAllocator();
     
     const string rest_api(rest_api_env);
     const string app_id(app_id_env);
@@ -331,6 +660,8 @@ int main() {
             fetch_subdomains(rest_api, app_id, api_key, fetch_interval);
         }).detach();
 
+    // Crea un thread que revisa la cache y elimina los objetos expirados.
+    thread(cleanup_expired_cache, ref(cache), ref(subdomain_mutex)).detach();
     
     // Abrir socket para escuchar solicitudes HTTP
     int socket_fd;
@@ -355,6 +686,68 @@ int main() {
 
     cout << "Zonal cache is running on port " << HTTP_PORT << "...\n";
 
+    // Define the host and URI
+    string host = "hola2.test.com";
+    string uri = "GET-index.html";
+
+    // Get the current timestamp
+    auto now = chrono::system_clock::now();
+    auto now_time_t = chrono::system_clock::to_time_t(now);
+    string currentTimestamp = ctime(&now_time_t);
+    currentTimestamp.pop_back(); // Remove the newline character
+
+    // Calculate the time-to-live (TTL) as 1 hour from now
+    auto ttl_time_t = chrono::system_clock::to_time_t(now + chrono::hours(1));
+    string ttlTimestamp = ctime(&ttl_time_t);
+    ttlTimestamp.pop_back(); // Remove the newline character
+
+    // Generate a hashed filename
+    string filename = "85ec3b1da48dab40828fe44f8f1030876ea1de3ee95be8182797ddd03ebe5194.bin";
+
+    // Add the object to the cache
+    if (!cache.HasMember(host.c_str())) {
+        Value hostObj(kObjectType);
+        cache.AddMember(Value().SetString(host.c_str(), allocator), hostObj, allocator);
+    }
+
+    Value& hostObject = cache[host.c_str()];
+    if (!hostObject.HasMember(uri.c_str())) {
+        Value uriObj(kObjectType);
+        uriObj.AddMember("received", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("most_recent_use", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("times_used", Value().SetInt(0), allocator);
+        uriObj.AddMember("time_to_live", Value().SetString(ttlTimestamp.c_str(), allocator), allocator);
+        uriObj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
+
+        hostObject.AddMember(Value().SetString(uri.c_str(), allocator), uriObj, allocator);
+    }
+
+    // Debug: Print the cache to verify the object was added
+    StringBuffer buffer;
+    Writer<StringBuffer> writer(buffer);
+    cache.Accept(writer);
+    cout << "Cache after adding object: " << buffer.GetString() << endl;
+
+
+    httpparser::Request request;
+    request.method = "GET";
+    request.uri = "index.html";
+    request.versionMajor = 1;
+    request.versionMinor = 1;
+    request.headers = {}; // Empty headers
+    request.content = {}; // Empty content
+    request.keepAlive = true;
+
+    string response = get_response(HttpRequest{
+        {
+            {"host", "hola2.test.com"},
+            {"cookie", ""},
+            {"x-api-key", api_key},
+            {"Connection", "keep-alive"},
+        },
+        request
+    });
+    cout << "Response: " << response << endl;
     // Inicialización CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
