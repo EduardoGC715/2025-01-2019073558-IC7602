@@ -21,6 +21,7 @@
 #include <openssl/sha.h>
 #include <iomanip>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 
 
 using namespace std;
@@ -38,7 +39,6 @@ Document subdomains;
 shared_mutex subdomain_mutex;
 
 Document cache;
-cache.SetObject();
 shared_mutex cache_mutex;
 
 
@@ -55,7 +55,7 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
     // Hilo que se ejecuta indefinidamente para obtener los subdominios.
     while (true) {
         // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-        memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET");
+        memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
         if (response && response->status_code == 200) {
             // Documento temporal para almacenar la respuesta JSON.
             Document temp;
@@ -74,6 +74,9 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
                 cout << "\033[1;34mSubdomains fetched successfully.\033[0m" << endl;
                 cout << "\033[1;34mSubdomains: " << buffer.GetString() << "\033[0m" << endl;
                 cout << "\033[1;34mResponse code: " << response->status_code << "\033[0m" << endl;
+                for (auto &header : response->headers) {
+                    cout << "\033[1;34mHeader: " << header.first << ": " << header.second << "\033[0m" << endl;
+                }
             } else {
                 cout << "\033[1;34mFailed to parse JSON response.\033[0m" << endl;
             }
@@ -247,7 +250,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                     };
 
                     // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-                    memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET");
+                    memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
                     if (response && response->status_code == 200) {
                         // Si la respuesta es válida, se autentica la solicitud.
                         cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
@@ -299,7 +302,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 };
 
                 // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map, true, request.request.method.c_str());
+                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map, true, request.request.method.c_str(), false);
                 if (response && response->status_code == 200) {
                     // Si la respuesta es válida, se autentica la solicitud.
                     cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
@@ -377,8 +380,9 @@ void addToCacheByHost(Document& cache, const string& host, const string& uri, co
     }
 }
 
-string get_response(HttpRequest request){
-    if (cache.HasMember(request.headers["host"].c_str())) {
+string get_response(const int &client_socket, HttpRequest request){
+    if (cache.HasMember(request.headers.at("host").c_str())) {
+
         Value& host_object = cache[request.headers["host"].c_str()];
         cout << "Host object found in cache." << endl;
         cout << "Request URI: " << request.request.method << request.request.uri << endl;
@@ -428,32 +432,71 @@ string get_response(HttpRequest request){
                 return "";
             }
             
-        } else {
-            // El objeto URI no está en el cache, se agrega.
-            // memory_struct response = send_https_request(request.headers["host"].c_str(), request.request.method.c_str(), request.request.uri.c_str(), request.headers);
-            
-            // cout << "Ese request no está en el cache: " << request.headers["host"] << request.request.method << request.request.uri << endl;
-            // Value& subdomain_object = subdomains[request.headers["host"].c_str()];
-            // string destination = subdomain_Object["destination"].GetString();
-            // cout << destination << endl;
-            // auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
-            // string currentTimestamp = ctime(&now);
-            // currentTimestamp.pop_back(); 
-            // string filename = request.request.method + request.request.uri + "_" + currentTimestamp;
-            // addToCacheByHost(cache, request.headers["host"], request.request.uri, filename, 60); // 60 seconds TTL
-            // cout << "Añadido: " << filename << endl;
-            // return filename;
-            return "hol1a";
-        }
-    } else { // El objeto no está en el cache
-        // // Se fetchea al subdominio correspondiente.
-        // cout << "Cache miss for key: " << key << endl;
-        return "hol2a";
+        } 
     }
-    // Value httpRequestKey(kObjectType);
-    
-    
+    shared_lock<shared_mutex> lock(subdomain_mutex);
+    const Value& subdomain_obj = subdomains[host.c_str()];
+    if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
+        string destination = subdomain_obj["destination"].GetString();
+        cout << "Destination found: " << destination << endl;
+        bool https = subdomain_obj["https"].GetBool();
+        auto &fileTypes = subdomain_obj["fileTypes"].GetArray();
 
+        // Si no está en el cache, se hace una solicitud al destino.
+        string url = (https ? "https://" : "http://") + destination + request.request.uri;
+        cout << "Fetching from URL: " << url << endl;
+        unordered_map<string, string> headers_map = {
+            {"Content-Type", "application/json"},
+            {"x-app-id", app_id},
+            {"x-api-key", api_key}
+        };
+        
+        memory_struct * response = send_https_request(url, request.request.content.data(), request.request.content.size(), headers_map, https, request.request.method, true);
+        if (response) {
+            HttpResponse http_response = parse_http_response(response->memory, response->size);
+            auto it = http_response.headers.find("Content-Type");
+            if (it != http_response.headers.end()) {
+                string content_type_header = it->second;
+                cout << "Content-Type: " << content_type_header << endl;
+                size_t pos = content_type_header.find(';');
+                string content_type = content_type_header.substr(0, pos); // Extraer el content_type antes del punto y coma
+                content_type.erase(remove_if(content_type.begin(), content_type.end(), ::isspace), content_type.end()); // Quitar espacios
+
+                // Verificar si el Content-Type es uno de los tipos de archivo permitidos.
+                bool is_allowed = false;
+                for (const auto& fileType : fileTypes) {
+                    if (fileType.IsString() && content_type == fileType.GetString()) {
+                        is_allowed = true;
+                        break;
+                    }
+                }
+
+                if (is_allowed) {
+                    cout << "Content-Type is allowed." << endl;
+                    // Guardar la respuesta en el cache.
+                    string filename = hashString(url + to_string(time(nullptr))) + ".ksh";
+                    ofstream out_file("sub_domains_caches/" + filename, ios::binary);
+                    if (out_file) {
+                        out_file.write(response->memory, response->size);
+                        out_file.close();
+                        cout << "Response saved to cache as: " << filename << endl;
+
+                        // Agregar a la cache
+                        addToCacheByHost(cache, request.headers.at("host"), request.request.method + "-" + request.request.uri, filename, 60);
+
+                        return string(response->memory, response->size);
+                    } else {
+                        cerr << "Failed to open cache file for writing." << endl;
+                    }
+                } else {
+                    cerr << "Content-Type not allowed: " << content_type << endl;
+                }
+            } else {
+                cerr << "Content-Type header not found in response." << endl;
+            }
+            send(client_socket, response->memory, response->size, 0);
+        }
+    }
 }
 
 // Función para procesar una solicitud HTTP entrante.
