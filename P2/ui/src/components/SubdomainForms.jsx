@@ -115,23 +115,21 @@ export default function SubdomainForm() {
       try {
         const data = await getSubdomainByName(domain, subParam);
 
-        const apiKeys = Object.entries(data.apiKeys || {}).map(
-          ([hashedKey, name], i) => ({
-            id: i,
-            name,
-            rawKey: '',            
-            isExisting: true,
-            showRaw: false,
-            outputKey: hashedKey,   
-          })
-        );
+        const apiKeysData = data.apiKeys || {};
+        const apiKeys = Object.entries(apiKeysData).map(([hashedKey, name], i) => ({
+          id:          i,
+          name,                  
+          rawKey:       hashedKey, 
+          isExisting:   true,    
+          showRaw:      false,   
+        }));
         if (!apiKeys.length) {
           apiKeys.push({
-            id: 0,
-            name: '',
-            rawKey: genKey(),
+            id:         0,
+            name:       '',
+            rawKey:     genKey(),
             isExisting: false,
-            showRaw: false,
+            showRaw:    true,
           });
         }
 
@@ -261,7 +259,7 @@ export default function SubdomainForm() {
       const payload = {
         subdomain: form.subdomain,
         destination: form.destination,
-        cacheSize: mb,
+        cacheSize: cacheBytes,
         ttl: ttlMs,
         fileTypes: form.fileTypes,
         replacementPolicy: form.replacementPolicy,
@@ -435,7 +433,7 @@ export default function SubdomainForm() {
               <div key={item.id} className="flex gap-4 items-center">
                 <input
                   type="text"
-                  defaultValue={item.key}
+                  value={item.name}
                   placeholder="Nombre de la Key"
                   className="flex-1 p-2 border rounded"
                   onChange={e => 
