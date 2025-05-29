@@ -288,16 +288,16 @@ export default function SubdomainForm() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin h-8 w-8 border-b-2 rounded-full"></div>
+        <div className="animate-spin h-8 w-8 border-b-2 border-secondary rounded-full"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-lightgrey2 text-darkgrey max-w-xl mx-auto mt-10 p-6 rounded-2xl shadow-lg">
+    <div className="bg-lightgrey2 text-secondary max-w-xl mx-auto mt-10 p-6 rounded-2xl shadow-lg">
       <button
         onClick={() => navigate(-1)}
-        className="mb-4 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+        className="mb-4 p-2 hover:bg-lightgrey2 rounded-full transition-colors"
       >
         <ArrowLeft size={24} />
       </button>
@@ -307,7 +307,7 @@ export default function SubdomainForm() {
       </h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Subdomain (disabled on edit) */}
+        {/* Base inputs */}
         <div>
           <label>Subdominio</label>
           <input
@@ -316,7 +316,7 @@ export default function SubdomainForm() {
             onChange={handleChange}
             required
             disabled={isEdit}
-            className="w-full p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+            className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           />
         </div>
 
@@ -327,10 +327,8 @@ export default function SubdomainForm() {
             <select
               name="protocol"
               value={form.protocol}
-              onChange={e =>
-                setForm(f => ({ ...f, protocol: e.target.value }))
-              }
-              className="p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              onChange={e => setForm(f => ({ ...f, protocol: e.target.value }))}
+              className="p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="http">http://</option>
               <option value="https">https://</option>
@@ -341,12 +339,12 @@ export default function SubdomainForm() {
               onChange={handleChange}
               required
               placeholder="ej. ejemplo.com o 192.168.0.1"
-              className="flex-1 p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex-1 p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
         </div>
 
-        {/* Cache size & TTL */}
+        {/* Cache and TTL inputs */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label>Cache Size (MB)</label>
@@ -355,20 +353,21 @@ export default function SubdomainForm() {
               type="number"
               value={form.cacheSize}
               onChange={handleChange}
-              className="w-full p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <div>
-            <label>TTL (ej. “5m”, “1h”, “30s”)</label>
+            <label>TTL (ej. "5m", "1h", "30s")</label>
             <input
               name="ttl"
               value={form.ttl}
               onChange={handleChange}
-              className="w-full p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
         </div>
-        {/* MIME types a cachear */}
+
+        {/* MIME types selector */}
         <div>
           <label className="block mb-1 font-medium">Tipos de archivo a cachear</label>
           <select
@@ -379,18 +378,17 @@ export default function SubdomainForm() {
               const selected = Array.from(e.target.selectedOptions, opt => opt.value);
               setForm(prev => ({ ...prev, fileTypes: selected }));
             }}
-            className="w-full h-32 p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full h-32 p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {mimeTypes.map(mt => (
-              <option key={mt} value={mt}>
-                {mt}
-              </option>
+              <option key={mt} value={mt}>{mt}</option>
             ))}
           </select>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-lightgrey mt-1">
             Mantén presionada la tecla Ctrl (o Cmd) para seleccionar múltiples.
           </p>
         </div>
+
         {/* Replacement policy */}
         <div>
           <label>Política de reemplazo</label>
@@ -398,7 +396,7 @@ export default function SubdomainForm() {
             name="replacementPolicy"
             value={form.replacementPolicy}
             onChange={handleChange}
-            className="w-full p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="" disabled>
             </option>
@@ -415,7 +413,7 @@ export default function SubdomainForm() {
             name="authMethod"
             value={form.authMethod}
             onChange={handleChange}
-            className="w-full p-2 border border-darkgrey rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="" disabled>
             </option>
@@ -428,14 +426,13 @@ export default function SubdomainForm() {
         {/* API keys or users */}
         {form.authMethod === 'api-keys' && (
           <div>
-            <label>API Keys</label>
             {form.apiKeys.map(item => (
               <div key={item.id} className="flex gap-4 items-center mb-2">
                 <input
                   type="text"
                   value={item.name}
                   placeholder="Nombre de la Key"
-                  className="flex-1 p-2 border rounded"
+                  className="flex-1 p-2 border border-lightgrey rounded-md text-secondary"
                   onChange={e => 
                     setForm(f => ({
                       ...f,
@@ -458,7 +455,7 @@ export default function SubdomainForm() {
                         ),
                       }))
                     }
-                    className="p-2 border rounded text-sm flex items-center gap-1"
+                    className="p-2 border border-lightgrey rounded-md text-sm flex items-center gap-1 hover:bg-lightgrey2"
                   >
                     <Eye size={14} />
                     {item.showRaw ? 'Ocultar' : 'Mostrar Key'}
@@ -466,7 +463,7 @@ export default function SubdomainForm() {
                 )}
 
                 {item.showRaw && (
-                  <code className="bg-gray-100 px-2 py-1 rounded break-all">
+                  <code className="bg-lightgrey2 px-2 py-1 rounded break-all">
                     {item.rawKey}
                   </code>
                 )}
@@ -474,13 +471,17 @@ export default function SubdomainForm() {
                 <button
                   type="button"
                   onClick={() => deleteApiKey(item.id)}
-                  className="p-2 text-red-600 cursor-pointer"
+                  className="p-2 text-warning hover:text-secondary transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             ))}
-            <button type="button" onClick={addApiKey} className="text-blue-600 cursor-pointer">
+            <button 
+              type="button" 
+              onClick={addApiKey} 
+              className="text-primary hover:text-secondary transition-colors"
+            >
               + Agregar otra API Key
             </button>
           </div>
@@ -540,19 +541,19 @@ export default function SubdomainForm() {
           </div>
         )}
 
-        {/* Actions */}
+        {/* Action buttons */}
         <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 border rounded cursor-pointer"
+            className="px-4 py-2 border border-lightgrey rounded-md hover:bg-lightgrey2 transition-colors"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="w-full px-4 py-2 bg-secondary text-light rounded-md hover:bg-black transition-colors cursor-pointer"
+            className="w-full px-4 py-2 bg-primary text-light rounded-md hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
           >
             {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear'}
           </button>

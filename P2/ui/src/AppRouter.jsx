@@ -15,8 +15,8 @@ import DNSRegisterCard from "./components/DNSRegisterCard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 import SubdomainsDashboard from "./components/SubdomainsDashboard";
 import SubdomainForm from "./components/SubdomainForms";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function AppRouter() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -47,15 +47,7 @@ function AppRouter() {
                   )
                 }
               />
-              <Route
-                path="/login"
-                element={
-                  <LoginSubdomain
-                    subdomain={subdomain}
-                    authMethod={authMethod}
-                  />
-                }
-              />
+              <Route path="/login" element={<LoginSubdomain />} />
               <Route
                 path="/register"
                 element={

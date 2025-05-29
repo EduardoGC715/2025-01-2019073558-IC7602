@@ -23,6 +23,7 @@
 #include <sstream>
 #include <cerrno>
 #include <cstring>
+#include <vector>
 #include <ctime>
 
 using namespace std;
@@ -274,6 +275,7 @@ string hashString(const string& input) {
 bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
     auto host_it = request.headers.find("host");
     if (host_it != request.headers.end()) {
+        cout << "\033[1;34mPRINT 1: Host header found: " << host_it->second << "\033[0m" << endl;
         // Obtener el host
         const string &host = host_it->second;
         shared_lock<shared_mutex> lock(subdomain_mutex);
@@ -304,6 +306,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
             // Si el método de autenticación es user-password, se verifica si hay un cookie con el token de autenticación.
             auto it = request.headers.find("cookie");
             if (it != request.headers.end()) {
+                cout << "\033[1;34mPRINT 3: Cookie header found.\033[0m" << endl;
                 const string &cookies = it->second;
                 string token = get_token_from_cookies(cookies);
                 if (!token.empty()) {
@@ -329,8 +332,9 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                     free(response);
                 }
             } else if (request.request.uri.find("/_auth/callback") != string::npos) {
+                cout << "\033[1;34mPRINT 2: Auth callback found in URI.\033[0m" << endl;
                 string token = get_query_parameter(request.request.uri, "token");
-                string next = get_query_parameter(request.request.uri, "next");
+                string next = url_decode(get_query_parameter(request.request.uri, "next"));
                 string exp = get_query_parameter(request.request.uri, "exp");
                 cout << "Token: " << token << endl;
                 cout << "Next: " << next << endl;
@@ -338,10 +342,11 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 // Enviar la respuesta con el Cookie al cliente por el socket.
                 string response = "HTTP/1.1 302 Found\r\n"
                                 "Location: " + next + "\r\n"
-                                "Set-Cookie: token=" + token + "; HttpOnly; SameSite=Lax; Expires=" + exp + "\r\n"
+                                "Set-Cookie: token=" + token + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + exp + "\r\n"
                                 "Connection: close\r\n"
                                 "Content-Length: 0\r\n"
                                 "\r\n";
+                cout << "\033[1;34mPRINT 2.5: \033[0m" << response << endl;
                 send(client_socket, response.c_str(), response.size(), 0);
                 return false;
             }
@@ -627,7 +632,7 @@ void addToCacheByHost(const string& host, const string& key, const string& filen
     hostObject["size"].SetUint64(hostSize + size); // Update the size field of the host object
 }
 
-string get_response(const int &client_socket, HttpRequest request){
+bool get_response(const int &client_socket, HttpRequest request ){
     if (cache.HasMember(request.headers.at("host").c_str())) {
 
         Value& host_object = cache[request.headers["host"].c_str()];
@@ -649,16 +654,15 @@ string get_response(const int &client_socket, HttpRequest request){
                     cerr << "File stream failed. Possible reasons: file does not exist, insufficient permissions, or invalid path." << endl;
                 }
                 cerr << "Error: " << strerror(errno) << endl; // Prints the specific error message
-                return "";
+                return false;
             }
 
             streamsize size = file.tellg();
             file.seekg(0, ios::beg);
 
-            string content;
-            content.resize(size);
+            vector<char> content(size);
             
-            if (file.read(&content[0], size)) {
+            if (file.read(content.data(), size)) {
                 cout << "Se pudieron leer " << size << " bytes de " << filepath << endl;
                 // Check if the entry is still valid based on time_to_live
                 auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -676,80 +680,86 @@ string get_response(const int &client_socket, HttpRequest request){
                     // If times_used doesn't exist or is not an integer, initialize it
                     entry.AddMember("times_used", 1, allocator);
                 }
-                cout << content << endl;
-                return content;
+                send(client_socket, content.data(), size, 0);
+                return true;
             } else {
                 cerr << "Failed to read cache file: " << filepath << endl;
-                return "";
+                return false;
             }
             
         } 
     }
-    shared_lock<shared_mutex> lock(subdomain_mutex);
-    string host = request.headers.at("host");
-    const Value& subdomain_obj = subdomains[host.c_str()];
-    if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
-        string destination = subdomain_obj["destination"].GetString();
-        cout << "Destination found: " << destination << endl;
-        bool https = subdomain_obj["https"].GetBool();
-        auto &fileTypes = subdomain_obj["fileTypes"].GetArray();
-
-        // Si no está en el cache, se hace una solicitud al destino.
-        string url = (https ? "https://" : "http://") + destination + request.request.uri;
-        cout << "Fetching from URL: " << url << endl;
-        unordered_map<string, string> headers_map = {
-            {"Content-Type", "application/json"},
-            {"x-app-id", app_id},
-            {"x-api-key", api_key}
-        };
-        
-        memory_struct * response = send_https_request(url, request.request.content.data(), request.request.content.size(), headers_map, https, request.request.method, true);
-        if (response) {
-            HttpResponse http_response = parse_http_response(response->memory, response->size);
-            auto it = http_response.headers.find("Content-Type");
-            if (it != http_response.headers.end()) {
-                string content_type_header = it->second;
-                cout << "Content-Type: " << content_type_header << endl;
-                size_t pos = content_type_header.find(';');
-                string content_type = content_type_header.substr(0, pos); // Extraer el content_type antes del punto y coma
-                content_type.erase(remove_if(content_type.begin(), content_type.end(), ::isspace), content_type.end()); // Quitar espacios
-
-                // Verificar si el Content-Type es uno de los tipos de archivo permitidos.
-                bool is_allowed = false;
-                for (const auto& fileType : fileTypes) {
-                    if (fileType.IsString() && content_type == fileType.GetString()) {
-                        is_allowed = true;
-                        break;
-                    }
+    string destination;
+    bool https;
+    vector<string> file_types;
+    {
+        shared_lock<shared_mutex> lock(subdomain_mutex);
+        const Value& subdomain_obj = subdomains[request.headers.at("host").c_str()];
+        if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
+            destination = subdomain_obj["destination"].GetString();
+            https = subdomain_obj["https"].GetBool();
+            file_types.clear();
+            for (const auto& file_type : subdomain_obj["fileTypes"].GetArray()) {
+                if (file_type.IsString()) {
+                    file_types.push_back(file_type.GetString());
                 }
-
-                if (is_allowed) {
-                    cout << "Content-Type is allowed." << endl;
-                    // Guardar la respuesta en el cache.
-                    string filename = hashString(url + to_string(time(nullptr))) + ".ksh";
-                    ofstream out_file("sub_domains_caches/" + filename, ios::binary);
-                    if (out_file) {
-                        out_file.write(response->memory, response->size);
-                        out_file.close();
-                        cout << "Response saved to cache as: " << filename << endl;
-
-                        // Agregar a la cache
-                        addToCacheByHost(request.headers.at("host"), request.request.method + "-" + request.request.uri, filename, 60);
-
-                        return string(response->memory, response->size);
-                    } else {
-                        cerr << "Failed to open cache file for writing." << endl;
-                    }
-                } else {
-                    cerr << "Content-Type not allowed: " << content_type << endl;
-                }
-            } else {
-                cerr << "Content-Type header not found in response." << endl;
             }
-            send(client_socket, response->memory, response->size, 0);
-            return string(response->memory, response->size);
         }
     }
+    
+
+    // Si no está en el cache, se hace una solicitud al destino.
+    string url = destination + request.request.uri;
+    cout << "Fetching from URL: " << url << endl;
+    
+    memory_struct * response = send_https_request(url, request.request.content.data(), request.request.content.size(), request.headers, https, request.request.method, true);
+    if (response) {
+        HttpResponse http_response = parse_http_response(response->memory, response->size);
+        auto it = http_response.headers.find("Content-Type");
+        if (it != http_response.headers.end()) {
+            string content_type_header = it->second;
+            cout << "Content-Type: " << content_type_header << endl;
+            size_t pos = content_type_header.find(';');
+            string content_type = content_type_header.substr(0, pos); // Extraer el content_type antes del punto y coma
+            content_type.erase(remove_if(content_type.begin(), content_type.end(), ::isspace), content_type.end()); // Quitar espacios
+
+            // Verificar si el Content-Type es uno de los tipos de archivo permitidos.
+            bool is_allowed = false;
+            for (const auto& file_type : file_types) {
+                if (content_type == file_type) {
+                    is_allowed = true;
+                    break;
+                }
+            }
+            is_allowed = false;
+            // Si el Content-Type es permitido, se guarda la respuesta en el cache.
+            if (is_allowed) {
+                cout << "Content-Type is allowed." << endl;
+                // Guardar la respuesta en el cache.
+                string filename = hashString(url + to_string(time(nullptr))) + ".ksh";
+                ofstream out_file("sub_domains_caches/" + filename, ios::binary);
+                if (out_file) {
+                    out_file.write(response->memory, response->size);
+                    out_file.close();
+                    cout << "Response saved to cache as: " << filename << endl;
+
+                    // Agregar a la cache
+                    add_to_cache_by_host(request.headers.at("host"), request.request.method + "-" + request.request.uri, filename, response->size);
+                } else {
+                    cerr << "Failed to open cache file for writing." << endl;
+                }
+            } else {
+                cerr << "Content-Type not allowed: " << content_type << endl;
+            }
+        } else {
+            cerr << "Content-Type header not found in response." << endl;
+        }
+        send(client_socket, response->memory, response->size, 0);
+        free(response->memory);
+        free(response);
+        return true;
+    }
+    return false;
 }
 
 // Función para procesar una solicitud HTTP entrante.
@@ -788,6 +798,12 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 break;
             }
 
+            const bool set_response = get_response(client_socket, request);
+            if (!set_response) {
+                // Si no se pudo obtener la respuesta, enviar un error.
+                send_http_error_response(client_socket, "Internal Server Error", 500);
+                break;
+            }
             if (request.request.keepAlive) {
                 cout << "Connection header: keep-alive\n";
                 keep_alive = true;
@@ -795,13 +811,13 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 keep_alive = false;
             }
             
-            // Enviar respuesta HTTP 200 OK
-            string response = "HTTP/1.1 200 OK\r\n"
-                                "Content-Type: application/json\r\n"
-                                "Content-Length: " + to_string(37) + "\r\n"
-                                "\r\n" +
-                                "{\"message\": \"Zonal cache is running\"}";
-            send(client_socket, response.c_str(), response.size(), 0);
+            // // Enviar respuesta HTTP 200 OK
+            // string response = "HTTP/1.1 200 OK\r\n"
+            //                     "Content-Type: application/json\r\n"
+            //                     "Content-Length: " + to_string(37) + "\r\n"
+            //                     "\r\n" +
+            //                     "{\"message\": \"Zonal cache is running\"}";
+            // send(client_socket, response.c_str(), response.size(), 0);
         } else {
             perror("recv failed\n");
             break;
@@ -830,9 +846,7 @@ int main() {
         return 1;
     }
 
-    
     cache.SetObject();
-    Document::AllocatorType& allocator = cache.GetAllocator();
     
     const string rest_api(rest_api_env);
     const string app_id(app_id_env);
@@ -870,68 +884,6 @@ int main() {
 
     cout << "Zonal cache is running on port " << HTTP_PORT << "...\n";
 
-    // // Define the host and URI
-    // string host = "hola2.test.com";
-    // string uri = "GET-index.html";
-
-    // // Get the current timestamp
-    // auto now = chrono::system_clock::now();
-    // auto now_time_t = chrono::system_clock::to_time_t(now);
-    // string currentTimestamp = ctime(&now_time_t);
-    // currentTimestamp.pop_back(); // Remove the newline character
-
-    // // Calculate the time-to-live (TTL) as 1 hour from now
-    // auto ttl_time_t = chrono::system_clock::to_time_t(now + chrono::hours(1));
-    // string ttlTimestamp = ctime(&ttl_time_t);
-    // ttlTimestamp.pop_back(); // Remove the newline character
-
-    // // Generate a hashed filename
-    // string filename = "85ec3b1da48dab40828fe44f8f1030876ea1de3ee95be8182797ddd03ebe5194.bin";
-
-    // // Add the object to the cache
-    // if (!cache.HasMember(host.c_str())) {
-    //     Value hostObj(kObjectType);
-    //     cache.AddMember(Value().SetString(host.c_str(), allocator), hostObj, allocator);
-    // }
-
-    // Value& hostObject = cache[host.c_str()];
-    // if (!hostObject.HasMember(uri.c_str())) {
-    //     Value uriObj(kObjectType);
-    //     uriObj.AddMember("received", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
-    //     uriObj.AddMember("most_recent_use", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
-    //     uriObj.AddMember("times_used", Value().SetInt(0), allocator);
-    //     uriObj.AddMember("time_to_live", Value().SetString(ttlTimestamp.c_str(), allocator), allocator);
-    //     uriObj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
-
-    //     hostObject.AddMember(Value().SetString(uri.c_str(), allocator), uriObj, allocator);
-    // }
-
-    // // Debug: Print the cache to verify the object was added
-    // StringBuffer buffer;
-    // Writer<StringBuffer> writer(buffer);
-    // cache.Accept(writer);
-    // cout << "Cache after adding object: " << buffer.GetString() << endl;
-
-
-    // httpparser::Request request;
-    // request.method = "GET";
-    // request.uri = "index.html";
-    // request.versionMajor = 1;
-    // request.versionMinor = 1;
-    // request.headers = {}; // Empty headers
-    // request.content = {}; // Empty content
-    // request.keepAlive = true;
-
-    // string response = get_response(HttpRequest{
-    //     {
-    //         {"host", "hola2.test.com"},
-    //         {"cookie", ""},
-    //         {"x-api-key", api_key},
-    //         {"Connection", "keep-alive"},
-    //     },
-    //     request
-    // });
-    // cout << "Response: " << response << endl;
     // Inicialización CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
 

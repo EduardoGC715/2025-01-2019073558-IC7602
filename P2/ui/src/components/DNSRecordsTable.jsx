@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { Edit2, Trash2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { dnsApi } from "../services/api";
 import { getUserDomains, deleteDomain, verifyDomainOwnership } from "../services/domain";
 import DeleteConfirmationModal from './DeleteConfirmationModal';
@@ -13,19 +13,16 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     isOpen: false,
     record: null
   });
+  const [expandedDomains, setExpandedDomains] = useState({});
   const navigate = useNavigate();
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Obtener registros DNS
-        const records = await dnsApi.getAllRecords();
-        setLocalDnsRecords(records);
-
-        // Obtener dominios del usuario
         const { success, domains, message } = await getUserDomains();
         if (success) {
           setDomains(domains);
+          setLocalDnsRecords([]);
         } else {
           console.error("Error fetching domains:", message);
         }
@@ -120,6 +117,13 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     }
   };
 
+  const toggleDomainExpand = (domainName) => {
+    setExpandedDomains(prev => ({
+      ...prev,
+      [domainName]: !prev[domainName]
+    }));
+  };
+
   return (
     <div className="w-full p-4">
       <DeleteConfirmationModal
@@ -131,52 +135,64 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
       />
       <div className="bg-light shadow-md rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b">
-          <h2 className="text-xl font-semibold">Registros DNS</h2>
+          <h2 className="text-xl font-semibold text-secondary">Registros DNS</h2>
         </div>
         <div className="p-4">
           {isLoading ? (
             <div className="flex justify-center items-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-secondary"></div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm text-left">
-                <thead className="bg-primary text-s uppercase text-darkgrey">
+                <thead className="bg-primary text-s uppercase text-light">
                   <tr>
                     <th className="px-4 py-2">ID</th>
                     <th className="px-4 py-2">Dominio</th>
                     <th className="px-4 py-2">Subdominios</th>
-                    <th className="px-4 py-2">Dirección</th>
+                    <th className="px-4 py-2">Validación</th>
                     <th className="px-4 py-2">Ownership</th>
                     <th className="px-4 py-2">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(domains).map(([domainName, domainData], index) => (
-                    <tr key={domainName} className="border-b hover:bg-lightgrey1">
+                    <tr key={domainName} className="border-b hover:bg-lightgrey2 transition-colors duration-200">
                       <td className="px-4 py-2">{index + 1}</td>
-                      <td className="px-4 py-2">{domainName}</td>
+                      <td className="px-4 py-2 text-secondary">{domainName}</td>
                       <td className="px-4 py-2">
-                        <button onClick={() => navigate(`/domains/${domainName}/subdomains`)}className="text-blue-600 hover:underline">
+                        <button 
+                          onClick={() => navigate(`/domains/${domainName}/subdomains`)}
+                          className="text-accentBlue hover:text-secondary transition-colors duration-200"
+                        >
                           Ver Subdominios
                         </button>
                       </td>
-                      <td className="px-4 py-2">{domainData.validation?.subdomain || 'N/A'}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-secondary">
+                            {domainData.validation?.subdomain || 'N/A'}
+                          </span>
+                          <span className="text-xs text-lightgrey mt-1">
+                            {domainData.validation?.token || 'N/A'}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
-                          <span className={domainData.validated ? "text-green-600" : "text-warning"}>
+                          <span className={domainData.validated ? "text-primary" : "text-warning"}>
                             {domainData.validated ? "true" : "false"}
                           </span>
                           <button
                             onClick={() => handleVerifyDomain(domainName)}
-                            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                            className="p-1 hover:bg-lightgrey2 rounded-full transition-colors duration-200"
                             disabled={isLoading}
                           >
                             <RefreshCw 
                               size={16} 
-                              className={`${isLoading ? 'animate-spin' : ''} ${
-                                domainData.validated ? 'text-gray-400 hover:text-gray-600' : 'text-gray-600 hover:text-gray-800'
-                              }`}
+                              className={`${isLoading ? 'animate-spin' : ''} 
+                                ${domainData.validated ? 'text-lightgrey hover:text-lightgrey1' : 'text-secondary hover:text-primary'}
+                                transition-colors duration-200`}
                             />
                           </button>
                         </div>
@@ -185,13 +201,13 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                         <div className="flex gap-2">
                           <button
                             onClick={() => onEditRecord({ domain: domainName, ...domainData })}
-                            className="p-1 text-gray-600 hover:text-black"
+                            className="p-1 text-lightgrey hover:text-secondary transition-colors duration-200"
                           >
                             <Edit2 size={16} />
                           </button>
                           <button
                             onClick={() => handleDeleteClick({ domain: domainName, ...domainData })}
-                            className="p-1 text-red-600 hover:text-red-800"
+                            className="p-1 text-warning hover:text-secondary transition-colors duration-200"
                           >
                             <Trash2 size={16} />
                           </button>

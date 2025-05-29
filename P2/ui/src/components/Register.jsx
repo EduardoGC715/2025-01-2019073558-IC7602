@@ -60,8 +60,8 @@ export default function Register({ title = "Crear una cuenta" }) {
                 type="text"
                 autoComplete="username"
                 className={`appearance-none rounded-t-md relative block w-full px-3 py-2 border ${
-                  errors.username ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                  errors.username ? "border-warning" : "border-lightgrey2"
+                } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
                 placeholder="Nombre de usuario"
               />
               {errors.username && (
@@ -77,8 +77,8 @@ export default function Register({ title = "Crear una cuenta" }) {
                 type="password"
                 autoComplete="new-password"
                 className={`appearance-none relative block w-full px-3 py-2 border ${
-                  errors.password ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                  errors.password ? "border-warning" : "border-lightgrey2"
+                } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
                 placeholder="Contraseña"
               />
               {errors.password && (
@@ -95,8 +95,8 @@ export default function Register({ title = "Crear una cuenta" }) {
                 type="password"
                 autoComplete="new-password"
                 className={`appearance-none rounded-b-md relative block w-full px-3 py-2 border ${
-                  errors.confirmPassword ? "border-warning" : "border-gray-300"
-                } placeholder-gray-500 text-secondary focus:outline-none focus:ring-primary/80 focus:border-primary/80 focus:z-10 sm:text-sm`}
+                  errors.confirmPassword ? "border-warning" : "border-lightgrey2"
+                } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
                 placeholder="Confirmar contraseña"
               />
               {errors.confirmPassword && (
@@ -110,7 +110,7 @@ export default function Register({ title = "Crear una cuenta" }) {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-light bg-primary hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/80"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-light bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
             >
               Registrarse
             </button>

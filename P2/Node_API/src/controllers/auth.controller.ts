@@ -223,7 +223,7 @@ export const loginSubdomainUser = async (
     const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
     redirectURL.searchParams.set("token", token);
     redirectURL.searchParams.set("next", subdomain);
-    redirectURL.searchParams.set("exp", ms(expiration).toString());
+    redirectURL.searchParams.set("exp", (ms(expiration) / 1000).toString());
     res.status(200).json({ url: redirectURL.toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
@@ -288,7 +288,7 @@ export const loginSubdomainApiKey = async (req: Request, res: Response) => {
     const redirectURL = new URL("/_auth/callback", subdomainURL.origin);
     redirectURL.searchParams.set("token", token);
     redirectURL.searchParams.set("next", subdomain);
-    redirectURL.searchParams.set("exp", ms(expiration).toString());
+    redirectURL.searchParams.set("exp", (ms(expiration) / 1000).toString());
     res.status(200).json({ url: redirectURL.toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
