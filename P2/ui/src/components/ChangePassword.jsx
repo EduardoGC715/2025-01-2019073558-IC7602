@@ -2,23 +2,20 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { registerUser } from "../services/auth";
+import { changePassword } from "../services/auth";
 
-// Validación con Zod
-const schema = z
-  .object({
-    username: z.string().min(4, "El nombre de usuario es requerido"),
-    password: z
-      .string()
-      .min(6, "La contraseña debe tener al menos 6 caracteres"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Las contraseñas no coinciden",
-    path: ["confirmPassword"],
-  });
+const schema = z.object({
+  username: z.string().min(4, "El nombre de usuario es requerido"),
+  newPassword: z
+    .string()
+    .min(6, "La nueva contraseña debe tener al menos 6 caracteres"),
+  confirmNewPassword: z.string()
+}).refine((data) => data.newPassword === data.confirmNewPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmNewPassword"],
+});
 
-export default function Register({ title = "Crear una cuenta" }) {
+export default function ChangePassword({ title = "Recuperar Contraseña" }) {
   const navigate = useNavigate();
   const {
     register,
@@ -30,15 +27,16 @@ export default function Register({ title = "Crear una cuenta" }) {
 
   const onSubmit = async (data) => {
     try {
-      const { confirmPassword, ...registerData } = data;
-      const result = await registerUser(registerData);
+      const { confirmNewPassword, ...changePasswordData } = data;
+      const result = await changePassword(changePasswordData);
       if (result.success) {
+        alert("Contraseña cambiada exitosamente");
         navigate("/dashboard");
       } else {
         alert(result.message);
       }
     } catch (error) {
-      alert("Error de red al registrar usuario");
+      alert("Error al cambiar la contraseña");
     }
   };
 
@@ -58,7 +56,6 @@ export default function Register({ title = "Crear una cuenta" }) {
                 {...register("username")}
                 id="username"
                 type="text"
-                autoComplete="username"
                 className={`appearance-none rounded-md relative block w-full px-3 py-2 border ${
                   errors.username ? "border-warning" : "border-lightgrey2"
                 } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
@@ -73,36 +70,34 @@ export default function Register({ title = "Crear una cuenta" }) {
 
             <div className="mb-4">
               <input
-                {...register("password")}
-                id="password"
+                {...register("newPassword")}
+                id="newPassword"
                 type="password"
-                autoComplete="new-password"
                 className={`appearance-none rounded-md relative block w-full px-3 py-2 border ${
-                  errors.password ? "border-warning" : "border-lightgrey2"
+                  errors.newPassword ? "border-warning" : "border-lightgrey2"
                 } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
-                placeholder="Contraseña"
+                placeholder="Nueva contraseña"
               />
-              {errors.password && (
+              {errors.newPassword && (
                 <p className="text-warning text-xs mt-1">
-                  {errors.password.message}
+                  {errors.newPassword.message}
                 </p>
               )}
             </div>
 
             <div className="mb-4">
               <input
-                {...register("confirmPassword")}
-                id="confirmPassword"
+                {...register("confirmNewPassword")}
+                id="confirmNewPassword"
                 type="password"
-                autoComplete="new-password"
                 className={`appearance-none rounded-md relative block w-full px-3 py-2 border ${
-                  errors.confirmPassword ? "border-warning" : "border-lightgrey2"
+                  errors.confirmNewPassword ? "border-warning" : "border-lightgrey2"
                 } placeholder-lightgrey text-secondary focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
-                placeholder="Confirmar contraseña"
+                placeholder="Confirmar nueva contraseña"
               />
-              {errors.confirmPassword && (
+              {errors.confirmNewPassword && (
                 <p className="text-warning text-xs mt-1">
-                  {errors.confirmPassword.message}
+                  {errors.confirmNewPassword.message}
                 </p>
               )}
             </div>
@@ -113,7 +108,7 @@ export default function Register({ title = "Crear una cuenta" }) {
               type="submit"
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-light bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
             >
-              Registrarse
+             Cambio de contraseña
             </button>
           </div>
         </form>

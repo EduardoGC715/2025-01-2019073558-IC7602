@@ -330,6 +330,35 @@ export const validateSubdomainSession = async (
   res.status(200).send("OK");
 };
 
+export const changePassword = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { username, newPassword } = req.body;
+
+    const docRef = firestore.collection("users").doc(username);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      res.status(404).json({ message: "Usuario no encontrado" });
+      return;
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hashedNewPassword = bcrypt.hashSync(newPassword, salt);
+
+    await docRef.update({
+      password: hashedNewPassword,
+    });
+
+    res.status(200).json({ message: "Contraseña actualizada exitosamente" });
+  } catch (error) {
+    console.error("Error al cambiar la contraseña:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 /* Referencias:
 https://firebase.google.com/docs/database/admin/save-data
 https://www.npmjs.com/package/ms
