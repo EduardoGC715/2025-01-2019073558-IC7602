@@ -147,53 +147,76 @@ export const deleteDomain = async (req: Request, res: Response) => {
 
 export const verifyDomainOwnership = async (req: Request, res: Response) => {
   const { session } = req;
-  const { domain } = req.params;
 
   if (!session || !session.user) {
+    console.log("No hay sesión de usuario");
     res.status(401).json({ message: "Unauthorized" });
-    return
+    return;
   }
 
   try {
-    if (!session || !session.user) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
 
-    const domainRef = firestore
+    const domainsSnapshot = await firestore
       .collection("users")
       .doc(session.user)
       .collection("domains")
-      .doc(domain);
+      .where("validated", "==", false)
+      .get();
 
-    const domainSnap = await domainRef.get();
-    const data = domainSnap.data();
 
-    if (!data?.validation) {
-      res.status(400).json({ message: "Faltan datos de validación" });
-      return
+    if (domainsSnapshot.empty) {
+      console.log("No hay dominios para verificar");
+      res.status(200).json({ message: "No hay dominios pendientes de verificar" });
+      return;
     }
 
-    const { subdomain, token } = data.validation;
-    const fullDomain = `${subdomain}.${domain}`;
+    const results: Record<string, any> = {};
 
-    const txtRecords: string[][] = await dns.resolveTxt(fullDomain);
+    for (const doc of domainsSnapshot.docs) {
+      const domain = doc.id;
+      const data = doc.data();
 
-    if (!txtRecords.length) {
-      res.status(404).json({ message: "No se encontró el registro TXT" });
-      return
+      if (!data?.validation) {
+        results[domain] = { verified: false, error: "Faltan datos de validación" };
+        continue;
+      }
+
+      const { subdomain, token } = data.validation;
+      const fullDomain = `${subdomain}.${domain}`;
+
+      try {
+        const txtRecords: string[][] = await dns.resolveTxt(fullDomain);
+
+        if (!txtRecords.length) {
+          results[domain] = { verified: false, error: "No se encontró el registro TXT" };
+          continue;
+        }
+
+        const receivedToken = txtRecords[0][0].replace(/"/g, "");
+
+        if (receivedToken !== token) {
+          results[domain] = { verified: false, error: "Token no coincide" };
+          continue;
+        }
+
+        await doc.ref.update({ validated: true });
+        results[domain] = { verified: true, message: "Dominio verificado correctamente" };
+
+      } catch (dnsError) {
+        results[domain] = {
+          verified: false,
+          error: "Error al resolver registro TXT"
+        };
+      }
     }
 
-    const receivedToken = txtRecords[0][0].replace(/"/g, "");
+    res.status(200).json({
+      message: "Proceso de verificación completado",
+      results
+    });
 
-    if (receivedToken !== token) {
-      res.status(400).json({ message: "Token no coincide" });
-      return
-    }
-
-    res.status(200).json({ message: "Dominio verificado correctamente" });
   } catch (err) {
-    console.error("Error al verificar dominio:", err);
+    console.error("Error general en verificación:", err);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };

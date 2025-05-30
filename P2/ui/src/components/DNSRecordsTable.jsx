@@ -68,21 +68,21 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     try {
       const { success, domains, message } = await getUserDomains();
       if (success) {
-        // Verificar ownership para cada dominio
-        const verificationPromises = Object.keys(domains).map(async (domainName) => {
-          if (!domains[domainName].validated) {
-            const verificationResult = await verifyDomainOwnership(domainName);
-            console.log("Resultado de verificación:", verificationResult);
-
-            if (verificationResult.success) {
-              domains[domainName].validated = verificationResult.validated;
+        // Verificar ownership para todos los dominios no validados
+        const verificationResult = await verifyDomainOwnership();
+        
+        if (verificationResult.success) {
+          const updatedDomains = { ...domains };
+          
+          // Actualizar el estado de validación de los dominios
+          Object.entries(verificationResult.results).forEach(([domainName, result]) => {
+            if (updatedDomains[domainName]) {
+              updatedDomains[domainName].validated = result.verified;
             }
-          }
-          return domains[domainName];
-        });
-
-        await Promise.all(verificationPromises);
-        setDomains(domains);
+          });
+          
+          setDomains(updatedDomains);
+        }
       } else {
         console.error("Error fetching domains:", message);
       }
@@ -93,22 +93,19 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
     }
   };
 
-  const handleVerifyDomain = async (domainName) => {
+  const handleVerifyDomain = async () => {
     setIsLoading(true);
     try {
-      const result = await verifyDomainOwnership(domainName);
+      const result = await verifyDomainOwnership();
       
       if (result.success) {
-        setDomains(prevDomains => ({
-          ...prevDomains,
-          [domainName]: {
-            ...prevDomains[domainName],
-            validated: true, // Set to true if verification is successful
-            lastChecked: new Date().toISOString()
-          }
-        }));
+        // Actualizar los dominios después de la verificación
+        const { success: domainsSuccess, domains: newDomains } = await getUserDomains();
+        if (domainsSuccess) {
+          setDomains(newDomains);
+        }
       } else {
-        console.error(`Error verificando ${domainName}:`, result.message);
+        console.error(`Error en la verificación:`, result.message);
       }
     } catch (error) {
       console.error("Error en verificación:", error);

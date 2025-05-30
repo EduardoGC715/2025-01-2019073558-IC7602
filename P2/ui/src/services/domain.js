@@ -84,38 +84,23 @@ export const deleteDomain = async (domainName) => {
   }
 };
 
-export const verifyDomainOwnership = async (domainName) => {
-  console.log("========= INICIO DE VERIFICACIÓN =========");
-  console.log("Dominio a verificar:", domainName);
+export const verifyDomainOwnership = async () => {
   
-  if (!domainName) {
-    console.error("Error: Nombre de dominio no proporcionado");
-    return {
-      success: false,
-      validated: false,
-      message: "Nombre de dominio requerido"
-    };
-  }
-
   try {
-    console.log(`Verificando dominio: ${domainName}`);
-    const response = await api.get(`/domain/verify/${domainName}`, {
+    const response = await api.get(`/domain/verify`, {
       withCredentials: true,
     });
 
-    console.log(`Respuesta para ${domainName}:`, response.data);
 
-    // Retornamos la respuesta con el nombre del dominio para identificación
     return {
       success: true,
-      domainName: domainName,
-      validated: response.data.validated,
+      results: response.data.results,
       message: response.data.message,
       timestamp: new Date().toISOString()
     };
 
   } catch (error) {
-    console.error(`Error verificando ${domainName}:`, {
+    console.error(`Error en verificación:`, {
       name: error.name,
       message: error.message,
       response: error.response?.data
@@ -123,8 +108,7 @@ export const verifyDomainOwnership = async (domainName) => {
     
     return {
       success: false,
-      domainName: domainName,
-      validated: false,
+      results: {},
       message: error.response?.data?.message || "Error de verificación",
       timestamp: new Date().toISOString()
     };
