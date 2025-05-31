@@ -15,6 +15,7 @@ import DNSRegisterCard from "./components/DNSRegisterCard";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 import SubdomainsDashboard from "./components/SubdomainsDashboard";
 import SubdomainForm from "./components/SubdomainForms";
+import ChangePassword from "./components/ChangePassword";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -56,7 +57,7 @@ function AppRouter() {
               />
               <Route
                 path="/change-password"
-                element={<Register title="Cambiar contraseña" />}
+                element={<ChangePassword/>}
               />
               <Route element={<ProtectedRoutes />}>
                 <Route path="/dashboard" element={<Dashboard />} />

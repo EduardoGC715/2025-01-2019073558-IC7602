@@ -5,8 +5,8 @@ function SuccessModal({ isOpen, onClose, validationData }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-light rounded-lg max-w-md w-full p-6 relative">
+    <div className="fixed inset-0 bg-light bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-lightgrey rounded-lg max-w-md w-full p-6 relative">
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -24,15 +24,15 @@ function SuccessModal({ isOpen, onClose, validationData }) {
         <div className="space-y-4">
           <p className="text-secondary">Tu dominio ha sido registrado exitosamente. Aquí están los detalles de validación:</p>
           
-          <div className="bg-light p-4 rounded-lg">
+          <div className="bg-lightgrey p-4 rounded-lg">
             <div className="grid gap-2">
               <div>
                 <span className="font-medium">Subdominio: </span>
-                <span className="text-primary">{validationData.subdomain}</span>
+                <span className="text-light">{validationData.subdomain}</span>
               </div>
               <div>
                 <span className="font-medium">Token: </span>
-                <span className="text-primary">{validationData.token}</span>
+                <span className="text-light">{validationData.token}</span>
               </div>
             </div>
           </div>

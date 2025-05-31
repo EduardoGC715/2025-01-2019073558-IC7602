@@ -14,6 +14,6 @@ router.get("/all", getUserDomains);
 
 router.delete("/:domain", deleteDomain);
 
-router.get("/verify/:domain", verifyDomainOwnership);
+router.get("/verify/", verifyDomainOwnership);
 
 export default router;

@@ -7,6 +7,7 @@ import {
   loginSubdomainApiKey,
   logoutUser,
   validateSubdomainSession,
+  changePassword,
 } from "../controllers/auth.controller";
 
 import { authenticateJWT } from "../middlewares/auth.middleware";
@@ -18,4 +19,6 @@ router.post("/login/subdomain/user", loginSubdomainUser);
 router.post("/login/subdomain/apikey", loginSubdomainApiKey);
 router.get("/logout", logoutUser);
 router.get("/validate", authenticateJWT, validateSubdomainSession);
+router.post("/change-password", changePassword);
+
 export default router;

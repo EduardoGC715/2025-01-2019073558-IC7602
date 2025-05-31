@@ -294,7 +294,7 @@ export default function SubdomainForm() {
   }
 
   return (
-    <div className="bg-lightgrey2 text-secondary max-w-xl mx-auto mt-10 p-6 rounded-2xl shadow-lg">
+    <div className="bg-lightgrey1 text-secondary max-w-xl mx-auto mt-10 p-6 rounded-2xl shadow-lg">
       <button
         onClick={() => navigate(-1)}
         className="mb-4 p-2 hover:bg-lightgrey2 rounded-full transition-colors"

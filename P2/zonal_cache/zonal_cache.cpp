@@ -120,6 +120,10 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
 
                             // Remove the expired URI
                             cout << "Removing expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << endl;
+                            uriObj["filename"].SetNull();
+                            uriObj["most_recent_use"].SetNull();
+                            uriObj["received"].SetNull();
+                            uriObj["time_to_live"].SetNull();
                             uri_itr = hostObject.RemoveMember(uri_itr);
 
                             // Release the write lock and reacquire the shared lock
@@ -404,47 +408,228 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
     return false;
 }
 
+string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const string& replacementPolicy) {
+    string keyToDelete;
+
+    if (replacementPolicy == "LRU") {
+        // Implement LRU logic here
+        cout << "Implementing LRU replacement policy." << endl;
+        string leastRecentlyUsedTime;
+        time_t oldestTime = std::numeric_limits<time_t>::max();
+
+        // Iterate through each URI object in the host
+        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
+            Value& uriObj = itr->value;
+
+            string mostRecentUse = uriObj["most_recent_use"].GetString();
+
+            // Convert the "most_recent_use" string to a time_t
+            struct tm tm;
+            if (strptime(mostRecentUse.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
+                time_t mostRecentUseTime = mktime(&tm);
+
+                // Update the least recently used entry
+                if (mostRecentUseTime < oldestTime) {
+                    oldestTime = mostRecentUseTime;
+                    keyToDelete = itr->name.GetString();
+                    leastRecentlyUsedTime = mostRecentUse;
+                }
+            }
+        }
+    } else if (replacementPolicy == "LFU") {
+        // Implement LFU logic here
+        cout << "Implementing LFU replacement policy." << endl;
+        string leastFrequentlyUsedKey;
+        int leastUsedCount = std::numeric_limits<int>::max();
+
+        // Iterate through each URI object in the host
+        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
+            Value& uriObj = itr->value;
+
+            int timesUsed = uriObj["times_used"].GetInt();
+
+            // Update the least frequently used entry
+            if (timesUsed < leastUsedCount) {
+                leastUsedCount = timesUsed;
+                leastFrequentlyUsedKey = itr->name.GetString();
+            }
+        }
+    } else if (replacementPolicy == "FIFO") {
+        // Implement FIFO logic here
+        cout << "Implementing FIFO replacement policy." << endl;
+        string firstInTime;
+        time_t oldestTime = std::numeric_limits<time_t>::max();
+
+        // Iterate through each URI object in the host
+        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
+            Value& uriObj = itr->value;
+
+            string received = uriObj["received"].GetString();
+
+            // Convert the "most_recent_use" string to a time_t
+            struct tm tm;
+            if (strptime(received.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
+                time_t receivedTime = mktime(&tm);
+
+                // 
+                if (receivedTime < oldestTime) {
+                    oldestTime = receivedTime;
+                    keyToDelete = itr->name.GetString();
+                    firstInTime = received;
+                }
+            }
+        }
+    } else if (replacementPolicy == "MRU") {
+        // Implement MRU logic here
+        cout << "Implementing MRU replacement policy." << endl;
+        string mostRecentlyUsedTime;
+        time_t earliestTime = std::numeric_limits<time_t>::min();
+
+        // Iterate through each URI object in the host
+        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
+            Value& uriObj = itr->value;
+
+            string mostRecentUse = uriObj["most_recent_use"].GetString();
+
+            // Convert the "most_recent_use" string to a time_t
+            struct tm tm;
+            if (strptime(mostRecentUse.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
+                time_t mostRecentUseTime = mktime(&tm);
+
+                // Update the least recently used entry
+                if (mostRecentUseTime > earliestTime) {
+                    earliestTime = mostRecentUseTime;
+                    keyToDelete = itr->name.GetString();
+                    mostRecentlyUsedTime = mostRecentUse;
+                }
+            }
+        }
+    } else if (replacementPolicy == "Random") {
+        // Implement Random replacement logic here
+        cout << "Implementing Random replacement policy." << endl;
+        if (hostObject.MemberCount() == 0) {
+            cout << "No URIs to remove in the host object." << endl;
+            return "";
+        }
+
+        // Generate a random index
+        size_t randomIndex = rand() % hostObject.MemberCount();
+
+        // Iterate to the random index
+        auto itr = hostObject.MemberBegin();
+        std::advance(itr, randomIndex);
+
+        // Get the key of the random URI
+        string keyToDelete = itr->name.GetString();
+    } 
+    return keyToDelete;
+}
+
 // 
-void add_to_cache_by_host(const string& host, const string& uri, const string& filename, size_t size) {
+void add_to_cache_by_host(const string& host, const string& key, const string& filename, size_t size) {
+    // Acquire a unique lock for writing to the cache
+     shared_lock<shared_mutex> read_lock(subdomain_mutex);
+
+    // Check if the host exists in the subdomains
+
+    const Value& sub_domain_object = subdomains[host.c_str()];
+
+    // Read the ttl field
+    int ttl = sub_domain_object["ttl"].GetInt();
+    cout << "TTL for host " << host << ": " << ttl << endl;
+
+    // Read the cacheSize field
+    int cacheSize = sub_domain_object["cacheSize"].GetUint64();
+    cout << "Cache size for host " << host << ": " << cacheSize << endl;
+
+    // Read replacement policy
+    string replacementPolicy = sub_domain_object["replacementPolicy"].GetString();
+
+    read_lock.unlock();
+    
+
+    unique_lock<shared_mutex> write_lock(cache_mutex);
+
     Document::AllocatorType& allocator = cache.GetAllocator();
 
     // Check if the host exists in the cache
     if (!cache.HasMember(host.c_str())) {
         // Create a new host object if it doesn't exist
-        Value host_obj(kObjectType);
-        cache.AddMember(Value().SetString(host.c_str(), allocator), host_obj, allocator);
+        Value hostObj(kObjectType);
+        // Add size field to the host object
+        hostObj.AddMember("size", Value().SetUint64(0), allocator); // Initialize size to 0
+        cache.AddMember(Value().SetString(host.c_str(), allocator), hostObj, allocator);
     }
 
     // Get the host object
-    Value& host_object = cache[host.c_str()];
-
-    // Check if the URI exists for this host
-    if (!host_object.HasMember(uri.c_str())) {
-        // Create a new URI object if it doesn't exist
-        Value uri_obj(kObjectType);
-
-        // Add fields to the URI object
-        auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
-        string current_timestamp = ctime(&now);
-        current_timestamp.pop_back(); // Remove the newline character
-
-        uri_obj.AddMember("received", Value().SetString(current_timestamp.c_str(), allocator), allocator);
-        uri_obj.AddMember("most_recent_use", Value().SetString(current_timestamp.c_str(), allocator), allocator);
-        uri_obj.AddMember("times_used", Value().SetInt(0), allocator);
-        uri_obj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
-
-        // Add the URI object to the host object
-        host_object.AddMember(Value().SetString(uri.c_str(), allocator), uri_obj, allocator);
-    } else {
-        // Update the existing URI object
-        Value& uri_obj = host_object[uri.c_str()];
-        auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
-        string current_timestamp = ctime(&now);
-        current_timestamp.pop_back(); // Remove the newline character
-
-        uri_obj["most_recent_use"].SetString(current_timestamp.c_str(), allocator);
-        uri_obj["times_used"].SetInt(uri_obj["times_used"].GetInt() + 1);
+    Value& hostObject = cache[host.c_str()];
+    
+    auto hostSize = hostObject["size"].GetUint64();
+    string received = "";
+    int times_used = 0;
+    // Check if the URI Key exists for this host
+    if (!hostObject.HasMember(key.c_str())) {
+        // Si el URI ya existe, se borra para actualizarlo
+        Value& oldUriObj = hostObject[key.c_str()];
+        received = oldUriObj["received"].GetString();
+        times_used = oldUriObj["times_used"].GetInt();
+        hostSize -= oldUriObj["size"].GetUint64();
+        oldUriObj["filename"].SetNull();
+        oldUriObj["most_recent_use"].SetNull();
+        oldUriObj["received"].SetNull();
+        oldUriObj["time_to_live"].SetNull();
+        hostObject.RemoveMember(key.c_str());
     }
+
+    while (hostSize + size > sub_domain_object["cacheSize"].GetUint64()) {
+        // Se intenta eliminar el contenido con base en la replacement policy.
+        // "LFU", "FIFO", "MRU", "Random"
+
+        string keyToDelete = replacementPolicies(hostObject, cache_mutex, replacementPolicy);
+
+        if (!keyToDelete.empty()) {
+            cout << "Least recently used URI: " << keyToDelete << endl;
+            hostSize -= hostObject[keyToDelete.c_str()]["size"].GetUint64();
+            Value& uriObj = hostObject[keyToDelete.c_str()];
+            uriObj["filename"].SetNull();
+            uriObj["most_recent_use"].SetNull();
+            uriObj["received"].SetNull();
+            uriObj["time_to_live"].SetNull();
+            hostObject.RemoveMember(keyToDelete.c_str());
+        } else {
+            cout << "Could not remove key to add space. " << host << endl;
+            return;
+        }    
+    }
+
+    // Create a new URI object if it doesn't exist
+    Value uriObj(kObjectType);
+
+    // Add fields to the URI object
+    auto nowTime = chrono::system_clock::now();
+    auto now = chrono::system_clock::to_time_t(nowTime);
+    string currentTimestamp = ctime(&now);
+    currentTimestamp.pop_back(); // Remove the newline character
+
+    // Calculate the time-to-live (TTL) as 1 hour from now
+    auto ttl_time_point = nowTime + chrono::milliseconds(ttl); // Add milliseconds to the time_point
+    auto ttl_time_t = chrono::system_clock::to_time_t(ttl_time_point); // Convert to time_t
+    string ttlTimestamp = ctime(&ttl_time_t);
+    ttlTimestamp.pop_back();
+
+    if (received.empty()) {
+        received = currentTimestamp; // If no previous received time, use current time
+    }
+    uriObj.AddMember("received", Value().SetString(received.c_str(), allocator), allocator);
+    uriObj.AddMember("most_recent_use", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
+    uriObj.AddMember("times_used", Value().SetInt(times_used), allocator);
+    uriObj.AddMember("time_to_live", Value().SetString(ttlTimestamp.c_str(), allocator), allocator);
+    uriObj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
+    uriObj.AddMember("size", Value().SetUint64(size), allocator);
+
+    // Add the URI object to the host object
+    hostObject.AddMember(Value().SetString(key.c_str(), allocator), uriObj, allocator);
+    hostObject["size"].SetUint64(hostSize + size); // Update the size field of the host object
 }
 
 bool get_response(const int &client_socket, HttpRequest request ){
