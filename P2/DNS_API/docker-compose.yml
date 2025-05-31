@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       tags:
-        - dandiego235/dns-api:2.0
+        - dandiego235/dns-api:2.1
         - dandiego235/dns-api:latest
 
   dev:

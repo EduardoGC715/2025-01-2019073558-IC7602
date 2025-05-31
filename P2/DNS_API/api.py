@@ -216,7 +216,7 @@ def exists():
 
         # Se invierte el dominio para buscarlo en la base de datos
         flipped_path = "/".join(reversed(domain.strip().split(".")))
-        ref = domain_ref.child(flipped_path)
+        ref = domain_ref.child(flipped_path + "/_enabled")
         ip_data = ref.get()
         ip_response = ""
         if ip_data:

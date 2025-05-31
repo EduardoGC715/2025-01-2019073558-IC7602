@@ -71,7 +71,6 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
 
         string protocol = use_https ? "https://" : "http://";
         string url_req = protocol + url;
-        cout << url_req << endl;
         curl_easy_setopt(curl, CURLOPT_URL, url_req.c_str());
 
         // Set the HTTP method
@@ -101,6 +100,7 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)resp_mem);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+        curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         if (write_headers) {
             curl_easy_setopt(curl, CURLOPT_HEADER, 1L); // Incluir headers en la respuesta
@@ -153,7 +153,6 @@ HttpRequest parse_http_request(const char * request_buffer, size_t size) {
 
     HttpRequestParser::ParseResult result = parser.parse(request, request_buffer, request_buffer + size);
     if (result == HttpRequestParser::ParsingCompleted) {
-        std::cout << request.inspect() << std::endl;
         for (const auto &header : request.headers) {
             // Convertir el nombre del header a minúsculas para un acceso más fácil y estándar
             // El protocolo HTTP es case-insensitive.
@@ -177,7 +176,6 @@ HttpResponse parse_http_response(const char * response_buffer, size_t size) {
     // Crear un objeto response y un parser
     Response response;
     HttpResponseParser parser;
-
     HttpResponseParser::ParseResult result = parser.parse(response, response_buffer, response_buffer + size);
     if (result == HttpResponseParser::ParsingCompleted) {
         for (const auto &header : response.headers) {
@@ -186,8 +184,8 @@ HttpResponse parse_http_response(const char * response_buffer, size_t size) {
             headers[to_lowercase(header.name)] = header.value;
         }
     } else {
-        std::cerr << "Error parsing HTTP request: " << result << std::endl;
-        throw std::runtime_error("Failed to parse HTTP request");
+        std::cerr << "Error parsing HTTP response: " << result << std::endl;
+        throw std::runtime_error("Failed to parse HTTP response");
     }
     HttpResponse http_response;
     http_response.response = response;

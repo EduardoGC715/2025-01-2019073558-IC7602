@@ -33,7 +33,7 @@ export const registerDomain = async (req: Request, res: Response) => {
       return;
     }
     const flipped_domain = domain.trim().split(".").reverse().join("/");
-    const domainRef = database.ref(`domains/${flipped_domain}`);
+    const domainRef = database.ref(`domains/${flipped_domain}/_registered`);
     const domainSnapshot = await domainRef.once("value");
     if (domainSnapshot.exists()) {
       res.status(400).json({ message: "El dominio ya está registrado" });
@@ -50,7 +50,7 @@ export const registerDomain = async (req: Request, res: Response) => {
       validated: false,
     };
     const updates: Record<string, any> = {};
-    updates[`domains/${flipped_domain}/_enabled`] = true;
+    updates[`domains/${flipped_domain}/_registered`] = true;
 
     await database.ref().update(updates);
 
@@ -151,7 +151,7 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
   if (!session || !session.user) {
     res.status(401).json({ message: "Unauthorized" });
-    return
+    return;
   }
 
   try {
@@ -171,7 +171,7 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
     if (!data?.validation) {
       res.status(400).json({ message: "Faltan datos de validación" });
-      return
+      return;
     }
 
     const { subdomain, token } = data.validation;
@@ -181,14 +181,14 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
 
     if (!txtRecords.length) {
       res.status(404).json({ message: "No se encontró el registro TXT" });
-      return
+      return;
     }
 
     const receivedToken = txtRecords[0][0].replace(/"/g, "");
 
     if (receivedToken !== token) {
       res.status(400).json({ message: "Token no coincide" });
-      return
+      return;
     }
 
     res.status(200).json({ message: "Dominio verificado correctamente" });

@@ -448,9 +448,9 @@ void add_to_cache_by_host(const string& host, const string& uri, const string& f
 }
 
 bool get_response(const int &client_socket, HttpRequest request ){
-    if (cache.HasMember(request.headers.at("host").c_str())) {
-
-        Value& host_object = cache[request.headers["host"].c_str()];
+    const string host = request.headers.at("host");
+    if (cache.HasMember(host.c_str())) {
+        Value& host_object = cache[host.c_str()];
         cout << "Host object found in cache." << endl;
         cout << "Request URI: " << request.request.method << request.request.uri << endl;
         
@@ -460,7 +460,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
             
             // Revisar la cache para ver si el request está en el cache.
                 
-            string filepath = "sub_domain_caches/" + request.headers["host"] + "/" + entry["filename"].GetString();
+            string filepath = "sub_domain_caches/" + host + "/" + entry["filename"].GetString();
             ifstream file(filepath, ios::binary | ios::ate);
             
             if (!file.is_open()) {
@@ -509,7 +509,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
     vector<string> file_types;
     {
         shared_lock<shared_mutex> lock(subdomain_mutex);
-        const Value& subdomain_obj = subdomains[request.headers.at("host").c_str()];
+        const Value& subdomain_obj = subdomains[host.c_str()];
         if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
             destination = subdomain_obj["destination"].GetString();
             https = subdomain_obj["https"].GetBool();
@@ -526,11 +526,15 @@ bool get_response(const int &client_socket, HttpRequest request ){
     // Si no está en el cache, se hace una solicitud al destino.
     string url = destination + request.request.uri;
     cout << "Fetching from URL: " << url << endl;
-    
+    request.headers["host"] = destination;
     memory_struct * response = send_https_request(url, request.request.content.data(), request.request.content.size(), request.headers, https, request.request.method, true);
+    request.headers["host"] = host; // Restaurar el host original en los headers de la solicitud.
     if (response) {
+        cout << "Response received. Status code: " << response->status_code << endl;
+        cout << "Response: " << response->memory << endl;
+
         HttpResponse http_response = parse_http_response(response->memory, response->size);
-        auto it = http_response.headers.find("Content-Type");
+        auto it = http_response.headers.find("content-type");
         if (it != http_response.headers.end()) {
             string content_type_header = it->second;
             cout << "Content-Type: " << content_type_header << endl;
@@ -541,12 +545,12 @@ bool get_response(const int &client_socket, HttpRequest request ){
             // Verificar si el Content-Type es uno de los tipos de archivo permitidos.
             bool is_allowed = false;
             for (const auto& file_type : file_types) {
+                cout << "Checking against allowed file type: " << file_type << endl;
                 if (content_type == file_type) {
                     is_allowed = true;
                     break;
                 }
             }
-            is_allowed = false;
             // Si el Content-Type es permitido, se guarda la respuesta en el cache.
             if (is_allowed) {
                 cout << "Content-Type is allowed." << endl;
@@ -559,7 +563,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
                     cout << "Response saved to cache as: " << filename << endl;
 
                     // Agregar a la cache
-                    add_to_cache_by_host(request.headers.at("host"), request.request.method + "-" + request.request.uri, filename, response->size);
+                    add_to_cache_by_host(host, request.request.method + "-" + request.request.uri, filename, response->size);
                 } else {
                     cerr << "Failed to open cache file for writing." << endl;
                 }
@@ -607,11 +611,11 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 send_http_error_response(client_socket, "Bad Request", 400);
                 break;
             }
-            bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
-            if (!authenticated) {
-                // Si no está autenticado, salir, porque la respuesta ya se envió.
-                break;
-            }
+            // bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
+            // if (!authenticated) {
+            //     // Si no está autenticado, salir, porque la respuesta ya se envió.
+            //     break;
+            // }
 
             const bool set_response = get_response(client_socket, request);
             if (!set_response) {
