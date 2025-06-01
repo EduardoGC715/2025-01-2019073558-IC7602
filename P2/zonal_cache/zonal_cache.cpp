@@ -25,13 +25,14 @@
 #include <cstring>
 #include <vector>
 #include <ctime>
+#include <filesystem>
 
 using namespace std;
 using namespace rapidjson;
 
 #define HTTP_PORT 80
 #define REQUEST_BUFFER_SIZE 8192
-
+#define CACHE_FOLDER "subdomain_caches/"
 // Referencias para threads:
 // https://cplusplus.com/reference/thread/thread/
 
@@ -75,7 +76,6 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
                 
                 cout << "\033[1;34mSubdomains fetched successfully.\033[0m" << endl;
                 cout << "\033[1;34mSubdomains: " << buffer.GetString() << "\033[0m" << endl;
-                cout << "\033[1;34mResponse code: " << response->status_code << "\033[0m" << endl;
             } else {
                 cout << "\033[1;34mFailed to parse JSON response.\033[0m" << endl;
             }
@@ -89,44 +89,47 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
     }
 }
 
+// Función de garbage collection que limpia la caché de subdominios de TTLs expirados.
+// Esta función se ejecuta en un hilo separado y limpia la cache cada 30 segundos.
 void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
     while (true) {
         {
-            // Acquire a shared lock for reading
+            // Adquirir un bloqueo compartido para leer la caché
             shared_lock<shared_mutex> read_lock(cache_mutex);
 
-            // Get the current time
+            // Tiempo actual
             auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
             string currentTimestamp = ctime(&now);
-            currentTimestamp.pop_back(); // Remove the newline character
+            currentTimestamp.pop_back(); // Eliminar cambio de línea al final de la cadena
 
-            // Iterate over the hosts in the cache
+            // Iterar por los hosts en la caché
             for (auto host_itr = cache.MemberBegin(); host_itr != cache.MemberEnd(); ) {
-                Value& hostObject = host_itr->value;
-
-                // Iterate over the URIs for the current host
-                for (auto uri_itr = hostObject.MemberBegin(); uri_itr != hostObject.MemberEnd(); ) {
-                    Value& uriObj = uri_itr->value;
-
-                    cout << "Checking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\n";
+                Value& host_object = host_itr->value;
+                const string host = host_itr->name.GetString();
+                Value& requests_object = host_object["requests"];
+                // Iterar por las URIs cacheadas para el host
+                for (auto uri_itr = requests_object.MemberBegin(); uri_itr != requests_object.MemberEnd(); ) {
+                    Value& uri_obj = uri_itr->value;
+                
+                    cout << "\033[0;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m\n";
                     
-                    // Check if the TTL has expired
-                    if (uriObj.HasMember("time_to_live") && uriObj["time_to_live"].IsString()) {
-                        string ttlTimestamp = uriObj["time_to_live"].GetString();
-                        if (ttlTimestamp <= currentTimestamp) {
-                            // Release the shared lock and acquire a unique lock for writing
+                    // Revisar si el TTL ya expiró
+                    if (uri_obj.HasMember("time_to_live") && uri_obj["time_to_live"].IsString()) {
+                        string ttl_timestamp = uri_obj["time_to_live"].GetString();
+                        if (ttl_timestamp <= currentTimestamp) {
+                            // Liberar el bloqueo de lectura antes de escribir
                             read_lock.unlock();
                             unique_lock<shared_mutex> write_lock(cache_mutex);
-
-                            // Remove the expired URI
-                            cout << "Removing expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << endl;
-                            uriObj["filename"].SetNull();
-                            uriObj["most_recent_use"].SetNull();
-                            uriObj["received"].SetNull();
-                            uriObj["time_to_live"].SetNull();
-                            uri_itr = hostObject.RemoveMember(uri_itr);
-
-                            // Release the write lock and reacquire the shared lock
+                            // Eliminar la entrada de caché expirada
+                            cout << "\033[0;31mRemoving expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
+                            filesystem::remove(CACHE_FOLDER + host + "/" + uri_obj["filename"].GetString());
+                            uri_obj["filename"].SetNull();
+                            uri_obj["most_recent_use"].SetNull();
+                            uri_obj["received"].SetNull();
+                            uri_obj["time_to_live"].SetNull();
+                            uri_itr = host_object.RemoveMember(uri_itr);
+                            
+                            // Liberar los bloqueos.
                             write_lock.unlock();
                             read_lock.lock();
                             continue;
@@ -135,16 +138,15 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                     ++uri_itr;
                 }
 
-                // If the host has no more URIs, remove the host
-                if (hostObject.MemberCount() == 0) {
-                    // Release the shared lock and acquire a unique lock for writing
+                // Si el host no tiene URIs cacheadas, eliminar el host de la caché.
+                if (host_object.MemberCount() == 0) {
+                    // Liberar el bloqueo de lectura antes de escribir
                     read_lock.unlock();
                     unique_lock<shared_mutex> write_lock(cache_mutex);
 
-                    cout << "Removing empty host: " << host_itr->name.GetString() << endl;
+                    cout << "\033[0;31mRemoving empty host: " << host_itr->name.GetString() << "\033[0m" << endl;
                     host_itr = cache.RemoveMember(host_itr);
 
-                    // Release the write lock and reacquire the shared lock
                     write_lock.unlock();
                     read_lock.lock();
                 } else {
@@ -153,7 +155,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
             }
         }
 
-        // Sleep for a short interval before checking again
+        // Dormir durante 30 segundos antes de la próxima limpieza.
         this_thread::sleep_for(chrono::seconds(30));
     }
 }
@@ -275,7 +277,7 @@ string hashString(const string& input) {
 bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
     auto host_it = request.headers.find("host");
     if (host_it != request.headers.end()) {
-        cout << "\033[1;34mPRINT 1: Host header found: " << host_it->second << "\033[0m" << endl;
+        cout << "\033[0;36mPRINT 1: Host header found: " << host_it->second << "\033[0m" << endl;
         // Obtener el host
         const string &host = host_it->second;
         shared_lock<shared_mutex> lock(subdomain_mutex);
@@ -287,13 +289,13 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 // Obtener el método de autenticación del subdominio.
                 authMethod = subdomain_obj["authMethod"].GetString();
             } else {
-                cerr << "\033[1;31mAuth method not found in subdomain object.\033[0m" << endl;
+                cerr << "\033[0;31mAuth method not found in subdomain object.\033[0m" << endl;
                 // Enviar respuesta HTTP 401 Unauthorized
                 send_http_error_response(client_socket, "Not Found", 404);
                 return false;
             }
         } else {
-            cerr << "\033[1;31mSubdomain not found.\033[0m" << endl;
+            cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
             // Enviar respuesta HTTP 401 Unauthorized
             send_http_error_response(client_socket, "Not Found", 404);
             return false;
@@ -306,7 +308,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
             // Si el método de autenticación es user-password, se verifica si hay un cookie con el token de autenticación.
             auto it = request.headers.find("cookie");
             if (it != request.headers.end()) {
-                cout << "\033[1;34mPRINT 3: Cookie header found.\033[0m" << endl;
+                cout << "\033[0;34mPRINT 3: Cookie header found.\033[0m" << endl;
                 const string &cookies = it->second;
                 string token = get_token_from_cookies(cookies);
                 if (!token.empty()) {
@@ -332,7 +334,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                     free(response);
                 }
             } else if (request.request.uri.find("/_auth/callback") != string::npos) {
-                cout << "\033[1;34mPRINT 2: Auth callback found in URI.\033[0m" << endl;
+                cout << "\033[0;36mPRINT 2: Auth callback found in URI.\033[0m" << endl;
                 string token = get_query_parameter(request.request.uri, "token");
                 string next = url_decode(get_query_parameter(request.request.uri, "next"));
                 string exp = get_query_parameter(request.request.uri, "exp");
@@ -346,7 +348,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                                 "Connection: close\r\n"
                                 "Content-Length: 0\r\n"
                                 "\r\n";
-                cout << "\033[1;34mPRINT 2.5: \033[0m" << response << endl;
+                cout << "\033[0;36mPRINT 2.5: \033[0m" << response << endl;
                 send(client_socket, response.c_str(), response.size(), 0);
                 return false;
             }
@@ -408,27 +410,27 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
     return false;
 }
 
+// Función que maneja las políticas de reemplazo de caché.
 string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const string& replacementPolicy) {
     string keyToDelete;
 
     if (replacementPolicy == "LRU") {
-        // Implement LRU logic here
+        // Least Recently Used
         cout << "Implementing LRU replacement policy." << endl;
         string leastRecentlyUsedTime;
         time_t oldestTime = std::numeric_limits<time_t>::max();
 
-        // Iterate through each URI object in the host
         for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
             Value& uriObj = itr->value;
 
             string mostRecentUse = uriObj["most_recent_use"].GetString();
 
-            // Convert the "most_recent_use" string to a time_t
+            // Convertir el "most_recent_use" string a time_t
             struct tm tm;
             if (strptime(mostRecentUse.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
                 time_t mostRecentUseTime = mktime(&tm);
 
-                // Update the least recently used entry
+                // Actualizar la entrada menos recientemente usada
                 if (mostRecentUseTime < oldestTime) {
                     oldestTime = mostRecentUseTime;
                     keyToDelete = itr->name.GetString();
@@ -437,41 +439,38 @@ string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const s
             }
         }
     } else if (replacementPolicy == "LFU") {
-        // Implement LFU logic here
+        // Least Frequently Used
         cout << "Implementing LFU replacement policy." << endl;
         string leastFrequentlyUsedKey;
         int leastUsedCount = std::numeric_limits<int>::max();
 
-        // Iterate through each URI object in the host
         for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
             Value& uriObj = itr->value;
 
             int timesUsed = uriObj["times_used"].GetInt();
 
-            // Update the least frequently used entry
+            // Actualizar la entrada menos usada
             if (timesUsed < leastUsedCount) {
                 leastUsedCount = timesUsed;
                 leastFrequentlyUsedKey = itr->name.GetString();
             }
         }
     } else if (replacementPolicy == "FIFO") {
-        // Implement FIFO logic here
+        // First In First Out
         cout << "Implementing FIFO replacement policy." << endl;
         string firstInTime;
         time_t oldestTime = std::numeric_limits<time_t>::max();
 
-        // Iterate through each URI object in the host
         for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
             Value& uriObj = itr->value;
 
             string received = uriObj["received"].GetString();
 
-            // Convert the "most_recent_use" string to a time_t
             struct tm tm;
             if (strptime(received.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
                 time_t receivedTime = mktime(&tm);
 
-                // 
+                // Actualizar la entrada más antigua
                 if (receivedTime < oldestTime) {
                     oldestTime = receivedTime;
                     keyToDelete = itr->name.GetString();
@@ -480,23 +479,21 @@ string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const s
             }
         }
     } else if (replacementPolicy == "MRU") {
-        // Implement MRU logic here
+        // Most Recently Used
         cout << "Implementing MRU replacement policy." << endl;
         string mostRecentlyUsedTime;
         time_t earliestTime = std::numeric_limits<time_t>::min();
 
-        // Iterate through each URI object in the host
         for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
             Value& uriObj = itr->value;
 
             string mostRecentUse = uriObj["most_recent_use"].GetString();
 
-            // Convert the "most_recent_use" string to a time_t
             struct tm tm;
             if (strptime(mostRecentUse.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
                 time_t mostRecentUseTime = mktime(&tm);
 
-                // Update the least recently used entry
+                // Actualizar la entrada más recientemente usada
                 if (mostRecentUseTime > earliestTime) {
                     earliestTime = mostRecentUseTime;
                     keyToDelete = itr->name.GetString();
@@ -505,131 +502,134 @@ string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const s
             }
         }
     } else if (replacementPolicy == "Random") {
-        // Implement Random replacement logic here
+        // Random
         cout << "Implementing Random replacement policy." << endl;
         if (hostObject.MemberCount() == 0) {
             cout << "No URIs to remove in the host object." << endl;
             return "";
         }
 
-        // Generate a random index
+        // Generar índice random
         size_t randomIndex = rand() % hostObject.MemberCount();
 
-        // Iterate to the random index
+        // Iterar hasta el índice random
         auto itr = hostObject.MemberBegin();
         std::advance(itr, randomIndex);
 
-        // Get the key of the random URI
         string keyToDelete = itr->name.GetString();
     } 
     return keyToDelete;
 }
 
-// 
+// Función para agregar un URI al caché de un host específico.
 void add_to_cache_by_host(const string& host, const string& key, const string& filename, size_t size) {
-    // Acquire a unique lock for writing to the cache
+    // Adquirir un bloqueo de lectura compartida para acceder a los subdominios
      shared_lock<shared_mutex> read_lock(subdomain_mutex);
 
-    // Check if the host exists in the subdomains
+    const Value& subdomain_object = subdomains[host.c_str()];
 
-    const Value& sub_domain_object = subdomains[host.c_str()];
-
-    // Read the ttl field
-    int ttl = sub_domain_object["ttl"].GetInt();
+    // Leer campo de TTL
+    int ttl = subdomain_object["ttl"].GetInt();
     cout << "TTL for host " << host << ": " << ttl << endl;
 
-    // Read the cacheSize field
-    int cacheSize = sub_domain_object["cacheSize"].GetUint64();
-    cout << "Cache size for host " << host << ": " << cacheSize << endl;
+    // Leer tamaño de caché
+    auto cache_size = subdomain_object["cacheSize"].GetUint64();
+    cout << "Cache size for host " << host << ": " << cache_size << endl;
 
-    // Read replacement policy
-    string replacementPolicy = sub_domain_object["replacementPolicy"].GetString();
-
+    // Leer política de reemplazo
+    string replacement_policy = subdomain_object["replacementPolicy"].GetString();
+    cout << "Replacement policy for host " << host << ": " << replacement_policy << endl;
+    // Liberar el bloqueo de lectura compartida antes de escribir en la caché
     read_lock.unlock();
     
-
+    // Adquirir un bloqueo exclusivo para escribir en la caché
     unique_lock<shared_mutex> write_lock(cache_mutex);
 
     Document::AllocatorType& allocator = cache.GetAllocator();
 
-    // Check if the host exists in the cache
     if (!cache.HasMember(host.c_str())) {
-        // Create a new host object if it doesn't exist
-        Value hostObj(kObjectType);
-        // Add size field to the host object
-        hostObj.AddMember("size", Value().SetUint64(0), allocator); // Initialize size to 0
-        cache.AddMember(Value().SetString(host.c_str(), allocator), hostObj, allocator);
+        // Crear un nuevo objeto para el host si no existe en la caché
+        Value host_obj(kObjectType);
+        // Agregar campos de tamaño y requests al objeto del host
+        host_obj.AddMember("size", Value().SetUint64(0), allocator);
+        host_obj.AddMember("requests", Value(kObjectType), allocator);
+        cache.AddMember(Value().SetString(host.c_str(), allocator), host_obj, allocator);
     }
-
-    // Get the host object
-    Value& hostObject = cache[host.c_str()];
-    
-    auto hostSize = hostObject["size"].GetUint64();
+    // Obtener el objeto del host desde la caché
+    Value& host_object = cache[host.c_str()];
+    Value& requests_object = host_object["requests"];
+    auto host_size = host_object["size"].GetUint64();
     string received = "";
     int times_used = 0;
-    // Check if the URI Key exists for this host
-    if (!hostObject.HasMember(key.c_str())) {
+    // Revisar si el URI ya existe en la caché del host.
+    if (requests_object.HasMember(key.c_str())) {
+        cout << "URI already exists in cache for host: " << host << endl;
         // Si el URI ya existe, se borra para actualizarlo
-        Value& oldUriObj = hostObject[key.c_str()];
-        received = oldUriObj["received"].GetString();
-        times_used = oldUriObj["times_used"].GetInt();
-        hostSize -= oldUriObj["size"].GetUint64();
-        oldUriObj["filename"].SetNull();
-        oldUriObj["most_recent_use"].SetNull();
-        oldUriObj["received"].SetNull();
-        oldUriObj["time_to_live"].SetNull();
-        hostObject.RemoveMember(key.c_str());
+        Value& old_uri_obj = requests_object[key.c_str()];
+        received = old_uri_obj["received"].GetString();
+        times_used = old_uri_obj["times_used"].GetInt();
+        host_size -= old_uri_obj["size"].GetUint64();
+        old_uri_obj["filename"].SetNull();
+        old_uri_obj["most_recent_use"].SetNull();
+        old_uri_obj["received"].SetNull();
+        old_uri_obj["time_to_live"].SetNull();
+        host_object.RemoveMember(key.c_str());
     }
-
-    while (hostSize + size > sub_domain_object["cacheSize"].GetUint64()) {
-        // Se intenta eliminar el contenido con base en la replacement policy.
+    while (host_size + size > cache_size) {
+        // Se intenta eliminar el contenido con base en la replacement policy hasta que quepa en la caché.
         // "LFU", "FIFO", "MRU", "Random"
 
-        string keyToDelete = replacementPolicies(hostObject, cache_mutex, replacementPolicy);
+        string key_to_delete = replacementPolicies(host_object, cache_mutex, replacement_policy);
 
-        if (!keyToDelete.empty()) {
-            cout << "Least recently used URI: " << keyToDelete << endl;
-            hostSize -= hostObject[keyToDelete.c_str()]["size"].GetUint64();
-            Value& uriObj = hostObject[keyToDelete.c_str()];
-            uriObj["filename"].SetNull();
-            uriObj["most_recent_use"].SetNull();
-            uriObj["received"].SetNull();
-            uriObj["time_to_live"].SetNull();
-            hostObject.RemoveMember(keyToDelete.c_str());
+        if (!key_to_delete.empty()) {
+            cout << "Least recently used URI: " << key_to_delete << endl;
+            host_size -= host_object[key_to_delete.c_str()]["size"].GetUint64();
+            Value& uri_obj = host_object[key_to_delete.c_str()];
+            uri_obj["filename"].SetNull();
+            uri_obj["most_recent_use"].SetNull();
+            uri_obj["received"].SetNull();
+            uri_obj["time_to_live"].SetNull();
+            host_object.RemoveMember(key_to_delete.c_str());
         } else {
             cout << "Could not remove key to add space. " << host << endl;
             return;
         }    
     }
-
     // Create a new URI object if it doesn't exist
-    Value uriObj(kObjectType);
+    Value uri_obj(kObjectType);
 
     // Add fields to the URI object
-    auto nowTime = chrono::system_clock::now();
-    auto now = chrono::system_clock::to_time_t(nowTime);
-    string currentTimestamp = ctime(&now);
-    currentTimestamp.pop_back(); // Remove the newline character
+    auto now_time = chrono::system_clock::now();
+    auto now = chrono::system_clock::to_time_t(now_time);
+    string current_timestamp = ctime(&now);
+    current_timestamp.pop_back(); // Remove the newline character
 
     // Calculate the time-to-live (TTL) as 1 hour from now
-    auto ttl_time_point = nowTime + chrono::milliseconds(ttl); // Add milliseconds to the time_point
+    auto ttl_time_point = now_time + chrono::milliseconds(ttl); // Add milliseconds to the time_point
     auto ttl_time_t = chrono::system_clock::to_time_t(ttl_time_point); // Convert to time_t
-    string ttlTimestamp = ctime(&ttl_time_t);
-    ttlTimestamp.pop_back();
+    string ttl_timestamp = ctime(&ttl_time_t);
+    ttl_timestamp.pop_back();
 
     if (received.empty()) {
-        received = currentTimestamp; // If no previous received time, use current time
+        received = current_timestamp; // If no previous received time, use current time
     }
-    uriObj.AddMember("received", Value().SetString(received.c_str(), allocator), allocator);
-    uriObj.AddMember("most_recent_use", Value().SetString(currentTimestamp.c_str(), allocator), allocator);
-    uriObj.AddMember("times_used", Value().SetInt(times_used), allocator);
-    uriObj.AddMember("time_to_live", Value().SetString(ttlTimestamp.c_str(), allocator), allocator);
-    uriObj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
-    uriObj.AddMember("size", Value().SetUint64(size), allocator);
+    uri_obj.AddMember("received", Value().SetString(received.c_str(), allocator), allocator);
+    uri_obj.AddMember("most_recent_use", Value().SetString(current_timestamp.c_str(), allocator), allocator);
+    uri_obj.AddMember("times_used", Value().SetInt(times_used), allocator);
+    uri_obj.AddMember("time_to_live", Value().SetString(ttl_timestamp.c_str(), allocator), allocator);
+    uri_obj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
+    uri_obj.AddMember("size", Value().SetUint64(size), allocator);
 
     // Add the URI object to the host object
-    hostObject.AddMember(Value().SetString(key.c_str(), allocator), uriObj, allocator);
-    hostObject["size"].SetUint64(hostSize + size); // Update the size field of the host object
+    requests_object.AddMember(Value().SetString(key.c_str(), allocator), uri_obj, allocator);
+    host_object["size"].SetUint64(host_size + size); // Update the size field of the host object
+
+    StringBuffer buffer;
+    Writer<StringBuffer> writer(buffer);
+    cache.Accept(writer);
+    
+
+    cout << "\033[1;34mCache Object: " << buffer.GetString() << "\033[0m" << endl;
 }
 
 bool get_response(const int &client_socket, HttpRequest request ){
@@ -639,13 +639,15 @@ bool get_response(const int &client_socket, HttpRequest request ){
         cout << "Host object found in cache." << endl;
         cout << "Request URI: " << request.request.method << request.request.uri << endl;
         
-        if (host_object.HasMember((request.request.method + "-" + request.request.uri).c_str())) {
+        const string cache_key = (request.request.method + "-" + request.request.uri);
+        Value& requests_object = host_object["requests"];
+        if (requests_object.HasMember(cache_key.c_str())) {
             cout << "URI object found in cache." << endl;
-            Value& entry = host_object[(request.request.method + "-" + request.request.uri).c_str()];
+            Value& entry = requests_object[cache_key.c_str()];
             
             // Revisar la cache para ver si el request está en el cache.
                 
-            string filepath = "sub_domain_caches/" + host + "/" + entry["filename"].GetString();
+            string filepath = CACHE_FOLDER + host + "/" + entry["filename"].GetString();
             ifstream file(filepath, ios::binary | ios::ate);
             
             if (!file.is_open()) {
@@ -686,9 +688,9 @@ bool get_response(const int &client_socket, HttpRequest request ){
                 cerr << "Failed to read cache file: " << filepath << endl;
                 return false;
             }
-            
         } 
     }
+    // Si no está en el cache, se hace una solicitud al destino.
     string destination;
     bool https;
     vector<string> file_types;
@@ -706,9 +708,6 @@ bool get_response(const int &client_socket, HttpRequest request ){
             }
         }
     }
-    
-
-    // Si no está en el cache, se hace una solicitud al destino.
     string url = destination + request.request.uri;
     cout << "Fetching from URL: " << url << endl;
     request.headers["host"] = destination;
@@ -741,7 +740,12 @@ bool get_response(const int &client_socket, HttpRequest request ){
                 cout << "Content-Type is allowed." << endl;
                 // Guardar la respuesta en el cache.
                 string filename = hashString(url + to_string(time(nullptr))) + ".ksh";
-                ofstream out_file("sub_domains_caches/" + filename, ios::binary);
+                cout << filename << endl;
+                string directory = CACHE_FOLDER + host + "/";
+                // Crear el directorio
+                filesystem::create_directories(directory);
+                
+                ofstream out_file(directory + filename, ios::binary);
                 if (out_file) {
                     out_file.write(response->memory, response->size);
                     out_file.close();
@@ -750,7 +754,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
                     // Agregar a la cache
                     add_to_cache_by_host(host, request.request.method + "-" + request.request.uri, filename, response->size);
                 } else {
-                    cerr << "Failed to open cache file for writing." << endl;
+                    perror("Failed to open cache file for writing");
                 }
             } else {
                 cerr << "Content-Type not allowed: " << content_type << endl;
@@ -809,7 +813,6 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 break;
             }
             if (request.request.keepAlive) {
-                cout << "Connection header: keep-alive\n";
                 keep_alive = true;
             } else {
                 keep_alive = false;
@@ -822,6 +825,7 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             //                     "\r\n" +
             //                     "{\"message\": \"Zonal cache is running\"}";
             // send(client_socket, response.c_str(), response.size(), 0);
+            cout << endl;
         } else {
             perror("recv failed\n");
             break;
@@ -838,6 +842,7 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
 #ifndef UNIT_TEST
 
 int main() {
+    filesystem::create_directories(CACHE_FOLDER);
     setvbuf(stdout, NULL, _IONBF, 0);
     // Leer variables de entorno
     const char* rest_api_env = getenv("REST_API");
