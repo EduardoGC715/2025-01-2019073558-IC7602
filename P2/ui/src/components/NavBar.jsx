@@ -67,7 +67,7 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
         <button
           data-collapse-toggle="navbar-default"
           type="button"
-          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-lightgrey rounded-lg md:hidden hover:bg-lightgrey2 focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
+          className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-lightgrey rounded-lg md:hidden hover:bg-lightgrey2 hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
           aria-controls="navbar-default"
           aria-expanded="false"
         >
@@ -93,7 +93,11 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
             {!isLoggedIn && (
               <>
                 <li>
-                  <a href="/" className={getNavLinkClass("/")} aria-current="page">
+                  <a
+                    href="/"
+                    className={getNavLinkClass("/")}
+                    aria-current="page"
+                  >
                     Log In
                   </a>
                 </li>
@@ -107,14 +111,17 @@ function NavBar({ isLoggedIn, setIsLoggedIn }) {
             {isLoggedIn && (
               <>
                 <li>
-                  <a href="/dashboard" className={getNavLinkClass("/dashboard")}>
+                  <a
+                    href="/dashboard"
+                    className={getNavLinkClass("/dashboard")}
+                  >
                     Dashboard
                   </a>
                 </li>
                 <li>
                   <button
                     onClick={handleLogout}
-                    className="block py-2 px-3 text-secondary rounded-sm hover:bg-lightgrey2 md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 transition-colors"
+                    className="block py-2 px-3 text-secondary rounded-sm hover:bg-lightgrey2 hover:cursor-pointer md:hover:bg-transparent md:border-0 md:hover:text-primary md:p-0 transition-colors"
                   >
                     Cerrar sesión
                   </button>
