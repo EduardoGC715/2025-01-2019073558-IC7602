@@ -4,6 +4,7 @@ import ms from "ms";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { jwtDecode } from "jwt-decode";
+import crypto from "crypto";
 
 const createSessionUser = async (
   user: string,
@@ -328,6 +329,55 @@ export const validateSubdomainSession = async (
     return;
   }
   res.status(200).send("OK");
+};
+
+// Esta función se usa para encriptar la API key antes de guardarla en la base de datos
+// Referencia: https://nodejs.org/api/crypto.html#class-hmac
+export const hashApiKey = (apiKey: string): string => {
+  return crypto
+    .createHmac("sha256", process.env.API_KEY_SECRET || "default")
+    .update(apiKey)
+    .digest("hex");
+};
+
+export const validateSubdomainApiKey = async (req: Request, res: Response) => {
+  try {
+    const { apiKey, subdomain } = req.body;
+
+    const docRef = firestore.collection("subdomains").doc(subdomain);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      res.status(401).json({ message: "Unauthorized. No domain." });
+      return;
+    }
+
+    const subdomainData = doc.data();
+    if (!subdomainData) {
+      res.status(500).json({ message: "Internal server error" });
+      return;
+    }
+
+    if (subdomainData.authMethod != "api-keys") {
+      res.status(403).json({
+        message: "Forbidden, subdominio requiere autenticación con API keys",
+      });
+      return;
+    }
+
+    const hashedKey = hashApiKey(apiKey);
+    const isApiKeyValid = subdomainData.apiKeys?.[hashedKey];
+    if (!isApiKeyValid) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    res.status(200).send("OK");
+    return;
+  } catch (error) {
+    console.error("Error creating session:", error);
+    res.status(401).send("Forbidden");
+    return;
+  }
 };
 
 export const changePassword = async (

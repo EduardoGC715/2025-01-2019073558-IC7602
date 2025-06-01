@@ -4,6 +4,7 @@ import { WriteBatch } from "firebase-admin/firestore";
 import validator from "validator";
 import ms, { StringValue } from "ms";
 import bcrypt from "bcryptjs";
+import { hashApiKey } from "./auth.controller";
 
 export const getAllSubdomains = async (req: Request, res: Response) => {
   try {
@@ -72,7 +73,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     if (
       subdomain !== "" &&
-      !validator.isFQDN(subdomain, { require_tld: false }) && 
+      !validator.isFQDN(subdomain, { require_tld: false }) &&
       !wildcardRe.test(subdomain)
     ) {
       res.status(400).json({ message: "Subdominio inválido" });
@@ -101,8 +102,10 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    if (typeof https !== 'boolean') {
-      res.status(400).json({ message: 'El campo useHttps debe ser true o false' });
+    if (typeof https !== "boolean") {
+      res
+        .status(400)
+        .json({ message: "El campo useHttps debe ser true o false" });
       return;
     }
 
@@ -121,14 +124,24 @@ export const registerSubdomain = async (req: Request, res: Response) => {
 
     // Validar lógica de authMethod
     if (authMethod === "api-keys") {
-      if (typeof apiKeys !== 'object' ||  apiKeys === null || Array.isArray(apiKeys) || Object.keys(apiKeys).length === 0) {
+      if (
+        typeof apiKeys !== "object" ||
+        apiKeys === null ||
+        Array.isArray(apiKeys) ||
+        Object.keys(apiKeys).length === 0
+      ) {
         res.status(400).json({
           message:
             'Debe proporcionar llaves de autenticación cuando el método de autenticación sea por API keys"',
         });
         return;
       }
-      if (typeof users === "object" && users !== null && !Array.isArray(users) && Object.keys(users).length > 0) {
+      if (
+        typeof users === "object" &&
+        users !== null &&
+        !Array.isArray(users) &&
+        Object.keys(users).length > 0
+      ) {
         res.status(400).json({
           message:
             "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys",
@@ -143,13 +156,17 @@ export const registerSubdomain = async (req: Request, res: Response) => {
           });
           return;
         }
-      
-        const salt = bcrypt.genSaltSync(10);
-        const hashedKey = bcrypt.hashSync(rawKey, salt);
+
+        const hashedKey = hashApiKey(rawKey);
         hashedApiKeys[hashedKey] = nickname;
       }
     } else if (authMethod === "user-password") {
-      if (typeof users !== 'object' || users === null || Array.isArray(users) || Object.keys(users).length === 0) {
+      if (
+        typeof users !== "object" ||
+        users === null ||
+        Array.isArray(users) ||
+        Object.keys(users).length === 0
+      ) {
         res.status(400).json({
           message:
             'Debe proporcionar usuarios cuando el método de autenticación sea por usuario y password"',
@@ -166,11 +183,12 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       for (const [username, password] of Object.entries(users)) {
         if (!username || typeof password !== "string") {
           res.status(400).json({
-            message: 'Cada usuario debe tener un "username" y un "password" válidos',
+            message:
+              'Cada usuario debe tener un "username" y un "password" válidos',
           });
-          return
+          return;
         }
-      
+
         const salt = bcrypt.genSaltSync(10);
         users[username] = bcrypt.hashSync(password, salt);
       }
@@ -196,7 +214,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     const flipped_domain = fullDomain.trim().split(".").reverse().join("/");
 
     const fullDomainRef = database.ref(`domains/${flipped_domain}`);
- 
+
     const domainSnapshot = await fullDomainRef.once("value");
     if (domainSnapshot.exists()) {
       res.status(400).json({ message: "El subdominio ya está registrado" });
@@ -277,14 +295,14 @@ export const getSubdomainsByDomain = async (req: Request, res: Response) => {
     console.error("Error fetching subdomains:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
 export const updateSubdomain = async (req: Request, res: Response) => {
   try {
     const session = req.session;
     if (!session || !session.user) {
       res.status(401).json({ message: "Unauthorized" });
-      return
+      return;
     }
 
     const {
@@ -299,112 +317,151 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       users,
       https,
       destination,
-    }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;  
+    }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
 
     if (typeof subdomain !== "string" || !domain) {
-      res.status(400).json({ message: "El subdominio y el dominio son requeridos" });
-      return
+      res
+        .status(400)
+        .json({ message: "El subdominio y el dominio son requeridos" });
+      return;
     }
 
-    if (subdomain !== "" && !validator.isFQDN(subdomain, { require_tld: false })) {
+    if (
+      subdomain !== "" &&
+      !validator.isFQDN(subdomain, { require_tld: false })
+    ) {
       res.status(400).json({ message: "Subdominio inválido" });
-      return
+      return;
     }
 
     const fullDomain = subdomain + "." + domain;
     if (!validator.isFQDN(fullDomain)) {
       res.status(400).json({ message: "Dominio inválido" });
-      return
+      return;
     }
 
     if (typeof cacheSize !== "number" || isNaN(cacheSize)) {
-      res.status(400).json({ message: "El tamaño de caché debe ser un número válido" });
-      return
+      res
+        .status(400)
+        .json({ message: "El tamaño de caché debe ser un número válido" });
+      return;
     }
 
     if (typeof ttl !== "number" || Number.isNaN(ttl) || ttl <= 0) {
       res.status(400).json({
-        message: "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)",
+        message:
+          "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)",
       });
       return;
     }
-    
-    if (typeof https !== 'boolean') {
-      res.status(400).json({ message: 'El campo useHttps debe ser true o false' });
-      return
+
+    if (typeof https !== "boolean") {
+      res
+        .status(400)
+        .json({ message: "El campo useHttps debe ser true o false" });
+      return;
     }
 
     const allowedPolicies = ["LRU", "LFU", "FIFO", "MRU", "Random"];
     if (!allowedPolicies.includes(replacementPolicy)) {
       res.status(400).json({
-        message: `La política de reemplazo debe ser una de las siguientes: ${allowedPolicies.join(", ")}`,
+        message: `La política de reemplazo debe ser una de las siguientes: ${allowedPolicies.join(
+          ", "
+        )}`,
       });
-      return
+      return;
     }
 
     if (authMethod === "api-keys") {
-      if (typeof apiKeys !== 'object' ||  apiKeys === null || Array.isArray(apiKeys) || Object.keys(apiKeys).length === 0) {
+      if (
+        typeof apiKeys !== "object" ||
+        apiKeys === null ||
+        Array.isArray(apiKeys) ||
+        Object.keys(apiKeys).length === 0
+      ) {
         res.status(400).json({
-          message: "Debe proporcionar llaves de autenticación con el método API keys",
+          message:
+            "Debe proporcionar llaves de autenticación con el método API keys",
         });
-        return
+        return;
       }
       if (Array.isArray(users) && users.length > 0) {
         res.status(400).json({
-          message: "La lista de usuarios debe estar vacía cuando el método es API keys",
+          message:
+            "La lista de usuarios debe estar vacía cuando el método es API keys",
         });
-        return
+        return;
       }
     } else if (authMethod === "user-password") {
-      if (typeof users !== 'object' || users === null || Array.isArray(users) || Object.keys(users).length === 0) {
+      if (
+        typeof users !== "object" ||
+        users === null ||
+        Array.isArray(users) ||
+        Object.keys(users).length === 0
+      ) {
         res.status(400).json({
           message: "Debe proporcionar usuarios con el método usuario/password",
         });
-        return
+        return;
       }
-      if (typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys) && Object.keys(apiKeys).length > 0) {
+      if (
+        typeof apiKeys === "object" &&
+        apiKeys !== null &&
+        !Array.isArray(apiKeys) &&
+        Object.keys(apiKeys).length > 0
+      ) {
         res.status(400).json({
-          message: "La lista de API keys debe estar vacía cuando el método es usuario/password",
+          message:
+            "La lista de API keys debe estar vacía cuando el método es usuario/password",
         });
-        return
+        return;
       }
     } else if (!authMethod || authMethod === "none") {
-      if ((typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys) && Object.keys(apiKeys).length > 0) ||
-          (typeof users === "object" && users !== null && !Array.isArray(users) && Object.keys(users).length > 0)) {
+      if (
+        (typeof apiKeys === "object" &&
+          apiKeys !== null &&
+          !Array.isArray(apiKeys) &&
+          Object.keys(apiKeys).length > 0) ||
+        (typeof users === "object" &&
+          users !== null &&
+          !Array.isArray(users) &&
+          Object.keys(users).length > 0)
+      ) {
         res.status(400).json({
-          message: "Las listas de usuarios y API keys deben estar vacías si no se requiere autenticación",
+          message:
+            "Las listas de usuarios y API keys deben estar vacías si no se requiere autenticación",
         });
-        return
+        return;
       }
     } else {
       res.status(400).json({
-        message: 'El método de autenticación debe ser "api-keys", "user-password" o "none"',
+        message:
+          'El método de autenticación debe ser "api-keys", "user-password" o "none"',
       });
-      return
+      return;
     }
 
-    const usersMap = (users as Record<string, string>);
+    const usersMap = users as Record<string, string>;
 
     if (authMethod === "user-password") {
       for (const [username, password] of Object.entries(usersMap)) {
-        if (!password.startsWith('$2')) {
+        if (!password.startsWith("$2")) {
           const salt = bcrypt.genSaltSync(10);
           usersMap[username] = bcrypt.hashSync(password, salt);
         }
       }
     }
 
-    const apiKeysMap = (apiKeys as Record<string, string>);
+    const apiKeysMap = apiKeys as Record<string, string>;
     let hashedApiKeys: Record<string, string> = {};
-    if (authMethod === 'api-keys') {
+    if (authMethod === "api-keys") {
       for (const [rawKey, name] of Object.entries(apiKeysMap)) {
-        const finalKey = rawKey.startsWith('$2')
+        const finalKey = rawKey.startsWith("$2")
           ? rawKey
           : bcrypt.hashSync(rawKey, bcrypt.genSaltSync(10));
         hashedApiKeys[finalKey] = name;
       }
     }
-
 
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
     const subdomainRef = firestore.collection("subdomains").doc(fullDomain);
@@ -424,8 +481,8 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       ttl,
       replacementPolicy,
       authMethod,
-      apiKeys:   authMethod === 'api-keys'      ? hashedApiKeys : {},
-      users:     authMethod === 'user-password' ? usersMap    : {},
+      apiKeys: authMethod === "api-keys" ? hashedApiKeys : {},
+      users: authMethod === "user-password" ? usersMap : {},
       https,
       destination,
     };
@@ -444,10 +501,9 @@ export const updateSubdomain = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error updating subdomain:", error);
     res.status(500).json({ message: "Internal server error" });
-    return
+    return;
   }
 };
-
 
 export const deleteSubdomain = async (req: Request, res: Response) => {
   try {
