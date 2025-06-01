@@ -179,11 +179,11 @@ export default function SubdomainForm() {
   const handleSubmit = async e => {
     e.preventDefault();
 
-    // 1. Cache Size: must be an integer > 0
-    if (!/^\d+$/.test(form.cacheSize)) {
-      return toast.error('Cache Size debe ser un entero positivo (MB).');
+    // 1. Cache Size: must be a positive decimal number (MB)
+    if (!/^\d+(\.\d+)?$/.test(form.cacheSize)) {
+      return toast.error('Cache Size debe ser un número positivo (MB).');
     }
-    const mb = parseInt(form.cacheSize, 10);
+    const mb = parseFloat(form.cacheSize);
     if (mb <= 0) {
       return toast.error('Cache Size debe ser mayor que 0.');
     }
@@ -314,8 +314,6 @@ export default function SubdomainForm() {
             name="subdomain"
             value={form.subdomain}
             onChange={handleChange}
-            required
-            disabled={isEdit}
             className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           />
         </div>

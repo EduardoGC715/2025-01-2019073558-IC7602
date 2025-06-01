@@ -17,7 +17,9 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
     setIsDeleting(true);
 
     const { domain, subdomain } = deletionTarget;
-    const result = await deleteSubdomain(domain, subdomain);
+    const subToSend = subdomain === "" ? domain : subdomain;
+
+    const result = await deleteSubdomain(domain, subToSend);
 
     if (result.success) {
       alert(result.message);
@@ -54,7 +56,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
                 className="border-b hover:bg-lightgrey2 transition-colors"
               >
                 <td className="px-4 py-2">{idx + 1}</td>
-                <td className="px-4 py-2 text-secondary">{rec.subdomain}</td>
+                <td className="px-4 py-2 text-secondary">{rec.subdomain === "" ? "" : rec.subdomain}</td>
                 <td className="px-4 py-2 text-secondary">
                   {(rec.cacheSize / 1000000).toFixed(2)} MB
                 </td>
@@ -73,7 +75,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
                   <button
                     onClick={() =>
                       navigate(
-                        `/domains/${rec.domain}/subdomains/${rec.subdomain}`
+                        rec.subdomain === "" ? `/domains/${rec.domain}/subdomains/`: `/domains/${rec.domain}/subdomains/${rec.subdomain}`
                       )
                     }
                     className="p-1 text-accentBlue hover:text-secondary hover:cursor-pointer transition-colors"
@@ -96,11 +98,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
       </div>
       <DeleteConfirmationModal
         isOpen={!!deletionTarget}
-        name={
-          deletionTarget
-            ? `${deletionTarget.subdomain}.${deletionTarget.domain}`
-            : ""
-        }
+        name={deletionTarget ? deletionTarget.subdomain === "" ? "root" : `${deletionTarget.subdomain}.${deletionTarget.domain}` : ""}
         type="subdomain"
         onClose={() => setDeletionTarget(null)}
         onConfirm={confirmDelete}

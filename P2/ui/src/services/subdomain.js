@@ -4,9 +4,6 @@ import { api } from "./api";
 export const createSubdomain = async (domain, subdomainData) => {
   try {
     console.log("Creating subdomain:", domain, subdomainData);
-    if (!subdomainData.subdomain) {
-      throw new Error("El campo 'subdomain' es requerido.");
-    }
 
     const payload = {
       domain,
@@ -46,7 +43,6 @@ export const getSubdomainsByDomain = async (domain) => {
       params: { domain },
       withCredentials: true,
     });
-
     if (response.status === 200 && typeof response.data === "object") {
       return response.data; 
     }
@@ -119,6 +115,7 @@ export const updateSubdomain = async (domain, subdomainName, updateData) => {
 
 export const deleteSubdomain = async (domain, subdomainName) => {
   try {
+    console.log("Deleting subdomain:", domain, subdomainName);
     const response = await api.delete(
       `/subdomain/${domain}/${subdomainName}`,
       {

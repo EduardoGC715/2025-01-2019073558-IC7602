@@ -20,12 +20,16 @@ function SubdomainsDashboard() {
           const dataObj = await getSubdomainsByDomain(domain);
           console.log('Subdomains data:', dataObj);
           const records = Object.entries(dataObj).map(([full, info]) => {
+          let sub;
+          if (full === domain) {
+            sub = "";                      
+          } else {
             const suffix = `.${domain}`;
-            const sub = full.endsWith(suffix)
-              ? full.slice(0, full.length - suffix.length)
-              : full;
+            sub = full.endsWith(suffix) ? full.slice(0, full.length - suffix.length): full;
+          }
             return { subdomain: sub, domain, ...info };
           });
+          console.log('Processed subdomains:', records);
           setSubdomains(records);
         } catch (err) {
         console.error('Error fetching subdomains:', err);
@@ -35,7 +39,8 @@ function SubdomainsDashboard() {
     };
 
     const handleDelete = async (rec) => {
-    const confirm = window.confirm(`¿Estás seguro de eliminar ${rec.subdomain}.${rec.domain}?`);
+    const fullName = rec.subdomain === "" ? rec.domain : `${rec.subdomain}.${rec.domain}`;
+    const confirm = window.confirm(`¿Estás seguro de eliminar ${fullName}?`);
     if (!confirm) return;
 
     const result = await deleteSubdomainAPI(rec.domain, rec.subdomain);

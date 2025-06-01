@@ -63,10 +63,8 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
 
-    if (typeof subdomain !== "string" || !domain) {
-      res
-        .status(400)
-        .json({ message: "El subdominio y el dominio son requeridos" });
+    if (typeof domain !== "string" || domain.trim() === "") {
+      res.status(400).json({ message: "El dominio es requerido" });
       return;
     }
 
@@ -80,7 +78,8 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const fullDomain = subdomain + "." + domain;
+    const fullDomain = subdomain === "" ? domain.trim(): `${subdomain.trim()}.${domain.trim()}`;
+
     if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
@@ -211,26 +210,40 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    const isWildcard = wildcardRe.test(subdomain);
+    const cleanedSub = isWildcard ? subdomain.startsWith("*.") ? subdomain.slice(2) : "" : subdomain;
+
     const flipped_domain = fullDomain.trim().split(".").reverse().join("/");
-
     const fullDomainRef = database.ref(`domains/${flipped_domain}`);
-
-    const domainSnapshot = await fullDomainRef.once("value");
-    if (domainSnapshot.exists()) {
-      res.status(400).json({ message: "El subdominio ya está registrado" });
-      return;
+    if (subdomain === "") {
+      const rootFlagSnapshot = await fullDomainRef.child("_enabled").once("value");
+      if (rootFlagSnapshot.exists()) {
+        res.status(400).json({ message: "Ya existe un registro sin subdominio para este dominio." });
+        return;
+      }
+    } else {
+      const subdomainSnapshot = await fullDomainRef.once("value");
+      if (subdomainSnapshot.exists()) {
+        res.status(400).json({ message: "El subdominio ya está registrado." });
+        return;
+      }
     }
 
+    const targetCollection = isWildcard ? "wildcards" : "subdomains";
+    const docId = cleanedSub === "" ? domain : `${subdomain}.${domain}`;
     const subdomainRef = firestore
-      .collection("subdomains")
-      .doc(subdomain + "." + domain);
+      .collection(targetCollection)
+      .doc(docId);
+    
+    const domainRefDocId = subdomain === "" ? "root" : subdomain;
     const domainRef = firestore
       .collection("users")
       .doc(session.user)
       .collection("domains")
       .doc(domain)
       .collection("subdomains")
-      .doc(subdomain);
+      .doc(domainRefDocId);
+
     const batch: WriteBatch = firestore.batch();
 
     const subdomainData = {
@@ -257,42 +270,6 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     res.status(201).json({ message: "Subdomain añadido exitosamente" });
   } catch (error) {
     console.error("Error adding subdomain:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-export const getSubdomainsByDomain = async (req: Request, res: Response) => {
-  try {
-    const session = req.session;
-    if (!session || !session.user) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
-
-    const domain = req.query.domain as string;
-
-    if (!domain) {
-      res.status(400).json({ message: "Domain is required" });
-      return;
-    }
-
-    const subdomainsSnapshot = await firestore.collection("subdomains").get();
-
-    if (subdomainsSnapshot.empty) {
-      res.status(200).json({ message: "No subdomains found" });
-      return;
-    }
-    const subdomains: Record<string, any> = {};
-
-    subdomainsSnapshot.forEach((doc) => {
-      if (doc.id.endsWith(`.${domain}`)) {
-        subdomains[doc.id] = doc.data();
-      }
-    });
-
-    res.status(200).json(subdomains);
-  } catch (error) {
-    console.error("Error fetching subdomains:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -520,17 +497,23 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const fullDomain = `${subdomain}.${domain}`;
+    const isWildcard = subdomain.startsWith("*.");
+    const cleaned = isWildcard ? subdomain.slice(2) : subdomain;
+
+    const isRoot = subdomain === domain;
+    const fullDomain = isWildcard ? `${cleaned}.${domain}`: isRoot ? domain : `${cleaned}.${domain}`;
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
 
-    const subdomainRef = firestore.collection("subdomains").doc(fullDomain);
+    const primaryColl = isWildcard ? "wildcards" : "subdomains";
+    const subdomainRef = firestore.collection(primaryColl).doc(fullDomain);
+
     const domainRef = firestore
       .collection("users")
       .doc(session.user)
       .collection("domains")
       .doc(domain)
       .collection("subdomains")
-      .doc(subdomain);
+      .doc(isRoot ? "root" : cleaned);
 
     const batch = firestore.batch();
 
@@ -539,11 +522,56 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
 
     await batch.commit();
 
-    await database.ref(`domains/${flippedDomain}`).remove();
+    if (isRoot) {
+      await database.ref(`domains/${flippedDomain}/_enabled`).remove();
+    } else {
+      await database.ref(`domains/${flippedDomain}`).remove();
+    }
 
     res.status(200).json({ message: "Subdominio eliminado exitosamente" });
   } catch (error) {
     console.error("Error deleting subdomain:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getSubdomainsByDomain = async (req: Request, res: Response) => {
+  try {
+    const session = req.session;
+    if (!session || !session.user) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const domain = req.query.domain as string;
+
+    if (!domain) {
+      res.status(400).json({ message: "Domain is required" });
+      return;
+    }
+
+    const subdomainsSnapshot = await firestore.collection("subdomains").get();
+    const wildcardsSnapshot = await firestore.collection("wildcards").get();
+    const result: Record<string, any> = {};
+
+    // 1) Regular subdomains
+    subdomainsSnapshot.forEach((doc) => {
+      if (doc.id === domain || doc.id.endsWith(`.${domain}`)) {
+        result[doc.id] = doc.data();
+      }
+    });
+
+    // 2) Wildcard subdomains: prepend "*." when returning
+    wildcardsSnapshot.forEach((doc) => {
+      if (doc.id === domain || doc.id.endsWith(`.${domain}`)) {
+        const key = doc.id === domain ? `*.${domain}` : `*.${doc.id}`;
+        result[key] = doc.data();
+      }
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching subdomains:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -563,9 +591,13 @@ export const getSubdomainByName = async (req: Request, res: Response) => {
       return;
     }
 
-    const fullSubdomainId = `${subdomainName}.${domain}`;
 
-    const docRef = firestore.collection("subdomains").doc(fullSubdomainId);
+    const isWildcard = subdomainName.startsWith("*.");
+    const cleaned = isWildcard ? subdomainName.slice(2) : subdomainName;
+    const collectionName = isWildcard ? "wildcards" : "subdomains";
+    const fullSubdomainId = cleaned === "" ? domain : `${cleaned}.${domain}`;    
+
+    const docRef = firestore.collection(collectionName).doc(fullSubdomainId);
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
@@ -573,7 +605,9 @@ export const getSubdomainByName = async (req: Request, res: Response) => {
       return;
     }
 
-    res.status(200).json({ id: docSnap.id, ...docSnap.data() });
+    const returnedId = isWildcard ? fullSubdomainId === domain ? `*.${domain}` : `*.${fullSubdomainId}` : docSnap.id;
+
+    res.status(200).json({ id: returnedId, ...docSnap.data() });
   } catch (error) {
     console.error("Error fetching subdomain by name:", error);
     res.status(500).json({ message: "Internal server error" });
