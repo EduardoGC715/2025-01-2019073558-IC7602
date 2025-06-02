@@ -4,6 +4,7 @@ import { WriteBatch } from "firebase-admin/firestore";
 import validator from "validator";
 import ms, { StringValue } from "ms";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { hashApiKey } from "./auth.controller";
 
 export const getAllSubdomains = async (req: Request, res: Response) => {
@@ -36,6 +37,7 @@ interface registerSubdomainRequestBody {
   replacementPolicy: string; // e.g., "LRU", "LFU", etc.
   authMethod: string; // e.g., "api-keys", "user-password", "none"
   apiKeys?: Record<string, string>; // apiKey: true
+  newApiKeys?: string[]; // New API keys to add
   users?: Record<string, string>; // username: password
   https?: boolean; // Optional, true if HTTPS is enabled
   destination: string; // e.g., "https://example.com"
@@ -58,6 +60,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       replacementPolicy,
       authMethod,
       apiKeys,
+      newApiKeys,
       users,
       https,
       destination,
@@ -120,44 +123,33 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     }
 
     const hashedApiKeys: Record<string, string> = {};
+    const createdApiKeys: Record<string, string> = {};
 
-    // Validar lógica de authMethod
     if (authMethod === "api-keys") {
-      if (
-        typeof apiKeys !== "object" ||
-        apiKeys === null ||
-        Array.isArray(apiKeys) ||
-        Object.keys(apiKeys).length === 0
-      ) {
-        res.status(400).json({
-          message:
-            'Debe proporcionar llaves de autenticación cuando el método de autenticación sea por API keys"',
-        });
+      if (!Array.isArray(req.body.newApiKeys) || req.body.newApiKeys.length === 0) {
+        res.status(400).json({message:'Debe proporcionar un arreglo "newApiKeys" con los nombres de nueva(s) API Key(es).',});
         return;
       }
+      // No users allowed when api-keys
       if (
         typeof users === "object" &&
         users !== null &&
         !Array.isArray(users) &&
         Object.keys(users).length > 0
       ) {
-        res.status(400).json({
-          message:
-            "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys",
-        });
+        res.status(400).json({ message: "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys"});
         return;
       }
-      for (const [rawKey, nickname] of Object.entries(apiKeys)) {
-        if (!rawKey || typeof nickname !== "string") {
-          res.status(400).json({
-            message:
-              'Cada API Key debe tener una clave no vacía y un "nombre" válido',
-          });
+      // Generate & hash each new API key name
+      for (const nickname of req.body.newApiKeys as string[]) {
+        if (!nickname || typeof nickname !== "string") {
+          res.status(400).json({message:'Cada nuevo nombre de API Key debe ser una cadena no vacía'});
           return;
         }
-
+        const rawKey = crypto.randomBytes(32).toString("hex");
         const hashedKey = hashApiKey(rawKey);
-        hashedApiKeys[hashedKey] = nickname;
+        hashedApiKeys[hashedKey] = nickname.trim();
+        createdApiKeys[rawKey] = nickname.trim();
       }
     } else if (authMethod === "user-password") {
       if (
@@ -267,7 +259,12 @@ export const registerSubdomain = async (req: Request, res: Response) => {
 
     await database.ref().update(updates);
 
-    res.status(201).json({ message: "Subdomain añadido exitosamente" });
+    const response: any = { message: "Subdomain creado exitosamente" };
+    if (authMethod === "api-keys") {
+      response.createdApiKeys = createdApiKeys;
+    }
+    res.status(201).json(response);
+    return;
   } catch (error) {
     console.error("Error adding subdomain:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -291,28 +288,31 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       replacementPolicy,
       authMethod,
       apiKeys,
+      newApiKeys,
       users,
       https,
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
 
-    if (typeof subdomain !== "string" || !domain) {
-      res
-        .status(400)
-        .json({ message: "El subdominio y el dominio son requeridos" });
+    if (typeof domain !== "string" || domain.trim() === "") {
+      res.status(400).json({ message: "El dominio es requerido" });
       return;
     }
 
+    const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
+    const isWildcard = wildcardRe.test(subdomain);
+    const cleanedSub = isWildcard ? subdomain.startsWith("*.") ? subdomain.slice(2) : "" : subdomain;
     if (
       subdomain !== "" &&
-      !validator.isFQDN(subdomain, { require_tld: false })
+      !validator.isFQDN(subdomain, { require_tld: false }) &&
+      !wildcardRe.test(subdomain)
     ) {
       res.status(400).json({ message: "Subdominio inválido" });
       return;
     }
 
-    const fullDomain = subdomain + "." + domain;
-    if (!validator.isFQDN(fullDomain)) {
+    const fullDomain = subdomain === "" ? domain.trim(): `${subdomain.trim()}.${domain.trim()}`;
+    if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
     }
@@ -359,6 +359,12 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         res.status(400).json({
           message:
             "Debe proporcionar llaves de autenticación con el método API keys",
+        });
+        return;
+      }
+      if (!Array.isArray(newApiKeys)) {
+        res.status(400).json({
+          message: 'El campo "newApiKeys" debe ser un arreglo de nombres',
         });
         return;
       }
@@ -429,30 +435,29 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       }
     }
 
-    const apiKeysMap = apiKeys as Record<string, string>;
+    const existingKeysMap = apiKeys as Record<string, string>;
     let hashedApiKeys: Record<string, string> = {};
+    const createdApiKeys: Record<string, string> = {};
+
     if (authMethod === "api-keys") {
-      for (const [rawKey, name] of Object.entries(apiKeysMap)) {
-        const finalKey = rawKey.startsWith("$2")
-          ? rawKey
-          : bcrypt.hashSync(rawKey, bcrypt.genSaltSync(10));
-        hashedApiKeys[finalKey] = name;
+      for (const [alreadyHashedKey, name] of Object.entries(existingKeysMap)) {
+        hashedApiKeys[alreadyHashedKey] = name;
+      }
+
+      for (const nickname of (newApiKeys || [])) {
+        const rawKey = crypto.randomBytes(32).toString("hex");
+        const newHashedKey = hashApiKey(rawKey);
+        hashedApiKeys[newHashedKey] = nickname.trim();
+        createdApiKeys[rawKey] = nickname.trim();
       }
     }
 
-    const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
-    const subdomainRef = firestore.collection("subdomains").doc(fullDomain);
-    const domainRef = firestore
-      .collection("users")
-      .doc(session.user)
-      .collection("domains")
-      .doc(domain)
-      .collection("subdomains")
-      .doc(subdomain);
+    const primaryColl = isWildcard ? "wildcards" : "subdomains";
 
-    const batch: WriteBatch = firestore.batch();
+    const topDocId = isWildcard ? cleanedSub === "" ? domain : `${cleanedSub}.${domain}` : subdomain === "" ? domain : `${subdomain}.${domain}`;
+    const subdomainRef = firestore.collection(primaryColl).doc(topDocId);
 
-    const subdomainData = {
+    const subdomainData: any = {
       cacheSize,
       fileTypes,
       ttl,
@@ -464,15 +469,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       destination,
     };
 
-    batch.update(subdomainRef, subdomainData);
-    batch.update(domainRef, { enabled: true });
-
-    await batch.commit();
-
-    const updates: Record<string, any> = {};
-    updates[`domains/${flippedDomain}/_enabled`] = true;
-
-    await database.ref().update(updates);
+    await subdomainRef.set(subdomainData, { merge: true });
 
     res.status(200).json({ message: "Subdominio actualizado exitosamente" });
   } catch (error) {
@@ -491,20 +488,19 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
     }
 
     const { domain, subdomain } = req.params;
-
     if (!domain || !subdomain) {
       res.status(400).json({ message: "Domain and subdomain are required" });
       return;
     }
 
-    const isWildcard = subdomain.startsWith("*.");
-    const cleaned = isWildcard ? subdomain.slice(2) : subdomain;
+    const isWildcard = subdomain.includes("*");
+    const cleaned = subdomain === "*" ? "*" : subdomain.startsWith("*.") ? subdomain.slice(2) : subdomain;
 
     const isRoot = subdomain === domain;
-    const fullDomain = isWildcard ? `${cleaned}.${domain}`: isRoot ? domain : `${cleaned}.${domain}`;
+    const fullDomain = isWildcard ? cleaned === "*" ? domain : `${cleaned}.${domain}` : isRoot ? domain : `${cleaned}.${domain}`;
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
-
     const primaryColl = isWildcard ? "wildcards" : "subdomains";
+    
     const subdomainRef = firestore.collection(primaryColl).doc(fullDomain);
 
     const domainRef = firestore
@@ -585,17 +581,18 @@ export const getSubdomainByName = async (req: Request, res: Response) => {
     }
 
     const { domain, subdomainName } = req.params;
-
+    console.log("Domain:", domain, "Subdomain Name:", subdomainName);
     if (!domain || !subdomainName) {
       res.status(400).json({ message: "Dominio y subdominio requeridos" });
       return;
     }
 
+    const isRoot = subdomainName === "root";
+    const isWildcard = subdomainName.includes("*");
 
-    const isWildcard = subdomainName.startsWith("*.");
-    const cleaned = isWildcard ? subdomainName.slice(2) : subdomainName;
+    const cleaned = subdomainName === "*" ? "*" : subdomainName.startsWith("*.") ? subdomainName.slice(2) : subdomainName;
     const collectionName = isWildcard ? "wildcards" : "subdomains";
-    const fullSubdomainId = cleaned === "" ? domain : `${cleaned}.${domain}`;    
+    const fullSubdomainId = cleaned === "*" || isRoot ? domain : `${cleaned}.${domain}`;    
 
     const docRef = firestore.collection(collectionName).doc(fullSubdomainId);
     const docSnap = await docRef.get();

@@ -8,7 +8,6 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, name, type }) {
   const handleConfirm = async () => {
     await onConfirm();
     onClose();
-    window.location.reload();
   };
 
   return (
