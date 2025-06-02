@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import SubdomainsRecordsTable from './SubdomainsRecordsTable';
 import { getSubdomainsByDomain } from '../services/subdomain';
 import { ArrowLeft } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 function SubdomainsDashboard() {
     const { domain } = useParams();            
@@ -21,13 +22,15 @@ function SubdomainsDashboard() {
           console.log('Subdomains data:', dataObj);
           const records = Object.entries(dataObj).map(([full, info]) => {
           let sub;
+          let root = false;
           if (full === domain) {
-            sub = "";                      
+            sub = "";      
+            root = true;                
           } else {
             const suffix = `.${domain}`;
             sub = full.endsWith(suffix) ? full.slice(0, full.length - suffix.length): full;
           }
-            return { subdomain: sub, domain, ...info };
+            return { subdomain: sub, isRoot: root, domain, ...info };
           });
           console.log('Processed subdomains:', records);
           setSubdomains(records);
@@ -45,10 +48,10 @@ function SubdomainsDashboard() {
 
     const result = await deleteSubdomainAPI(rec.domain, rec.subdomain);
     if (result.success) {
-        alert(result.message);
+        toast.success(result.message);
         setSubdomains((prev) => prev.filter(s => s.subdomain !== rec.subdomain));
     } else {
-        alert(result.message);
+        toast.error(result.message);
     }
     };
 

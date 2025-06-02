@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import { deleteSubdomain } from "../services/subdomain";
+import { toast } from "react-toastify";
 import ms from "ms";
 
 export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
   const [deletionTarget, setDeletionTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
-
   const confirmDelete = async () => {
     if (!deletionTarget) return;
 
@@ -22,10 +22,9 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
     const result = await deleteSubdomain(domain, subToSend);
 
     if (result.success) {
-      alert(result.message);
-      window.location.reload();
+      toast.success(result.message);
     } else {
-      alert(result.message);
+      toast.error(result.message);
     }
 
     setIsDeleting(false);
@@ -40,6 +39,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
             <tr>
               <th className="px-4 py-2">#</th>
               <th className="px-4 py-2">Subdominio</th>
+              <th className="px-4 py-2">Protocolo</th>
               <th className="px-4 py-2">Cache Size</th>
               <th className="px-4 py-2">Tipos</th>
               <th className="px-4 py-2">TTL</th>
@@ -56,7 +56,8 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
                 className="border-b hover:bg-lightgrey2 transition-colors"
               >
                 <td className="px-4 py-2">{idx + 1}</td>
-                <td className="px-4 py-2 text-secondary">{rec.subdomain === "" ? "" : rec.subdomain}</td>
+                <td className="px-4 py-2 text-secondary">{rec.isRoot ? "" : rec.subdomain}</td>
+                <td className="px-4 py-2 text-secondary">{rec.https ? "https://" : "http://"}</td>
                 <td className="px-4 py-2 text-secondary">
                   {(rec.cacheSize / 1000000).toFixed(2)} MB
                 </td>
@@ -75,7 +76,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
                   <button
                     onClick={() =>
                       navigate(
-                        rec.subdomain === "" ? `/domains/${rec.domain}/subdomains/`: `/domains/${rec.domain}/subdomains/${rec.subdomain}`
+                        rec.isRoot ? `/domains/${rec.domain}/subdomains/root/true`: `/domains/${rec.domain}/subdomains/${rec.subdomain}/false`
                       )
                     }
                     className="p-1 text-accentBlue hover:text-secondary hover:cursor-pointer transition-colors"
