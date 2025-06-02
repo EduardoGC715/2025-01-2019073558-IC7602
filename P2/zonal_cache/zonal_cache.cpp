@@ -121,14 +121,13 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                             read_lock.unlock();
                             unique_lock<shared_mutex> write_lock(cache_mutex);
                             // Eliminar la entrada de caché expirada
-                            cout << "\033[0;31mRemoving expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
                             filesystem::remove(CACHE_FOLDER + host + "/" + uri_obj["filename"].GetString());
                             uri_obj["filename"].SetNull();
                             uri_obj["most_recent_use"].SetNull();
                             uri_obj["received"].SetNull();
                             uri_obj["time_to_live"].SetNull();
-                            uri_itr = host_object.RemoveMember(uri_itr);
-                            
+                            uri_itr = requests_object.RemoveMember(uri_itr);
+                            cout << "\033[0;31mRemoved expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
                             // Liberar los bloqueos.
                             write_lock.unlock();
                             read_lock.lock();
@@ -156,7 +155,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
         }
         cout << flush;
         // Dormir durante 30 segundos antes de la próxima limpieza.
-        this_thread::sleep_for(chrono::seconds(30));
+        this_thread::sleep_for(chrono::seconds(10));
     }
 }
 
@@ -407,114 +406,114 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
 }
 
 // Función que maneja las políticas de reemplazo de caché.
-string replacementPolicies(Value& hostObject, shared_mutex& cache_mutex, const string& replacementPolicy) {
-    string keyToDelete;
+string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, const string& replacement_policy) {
+    string key_to_delete;
 
-    if (replacementPolicy == "LRU") {
+    if (replacement_policy == "LRU") {
         // Least Recently Used
         cout << "Implementing LRU replacement policy." << endl;
-        string leastRecentlyUsedTime;
-        time_t oldestTime = std::numeric_limits<time_t>::max();
+        string least_recently_used_time;
+        time_t oldest_time = std::numeric_limits<time_t>::max();
 
-        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
-            Value& uriObj = itr->value;
+        for (auto itr = requests_object.MemberBegin(); itr != requests_object.MemberEnd(); ++itr) {
+            Value& uri_obj = itr->value;
 
-            string mostRecentUse = uriObj["most_recent_use"].GetString();
+            string most_recent_use = uri_obj["most_recent_use"].GetString();
 
             // Convertir el "most_recent_use" string a time_t
             struct tm tm;
-            if (strptime(mostRecentUse.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
-                time_t mostRecentUseTime = mktime(&tm);
+            if (strptime(most_recent_use.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
+                time_t most_recent_use_time = mktime(&tm);
 
                 // Actualizar la entrada menos recientemente usada
-                if (mostRecentUseTime < oldestTime) {
-                    oldestTime = mostRecentUseTime;
-                    keyToDelete = itr->name.GetString();
-                    leastRecentlyUsedTime = mostRecentUse;
+                if (most_recent_use_time < oldest_time) {
+                    oldest_time = most_recent_use_time;
+                    key_to_delete = itr->name.GetString();
+                    least_recently_used_time = most_recent_use;
                 }
             }
         }
-    } else if (replacementPolicy == "LFU") {
+    } else if (replacement_policy == "LFU") {
         // Least Frequently Used
         cout << "Implementing LFU replacement policy." << endl;
-        string leastFrequentlyUsedKey;
-        int leastUsedCount = std::numeric_limits<int>::max();
+        string least_frequently_used_key;
+        int least_used_count = std::numeric_limits<int>::max();
 
-        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
-            Value& uriObj = itr->value;
+        for (auto itr = requests_object.MemberBegin(); itr != requests_object.MemberEnd(); ++itr) {
+            Value& uri_obj = itr->value;
 
-            int timesUsed = uriObj["times_used"].GetInt();
+            int times_used = uri_obj["times_used"].GetInt();
 
             // Actualizar la entrada menos usada
-            if (timesUsed < leastUsedCount) {
-                leastUsedCount = timesUsed;
-                leastFrequentlyUsedKey = itr->name.GetString();
+            if (times_used < least_used_count) {
+                least_used_count = times_used;
+                least_frequently_used_key = itr->name.GetString();
             }
         }
-    } else if (replacementPolicy == "FIFO") {
+    } else if (replacement_policy == "FIFO") {
         // First In First Out
         cout << "Implementing FIFO replacement policy." << endl;
-        string firstInTime;
-        time_t oldestTime = std::numeric_limits<time_t>::max();
+        string first_in_time;
+        time_t oldest_time = std::numeric_limits<time_t>::max();
 
-        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
-            Value& uriObj = itr->value;
+        for (auto itr = requests_object.MemberBegin(); itr != requests_object.MemberEnd(); ++itr) {
+            Value& uri_obj = itr->value;
 
-            string received = uriObj["received"].GetString();
+            string received = uri_obj["received"].GetString();
 
             struct tm tm;
             if (strptime(received.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
-                time_t receivedTime = mktime(&tm);
+                time_t received_time = mktime(&tm);
 
                 // Actualizar la entrada más antigua
-                if (receivedTime < oldestTime) {
-                    oldestTime = receivedTime;
-                    keyToDelete = itr->name.GetString();
-                    firstInTime = received;
+                if (received_time < oldest_time) {
+                    oldest_time = received_time;
+                    key_to_delete = itr->name.GetString();
+                    first_in_time = received;
                 }
             }
         }
-    } else if (replacementPolicy == "MRU") {
+    } else if (replacement_policy == "MRU") {
         // Most Recently Used
         cout << "Implementing MRU replacement policy." << endl;
-        string mostRecentlyUsedTime;
-        time_t earliestTime = std::numeric_limits<time_t>::min();
+        string most_recently_used_time;
+        time_t earliest_time = std::numeric_limits<time_t>::min();
 
-        for (auto itr = hostObject.MemberBegin(); itr != hostObject.MemberEnd(); ++itr) {
-            Value& uriObj = itr->value;
+        for (auto itr = requests_object.MemberBegin(); itr != requests_object.MemberEnd(); ++itr) {
+            Value& uri_obj = itr->value;
 
-            string mostRecentUse = uriObj["most_recent_use"].GetString();
+            string most_recent_use = uri_obj["most_recent_use"].GetString();
 
             struct tm tm;
-            if (strptime(mostRecentUse.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
-                time_t mostRecentUseTime = mktime(&tm);
+            if (strptime(most_recent_use.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
+                time_t most_recent_use_time = mktime(&tm);
 
                 // Actualizar la entrada más recientemente usada
-                if (mostRecentUseTime > earliestTime) {
-                    earliestTime = mostRecentUseTime;
-                    keyToDelete = itr->name.GetString();
-                    mostRecentlyUsedTime = mostRecentUse;
+                if (most_recent_use_time > earliest_time) {
+                    earliest_time = most_recent_use_time;
+                    key_to_delete = itr->name.GetString();
+                    most_recently_used_time = most_recent_use;
                 }
             }
         }
-    } else if (replacementPolicy == "Random") {
+    } else if (replacement_policy == "Random") {
         // Random
         cout << "Implementing Random replacement policy." << endl;
-        if (hostObject.MemberCount() == 0) {
+        if (requests_object.MemberCount() == 0) {
             cout << "No URIs to remove in the host object." << endl;
             return "";
         }
 
         // Generar índice random
-        size_t randomIndex = rand() % hostObject.MemberCount();
+        size_t random_index = rand() % requests_object.MemberCount();
 
         // Iterar hasta el índice random
-        auto itr = hostObject.MemberBegin();
-        std::advance(itr, randomIndex);
+        auto itr = requests_object.MemberBegin();
+        std::advance(itr, random_index);
 
-        string keyToDelete = itr->name.GetString();
+        key_to_delete = itr->name.GetString();
     } 
-    return keyToDelete;
+    return key_to_delete;
 }
 
 // Función para agregar un URI al caché de un host específico.
@@ -569,23 +568,23 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
         old_uri_obj["most_recent_use"].SetNull();
         old_uri_obj["received"].SetNull();
         old_uri_obj["time_to_live"].SetNull();
-        host_object.RemoveMember(key.c_str());
+        requests_object.RemoveMember(key.c_str());
     }
     while (host_size + size > cache_size) {
         // Se intenta eliminar el contenido con base en la replacement policy hasta que quepa en la caché.
         // "LFU", "FIFO", "MRU", "Random"
 
-        string key_to_delete = replacementPolicies(host_object, cache_mutex, replacement_policy);
+        string key_to_delete = replacementPolicies(requests_object, cache_mutex, replacement_policy);
 
         if (!key_to_delete.empty()) {
             cout << "Least recently used URI: " << key_to_delete << endl;
-            host_size -= host_object[key_to_delete.c_str()]["size"].GetUint64();
-            Value& uri_obj = host_object[key_to_delete.c_str()];
+            host_size -= requests_object[key_to_delete.c_str()]["size"].GetUint64();
+            Value& uri_obj = requests_object[key_to_delete.c_str()];
             uri_obj["filename"].SetNull();
             uri_obj["most_recent_use"].SetNull();
             uri_obj["received"].SetNull();
             uri_obj["time_to_live"].SetNull();
-            host_object.RemoveMember(key_to_delete.c_str());
+            requests_object.RemoveMember(key_to_delete.c_str());
         } else {
             cout << "Could not remove key to add space. " << host << endl;
             return;
@@ -767,7 +766,6 @@ bool get_response(const int &client_socket, HttpRequest request ){
         } else {
             cerr << "Content-Type header not found in response." << endl;
         }
-        cout << "RSTR " << response_str << endl;
         send(client_socket, response_str.c_str(), response_str.length(), 0);
         delete response;
         return true;
