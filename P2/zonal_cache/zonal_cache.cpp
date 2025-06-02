@@ -47,6 +47,7 @@ shared_mutex cache_mutex;
 
 // Función que obtiene los subdominios desde el Rest API y los almacena en un objeto Document de RapidJSON.
 // Recibe las variables de entorno REST_API, APP_ID, API_KEY y FETCH_INTERVAL.
+// Referencia para texto colorido: https://www.geeksforgeeks.org/how-to-print-colored-text-to-the-linux-terminal/
 void fetch_subdomains(const string &rest_api, const string &app_id, const string &api_key, const int &fetch_interval) {
     string url = rest_api + "/subdomain/all";
     unordered_map<string, string> headers_map = {
@@ -79,8 +80,7 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
             } else {
                 cout << "\033[1;34mFailed to parse JSON response.\033[0m" << endl;
             }
-            free(response->memory);
-            free(response);
+            delete response; // Liberar la memoria de la respuesta.
             this_thread::sleep_for(chrono::minutes(fetch_interval));
         } else {
             cout << "\033[1;34mFailed to fetch subdomains. Status code: " << (response ? response->status_code : -1) << "\033[0m" << endl;
@@ -154,7 +154,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                 }
             }
         }
-
+        cout << flush;
         // Dormir durante 30 segundos antes de la próxima limpieza.
         this_thread::sleep_for(chrono::seconds(30));
     }
@@ -325,13 +325,11 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                     memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
                     if (response && response->status_code == 200) {
                         // Si la respuesta es válida, se autentica la solicitud.
-                        cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
-                        free(response->memory);
-                        free(response);
+                        cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl << flush;
+                        delete response;
                         return true;
                     }
-                    free(response->memory);
-                    free(response);
+                    delete response;
                 }
             } else if (request.request.uri.find("/_auth/callback") != string::npos) {
                 cout << "\033[0;36mPRINT 2: Auth callback found in URI.\033[0m" << endl;
@@ -367,8 +365,8 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         } else if (authMethod == "api-keys") {
             auto it = request.headers.find("x-api-key");
             if (it != request.headers.end()) {
-                const string &api_key = it->second;
-                string url = rest_api + "/auth/validate";
+                const string auth_api_key = "{\"apiKey\": \"" + it->second + "\", \"subdomain\": \"" + host + "\"}";
+                string url = rest_api + "/auth/validate/apikey";
                 unordered_map<string, string> headers_map = {
                     {"Content-Type", "application/json"},
                     {"x-app-id", app_id},
@@ -376,19 +374,17 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 };
 
                 // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
-                memory_struct * response = send_https_request(url.c_str(), api_key.c_str(), api_key.length(), headers_map, true, request.request.method.c_str(), false);
+                memory_struct * response = send_https_request(url.c_str(), auth_api_key.c_str(), auth_api_key.length(), headers_map, true, "POST", false);
                 if (response && response->status_code == 200) {
                     // Si la respuesta es válida, se autentica la solicitud.
                     cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl;
-                    free(response->memory);
-                    free(response);
+                    delete response;
                     return true;
                 } else {
                     cerr << "\033[1;31mAuthentication failed with API key.\033[0m" << endl;
                     // Enviar respuesta HTTP 401 Unauthorized
                     send_http_error_response(client_socket, "Unauthorized", 401);
-                    free(response->memory);
-                    free(response);
+                    delete response;
                     return false;
                 }
             } else {
@@ -665,7 +661,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
             vector<char> content(size);
             
             if (file.read(content.data(), size)) {
-                cout << "Se pudieron leer " << size << " bytes de " << filepath << endl;
+                cout << "Read " << size << " bytes from " << filepath << endl;
                 // Check if the entry is still valid based on time_to_live
                 auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
                 string currentTimestamp = ctime(&now);
@@ -715,11 +711,20 @@ bool get_response(const int &client_socket, HttpRequest request ){
     request.headers["host"] = host; // Restaurar el host original en los headers de la solicitud.
     if (response) {
         cout << "Response received. Status code: " << response->status_code << endl;
-        cout << "Response: " << response->memory << endl;
-
-        HttpResponse http_response = parse_http_response(response->memory, response->size);
-        auto it = http_response.headers.find("content-type");
-        if (it != http_response.headers.end()) {
+        string response_str = build_http_response(response);
+        cout << "Response: " << response_str << endl;
+        // HttpResponse http_response;
+        // try {
+        //     http_response = parse_http_response(response->memory, response->size);
+        // } catch (const exception &e) {
+        //     cerr << "Error parsing HTTP response: " << e.what() << endl;
+        //     send_http_error_response(client_socket, "Internal Server Error", 500);
+        //     response->headers(response->memory);
+        //     response->headers(response);
+        //     return false;
+        // }
+        auto it = response->headers.find("content-type");
+        if (it != response->headers.end()) {
             string content_type_header = it->second;
             cout << "Content-Type: " << content_type_header << endl;
             size_t pos = content_type_header.find(';');
@@ -747,12 +752,12 @@ bool get_response(const int &client_socket, HttpRequest request ){
                 
                 ofstream out_file(directory + filename, ios::binary);
                 if (out_file) {
-                    out_file.write(response->memory, response->size);
+                    out_file.write(response_str.c_str(), response_str.length());
                     out_file.close();
                     cout << "Response saved to cache as: " << filename << endl;
 
                     // Agregar a la cache
-                    add_to_cache_by_host(host, request.request.method + "-" + request.request.uri, filename, response->size);
+                    add_to_cache_by_host(host, request.request.method + "-" + request.request.uri, filename, response_str.length());
                 } else {
                     perror("Failed to open cache file for writing");
                 }
@@ -762,9 +767,9 @@ bool get_response(const int &client_socket, HttpRequest request ){
         } else {
             cerr << "Content-Type header not found in response." << endl;
         }
-        send(client_socket, response->memory, response->size, 0);
-        free(response->memory);
-        free(response);
+        cout << "RSTR " << response_str << endl;
+        send(client_socket, response_str.c_str(), response_str.length(), 0);
+        delete response;
         return true;
     }
     return false;
@@ -800,11 +805,11 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 send_http_error_response(client_socket, "Bad Request", 400);
                 break;
             }
-            // bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
-            // if (!authenticated) {
-            //     // Si no está autenticado, salir, porque la respuesta ya se envió.
-            //     break;
-            // }
+            bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
+            if (!authenticated) {
+                // Si no está autenticado, salir, porque la respuesta ya se envió.
+                break;
+            }
 
             const bool set_response = get_response(client_socket, request);
             if (!set_response) {
@@ -842,8 +847,11 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
 #ifndef UNIT_TEST
 
 int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    
     filesystem::create_directories(CACHE_FOLDER);
-    setvbuf(stdout, NULL, _IONBF, 0);
+
     // Leer variables de entorno
     const char* rest_api_env = getenv("REST_API");
     const char* app_id_env = getenv("APP_ID");
@@ -892,7 +900,6 @@ int main() {
     }
 
     cout << "Zonal cache is running on port " << HTTP_PORT << "...\n";
-
     // Inicialización CURL
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
@@ -915,7 +922,7 @@ int main() {
 
     close(socket_fd);
     curl_global_cleanup();
-    printf("Zonal cache stopped.\n");
+    cout << "Zonal cache stopped.\n";
     return 0;
 }
 #endif //UNIT_TEST

@@ -20,7 +20,7 @@ router.post("/login/subdomain/user", loginSubdomainUser);
 router.post("/login/subdomain/apikey", loginSubdomainApiKey);
 router.get("/logout", logoutUser);
 router.get("/validate", authenticateJWT, validateSubdomainSession);
-router.get("/validate/apikey", validateSubdomainApiKey);
+router.post("/validate/apikey", validateSubdomainApiKey);
 router.post("/change-password", changePassword);
 
 export default router;

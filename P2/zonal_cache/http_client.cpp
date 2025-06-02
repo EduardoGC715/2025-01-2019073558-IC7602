@@ -19,6 +19,15 @@
 #include <stdexcept>
 
 using namespace httpparser;
+
+// Función para convertir una cadena a minúsculas
+// Obtenida de https://www.geeksforgeeks.org/conversion-whole-string-uppercase-lowercase-using-stl-c/
+std::string to_lowercase(const std::string& input) {
+    std::string result = input;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
 // Almacenar la respuesta de la request HTTPS en memoria.
 // Basado en:
 // https://curl.se/libcurl/c/getinmemory.html
@@ -43,6 +52,20 @@ static size_t write_callback(void * contents, size_t size, size_t nmemb, void * 
     return realsize;
 }
 
+// Callback para capturar el header de la respuesta HTTP
+size_t header_callback(char* buffer, size_t size, size_t nitems, void* userdata) {
+    size_t total_size = size * nitems;
+    header_info* info = static_cast<header_info*>(userdata);
+
+    // Capturar solo la primera línea con el estatus HTTP
+    if (!info->captured && std::strncmp(buffer, "HTTP/", 5) == 0) {
+        info->status_line = std::string(buffer, total_size);
+        info->captured = true;
+    }
+
+    return total_size;
+}
+
 // Enviar la solicitud HTTPS al DNS API
 // Basado en:
 // https://curl.se/libcurl/c/http-post.html
@@ -54,7 +77,7 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
 
     curl = curl_easy_init();
     if (curl) {
-        memory_struct *resp_mem = (memory_struct *) malloc(sizeof(memory_struct));
+        memory_struct *resp_mem = new memory_struct();
         if (!resp_mem) {
             perror("malloc failed");
             return NULL;
@@ -92,8 +115,7 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
             curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
         } else {
             cerr << "Unsupported HTTP method: " << method << endl;
-            free(resp_mem->memory);
-            free(resp_mem);
+            delete resp_mem; // Liberar memoria
             return NULL;
         }
 
@@ -102,10 +124,13 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        header_info info;
         if (write_headers) {
-            curl_easy_setopt(curl, CURLOPT_HEADER, 1L); // Incluir headers en la respuesta
+            // curl_easy_setopt(curl, CURLOPT_HEADER, 1L); // Incluir headers en la respuesta
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &info);
         } else {
-            curl_easy_setopt(curl, CURLOPT_HEADER, 0L); // No incluir headers en la respuesta
+            // curl_easy_setopt(curl, CURLOPT_HEADER, 0L); // No incluir headers en la respuesta
         }
         
         if (use_https) {
@@ -115,14 +140,22 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
 
         res = curl_easy_perform(curl);
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_mem->status_code);
-
+        
+        if (write_headers) {
+            struct curl_header *h = nullptr;
+            // Headers basado en: https://everything.curl.dev/helpers/headerapi/iterate.html
+            while((h = curl_easy_nextheader(curl, CURLH_HEADER, 0, h))) {
+                string key = to_lowercase(h->name);
+                resp_mem->headers[key] = h->value;
+            }
+            resp_mem->status_line = info.status_line; // Guardar la línea de estado HTTP
+        }
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
 
         if (res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-            free(resp_mem->memory);
-            free(resp_mem);
+            delete resp_mem; // Liberar memoria
             return NULL;
         }
 
@@ -131,15 +164,6 @@ memory_struct *send_https_request(const string &url, const char *data, int lengt
 
     perror("curl_easy_init failed");
     return NULL;
-}
-
-
-// Función para convertir una cadena a minúsculas
-// Obtenida de https://www.geeksforgeeks.org/conversion-whole-string-uppercase-lowercase-using-stl-c/
-std::string to_lowercase(const std::string& input) {
-    std::string result = input;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
 }
 
 // Parser de HTTP es la biblioteca https://github.com/nekipelov/httpparser
@@ -191,6 +215,19 @@ HttpResponse parse_http_response(const char * response_buffer, size_t size) {
     http_response.response = response;
     http_response.headers = headers;
     return http_response;
+}
+
+string build_http_response(const memory_struct * response_mem) {
+    // Construir la respuesta HTTP a partir de la memoria
+    std::ostringstream oss;
+    oss << response_mem->status_line;
+    for (const auto& header : response_mem->headers) {
+        if (header.first == "content-length" || header.first == "transfer-encoding") continue;
+        oss << header.first << ": " << header.second << "\r\n";
+    }
+    oss << "Content-Length: " << response_mem->size << "\r\n\r\n";
+    oss.write(response_mem->memory, response_mem->size);
+    return oss.str();
 }
 
 // Enviar una respuesta HTTP de error al cliente
