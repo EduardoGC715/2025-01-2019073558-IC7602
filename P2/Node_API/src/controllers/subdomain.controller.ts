@@ -222,7 +222,8 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     }
 
     const targetCollection = isWildcard ? "wildcards" : "subdomains";
-    const docId = cleanedSub === "" ? domain : `${subdomain}.${domain}`;
+    const docId = cleanedSub === "" ? domain : `${cleanedSub}.${domain}`;
+    console.log("Target Collection:", targetCollection, " Doc ID:", docId, " Cleaned Domain:", cleanedSub);
     const subdomainRef = firestore
       .collection(targetCollection)
       .doc(docId);
