@@ -47,6 +47,40 @@ def update_zonal_caches():
         time.sleep(180)
 
 
+wildcard_cache = {}
+wildcard_lock = threading.Lock()
+
+
+def update_wildcard_cache():
+    global wildcard_cache
+    global wildcard_lock
+    while True:
+        try:
+            new_wildcard_cache = {}
+            snapshot = firestore_client.collection("wildcards").stream()
+            for doc in snapshot:
+                if doc.exists:
+                    new_wildcard_cache[doc.id] = doc.to_dict()
+
+            with wildcard_lock:
+                wildcard_cache = new_wildcard_cache
+            logger.debug(str(wildcard_cache))
+            logger.debug("Wildcard cache updated successfully.")
+        except Exception as e:
+            logger.debug(f"Error updating wildcard cache: {e}")
+        time.sleep(60)
+
+
+def check_wildcard_cache(domain):
+    global wildcard_cache
+    global wildcard_lock
+    with wildcard_lock:
+        for key in wildcard_cache.keys():
+            if domain.endswith(key):
+                return True
+    return False
+
+
 def get_zonal_cache(country_code):
     global zonal_caches
     global zonal_caches_lock
@@ -65,6 +99,10 @@ def get_random_zonal_cache():
 
 updating_zonal_caches_thread = threading.Thread(target=update_zonal_caches, daemon=True)
 updating_zonal_caches_thread.start()
+updating_wildcard_cache_thread = threading.Thread(
+    target=update_wildcard_cache, daemon=True
+)
+updating_wildcard_cache_thread.start()
 
 
 domain_ref = db.reference("/domains")
@@ -213,50 +251,53 @@ def exists():
 
         if not domain:
             return jsonify({"error": "No se brindó un dominio"}), 400
-
+        if not ip_address:
+            return jsonify({"error": "No se dio un IP address"}), 400
         # Se invierte el dominio para buscarlo en la base de datos
         flipped_path = "/".join(reversed(domain.strip().split(".")))
         ref = domain_ref.child(flipped_path + "/_enabled")
         ip_data = ref.get()
         ip_response = ""
-        if ip_data:
+        if ip_data is None:
+            logger.debug(f"El dominio {domain} no existe")
+            # Revisamos si el dominio es un wildcard
+            is_wildcard = check_wildcard_cache(domain)
+            if not is_wildcard:
+                return "Ese dominio no existe", 404
+        try:
+            ip_num = ip_to_int(ip_address)
+            snapshot = (
+                ip_to_country_ref.order_by_key()
+                .end_at(str(ip_num))
+                .limit_to_last(1)
+                .get()
+            )
+            if snapshot:
+                for key, ip_record in snapshot.items():
+                    end_ip_num = ip_to_int(ip_record["end_ip"])
+                    if end_ip_num >= ip_num >= int(key):
+                        country_code = ip_record["country_iso_code"]
+                        logger.debug(f"País encontrado: {country_code}")
+                        break
+            else:
+                return "No se encontró el país", 500
             try:
-                if not ip_address:
-                    return jsonify({"error": "No se dio un IP address"}), 400
-
-                ip_num = ip_to_int(ip_address)
-                snapshot = (
-                    ip_to_country_ref.order_by_key()
-                    .end_at(str(ip_num))
-                    .limit_to_last(1)
-                    .get()
-                )
-                if snapshot:
-                    for key, ip_record in snapshot.items():
-                        end_ip_num = ip_to_int(ip_record["end_ip"])
-                        if end_ip_num >= ip_num >= int(key):
-                            country_code = ip_record["country_iso_code"]
-                            logger.debug(f"País encontrado: {country_code}")
-                            break
+                # Se busca el país en la base de datos
+                cache_doc = get_zonal_cache(country_code)
+                if cache_doc:
+                    ip_response = cache_doc["ip"]
                 else:
-                    return "No se encontró el país", 500
-                try:
-                    # Se busca el país en la base de datos
-                    cache_doc = get_zonal_cache(country_code)
+                    cache_doc = get_random_zonal_cache()
                     if cache_doc:
                         ip_response = cache_doc["ip"]
                     else:
-                        cache_doc = get_random_zonal_cache()
-                        if cache_doc:
-                            ip_response = cache_doc["ip"]
-                        else:
-                            return "No se encontró el país", 500
-                except Exception as e:
-                    logger.debug(f"Error al buscar el país: {e}")
-                    return "No se encontró el país", 500
+                        return "No se encontró el país", 500
             except Exception as e:
-                logger.debug(f"Ese dominio no existe: {e}")
-                return "Ese dominio no existe", 404
+                logger.debug(f"Error al buscar el país: {e}")
+                return "No se encontró el país", 500
+        except Exception as e:
+            logger.debug(f"Ese dominio no existe: {e}")
+            return "Ese dominio no existe", 404
         if ip_response != "":
             logger.debug(ip_response)
             return str(ip_to_int(ip_response)), 200

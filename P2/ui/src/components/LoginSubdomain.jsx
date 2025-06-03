@@ -11,6 +11,7 @@ function LoginSubdomain() {
   const [searchParams] = useSearchParams();
   const subdomain = searchParams.get("subdomain");
   const authMethod = searchParams.get("authMethod");
+  const wildcard = searchParams.get("wildcard");
 
   const navigate = useNavigate();
   const [subdomainUrl, setSubdomainUrl] = useState(null);
@@ -51,9 +52,12 @@ function LoginSubdomain() {
 
     try {
       data.subdomain = subdomain;
+      if (wildcard) {
+        data.wildcard = wildcard;
+      }
       const result = await loginSubdomain(data, authMethod);
       if (!result.success) {
-        toast.error("Seleccione un método de autenticación.", {
+        toast.error("Error al iniciar sesión. Intente de nuevo.", {
           position: "top-center",
           autoClose: 5000,
           hideProgressBar: false,

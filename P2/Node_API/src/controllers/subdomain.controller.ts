@@ -12,7 +12,7 @@ export const getAllSubdomains = async (req: Request, res: Response) => {
     const subdomainsRef = firestore.collection("subdomains");
     const subdomainsSnapshot = await subdomainsRef.get();
     if (subdomainsSnapshot.empty) {
-      res.status(200).json({ message: "No subdomains found" });
+      res.status(404).json({ message: "No subdomains found" });
       return;
     }
     const subdomains: Record<string, any> = {};
@@ -25,6 +25,24 @@ export const getAllSubdomains = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching user domains:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getWildcardSubdomains = async (req: Request, res: Response) => {
+  try {
+    const wildcards: Record<string, any> = {};
+    const wildcardsRef = firestore.collection("wildcards");
+    const wildcardsSnapshot = await wildcardsRef.get();
+    if (!wildcardsSnapshot.empty) {
+      wildcardsSnapshot.forEach((doc) => {
+        wildcards[doc.id] = doc.data();
+      });
+    }
+    res.status(200).json({ ...wildcards });
+  } catch (error) {
+    console.error("Error fetching wildcard subdomains:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
   }
 };
 
@@ -81,7 +99,8 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const fullDomain = subdomain === "" ? domain.trim(): `${subdomain.trim()}.${domain.trim()}`;
+    const fullDomain =
+      subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
 
     if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
@@ -126,8 +145,14 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     const createdApiKeys: Record<string, string> = {};
 
     if (authMethod === "api-keys") {
-      if (!Array.isArray(req.body.newApiKeys) || req.body.newApiKeys.length === 0) {
-        res.status(400).json({message:'Debe proporcionar un arreglo "newApiKeys" con los nombres de nueva(s) API Key(es).',});
+      if (
+        !Array.isArray(req.body.newApiKeys) ||
+        req.body.newApiKeys.length === 0
+      ) {
+        res.status(400).json({
+          message:
+            'Debe proporcionar un arreglo "newApiKeys" con los nombres de nueva(s) API Key(es).',
+        });
         return;
       }
       // No users allowed when api-keys
@@ -137,13 +162,19 @@ export const registerSubdomain = async (req: Request, res: Response) => {
         !Array.isArray(users) &&
         Object.keys(users).length > 0
       ) {
-        res.status(400).json({ message: "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys"});
+        res.status(400).json({
+          message:
+            "La lista de usuarios debe estar vacía cuando el método de autenticación es por API keys",
+        });
         return;
       }
       // Generate & hash each new API key name
       for (const nickname of req.body.newApiKeys as string[]) {
         if (!nickname || typeof nickname !== "string") {
-          res.status(400).json({message:'Cada nuevo nombre de API Key debe ser una cadena no vacía'});
+          res.status(400).json({
+            message:
+              "Cada nuevo nombre de API Key debe ser una cadena no vacía",
+          });
           return;
         }
         const rawKey = crypto.randomBytes(32).toString("hex");
@@ -203,14 +234,22 @@ export const registerSubdomain = async (req: Request, res: Response) => {
     }
 
     const isWildcard = wildcardRe.test(subdomain);
-    const cleanedSub = isWildcard ? subdomain.startsWith("*.") ? subdomain.slice(2) : "" : subdomain;
+    const cleanedSub = isWildcard
+      ? subdomain.startsWith("*.")
+        ? subdomain.slice(2)
+        : ""
+      : subdomain;
 
     const flipped_domain = fullDomain.trim().split(".").reverse().join("/");
     const fullDomainRef = database.ref(`domains/${flipped_domain}`);
     if (subdomain === "") {
-      const rootFlagSnapshot = await fullDomainRef.child("_enabled").once("value");
+      const rootFlagSnapshot = await fullDomainRef
+        .child("_enabled")
+        .once("value");
       if (rootFlagSnapshot.exists()) {
-        res.status(400).json({ message: "Ya existe un registro sin subdominio para este dominio." });
+        res.status(400).json({
+          message: "Ya existe un registro sin subdominio para este dominio.",
+        });
         return;
       }
     } else {
@@ -302,7 +341,11 @@ export const updateSubdomain = async (req: Request, res: Response) => {
 
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     const isWildcard = wildcardRe.test(subdomain);
-    const cleanedSub = isWildcard ? subdomain.startsWith("*.") ? subdomain.slice(2) : "" : subdomain;
+    const cleanedSub = isWildcard
+      ? subdomain.startsWith("*.")
+        ? subdomain.slice(2)
+        : ""
+      : subdomain;
     if (
       subdomain !== "" &&
       !validator.isFQDN(subdomain, { require_tld: false }) &&
@@ -312,7 +355,8 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const fullDomain = subdomain === "" ? domain.trim(): `${subdomain.trim()}.${domain.trim()}`;
+    const fullDomain =
+      subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
     if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
@@ -451,7 +495,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         hashedApiKeys[alreadyHashedKey] = name;
       }
 
-      for (const nickname of (newApiKeys || [])) {
+      for (const nickname of newApiKeys || []) {
         const rawKey = crypto.randomBytes(32).toString("hex");
         const newHashedKey = hashApiKey(rawKey);
         hashedApiKeys[newHashedKey] = nickname.trim();
@@ -504,13 +548,24 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
     }
 
     const isWildcard = subdomain.includes("*");
-    const cleaned = subdomain === "*" ? "*" : subdomain.startsWith("*.") ? subdomain.slice(2) : subdomain;
+    const cleaned =
+      subdomain === "*"
+        ? "*"
+        : subdomain.startsWith("*.")
+        ? subdomain.slice(2)
+        : subdomain;
 
     const isRoot = subdomain === domain;
-    const fullDomain = isWildcard ? cleaned === "*" ? domain : `${cleaned}.${domain}` : isRoot ? domain : `${cleaned}.${domain}`;
+    const fullDomain = isWildcard
+      ? cleaned === "*"
+        ? domain
+        : `${cleaned}.${domain}`
+      : isRoot
+      ? domain
+      : `${cleaned}.${domain}`;
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
     const primaryColl = isWildcard ? "wildcards" : "subdomains";
-    
+
     const subdomainRef = firestore.collection(primaryColl).doc(fullDomain);
 
     const domainRef = firestore
@@ -600,9 +655,15 @@ export const getSubdomainByName = async (req: Request, res: Response) => {
     const isRoot = subdomainName === "_root_";
     const isWildcard = subdomainName.includes("*");
 
-    const cleaned = subdomainName === "*" ? "*" : subdomainName.startsWith("*.") ? subdomainName.slice(2) : subdomainName;
+    const cleaned =
+      subdomainName === "*"
+        ? "*"
+        : subdomainName.startsWith("*.")
+        ? subdomainName.slice(2)
+        : subdomainName;
     const collectionName = isWildcard ? "wildcards" : "subdomains";
-    const fullSubdomainId = cleaned === "*" || isRoot ? domain : `${cleaned}.${domain}`;    
+    const fullSubdomainId =
+      cleaned === "*" || isRoot ? domain : `${cleaned}.${domain}`;
 
     const docRef = firestore.collection(collectionName).doc(fullSubdomainId);
     const docSnap = await docRef.get();
@@ -612,7 +673,11 @@ export const getSubdomainByName = async (req: Request, res: Response) => {
       return;
     }
 
-    const returnedId = isWildcard ? fullSubdomainId === domain ? `*.${domain}` : `*.${fullSubdomainId}` : docSnap.id;
+    const returnedId = isWildcard
+      ? fullSubdomainId === domain
+        ? `*.${domain}`
+        : `*.${fullSubdomainId}`
+      : docSnap.id;
 
     res.status(200).json({ id: returnedId, ...docSnap.data() });
   } catch (error) {

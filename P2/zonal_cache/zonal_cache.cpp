@@ -41,6 +41,9 @@ Document subdomains;
 // https://en.cppreference.com/w/cpp/thread/shared_mutex
 shared_mutex subdomain_mutex;
 
+Document wildcards;
+shared_mutex wildcard_mutex;
+
 Document cache;
 shared_mutex cache_mutex;
 
@@ -50,6 +53,7 @@ shared_mutex cache_mutex;
 // Referencia para texto colorido: https://www.geeksforgeeks.org/how-to-print-colored-text-to-the-linux-terminal/
 void fetch_subdomains(const string &rest_api, const string &app_id, const string &api_key, const int &fetch_interval) {
     string url = rest_api + "/subdomain/all";
+    string url_wildcards = rest_api + "/subdomain/wildcards";
     unordered_map<string, string> headers_map = {
         {"Content-Type", "application/json"},
         {"x-app-id", app_id},
@@ -60,35 +64,86 @@ void fetch_subdomains(const string &rest_api, const string &app_id, const string
     while (true) {
         // Enviar la solicitud HTTPS al Rest API y obtener la respuesta.
         memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
-        if (response && response->status_code == 200) {
-            // Documento temporal para almacenar la respuesta JSON.
-            Document temp;
-            if (!temp.Parse(response->memory).HasParseError()) {
-                // Si la respuesta es válida, intercambiar el objeto Document subdomains con el temporal.
-                // Esto asegura que el objeto subdomains se actualice de manera segura en un entorno multihilo.
-                unique_lock<shared_mutex> lock(subdomain_mutex);
-                subdomains.Swap(temp);
-                lock.unlock();
+        if (response) {
+            if (response->status_code == 200) {
+                // Documento temporal para almacenar la respuesta JSON.
+                Document temp;
+                if (!temp.Parse(response->memory).HasParseError()) {
+                    // Si la respuesta es válida, intercambiar el objeto Document subdomains con el temporal.
+                    // Esto asegura que el objeto subdomains se actualice de manera segura en un entorno multihilo.
+                    unique_lock<shared_mutex> lock(subdomain_mutex);
+                    subdomains.Swap(temp);
+                    lock.unlock();
 
-                // Escribir los subdominios. Para debugging.
-                StringBuffer buffer;
-                Writer<StringBuffer> writer(buffer);
-                subdomains.Accept(writer);
-                
-                cout << "\033[1;34mSubdomains fetched successfully.\033[0m" << endl;
-                cout << "\033[1;34mSubdomains: " << buffer.GetString() << "\033[0m" << endl;
-            } else {
-                cout << "\033[1;34mFailed to parse JSON response.\033[0m" << endl;
+                    // Escribir los subdominios. Para debugging.
+                    StringBuffer buffer;
+                    Writer<StringBuffer> writer(buffer);
+                    subdomains.Accept(writer);
+                    
+                    cout << "\033[1;34mSubdomains fetched successfully.\033[0m" << endl;
+                    cout << "\033[1;34mSubdomains: " << buffer.GetString() << "\033[0m" << endl;
+                } else {
+                    cout << "\033[1;34mFailed to parse JSON response.\033[0m" << endl;
+                }
             }
             delete response; // Liberar la memoria de la respuesta.
-            this_thread::sleep_for(chrono::minutes(fetch_interval));
+            
         } else {
             cout << "\033[1;34mFailed to fetch subdomains. Status code: " << (response ? response->status_code : -1) << "\033[0m" << endl;
             this_thread::sleep_for(chrono::seconds(20));
+            continue;
         }
+        memory_struct * response_wildcards = send_https_request(url_wildcards.c_str(), NULL, 0, headers_map, true, "GET", false);
+        if (response_wildcards) {
+            if (response_wildcards->status_code == 200) {
+                // Documento temporal para almacenar la respuesta JSON de wildcards.
+                Document temp_wildcards;
+                if (!temp_wildcards.Parse(response_wildcards->memory).HasParseError()) {
+                    // Si la respuesta es válida, intercambiar el objeto Document wildcards con el temporal.
+                    unique_lock<shared_mutex> lock(wildcard_mutex);
+                    wildcards.Swap(temp_wildcards);
+                    lock.unlock();
+
+                    // Escribir los wildcards. Para debugging.
+                    StringBuffer buffer;
+                    Writer<StringBuffer> writer(buffer);
+                    wildcards.Accept(writer);
+                    
+                    cout << "\033[1;35mWildcards fetched successfully.\033[0m" << endl;
+                    cout << "\033[1;35mWildcards: " << buffer.GetString() << "\033[0m" << endl;
+                } else {
+                    cout << "\033[1;35mFailed to parse JSON response for wildcards.\033[0m" << endl;
+                }
+            }
+            delete response_wildcards; // Liberar la memoria de la respuesta.
+        } else {
+            cout << "\033[1;34mFailed to fetch wildcards. Status code: " << (response_wildcards ? response_wildcards->status_code : -1) << "\033[0m" << endl;
+            this_thread::sleep_for(chrono::seconds(20));
+            continue;
+        }
+        this_thread::sleep_for(chrono::minutes(fetch_interval));
     }
 }
 
+string check_wildcard(const string &subdomain) {
+    size_t length = 0;
+    string response;
+    // Iterar sobre los wildcards
+    for (auto wildcard_itr = wildcards.MemberBegin(); wildcard_itr != wildcards.MemberEnd(); ) {
+        const string wildcard_str = wildcard_itr->name.GetString();
+        // Verificar si el subdominio termina con el wildcard
+        if (subdomain.ends_with(wildcard_str)) {
+            // Si el wildcard es más largo que el actual, actualizar la longitud
+            if (wildcard_str.length() > length) {
+                length = wildcard_str.length();
+                response = wildcard_str;
+            }
+            // Retornar el wildcard encontrado
+            return wildcard_str;
+        }
+    }
+    return "";
+}
 // Función de garbage collection que limpia la caché de subdominios de TTLs expirados.
 // Esta función se ejecuta en un hilo separado y limpia la cache cada 30 segundos.
 void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
@@ -241,7 +296,7 @@ string url_decode(const string& encoded) {
 
 // Función para codificar una cadena a URL encoding obtenida de:
 // https://smolkit.com/blog/posts/how-to-url-encode-in-cpp/
-std::string urlEncode(const std::string& str) {
+std::string url_encode(const std::string& str) {
     std::ostringstream encodedStream;
     encodedStream << std::hex << std::uppercase << std::setfill('0');
 
@@ -260,7 +315,7 @@ std::string urlEncode(const std::string& str) {
 }
 
 // Referencia para SHA256 en C++: https://terminalroot.com/how-to-generate-sha256-hash-with-cpp-and-openssl/
-string hashString(const string& input) {
+string hash_string(const string& input) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256((unsigned char*)input.c_str(), input.size(), hash);
 
@@ -281,6 +336,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         const string &host = host_it->second;
         shared_lock<shared_mutex> lock(subdomain_mutex);
         string authMethod;
+        string wildcard;
         // Verificar si el host es un subdominio registrado en el objeto subdomains.
         if (subdomains.HasMember(host.c_str()) && subdomains[host.c_str()].IsObject()) {
             const Value& subdomain_obj = subdomains[host.c_str()];
@@ -294,10 +350,26 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 return false;
             }
         } else {
-            cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
-            // Enviar respuesta HTTP 401 Unauthorized
-            send_http_error_response(client_socket, "Not Found", 404);
-            return false;
+            shared_lock<shared_mutex> wildcard_lock(wildcard_mutex);
+            wildcard = check_wildcard(host);
+            if (!wildcard.empty()) {
+                cout << "\033[0;36mPRINT 1.5: Wildcard found: " << wildcard << "\033[0m" << endl;
+                // Si se encuentra un wildcard, se obtiene el método de autenticación del wildcard.
+                const Value& wildcard_obj = wildcards[wildcard.c_str()];
+                if (wildcard_obj.HasMember("authMethod") && wildcard_obj["authMethod"].IsString()) {
+                    authMethod = wildcard_obj["authMethod"].GetString();
+                } else {
+                    cerr << "\033[0;31mAuth method not found in wildcard object.\033[0m" << endl;
+                    // Enviar respuesta HTTP 401 Unauthorized
+                    send_http_error_response(client_socket, "Not Found", 404);
+                    return false;
+                }
+            } else {            
+                cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
+                // Enviar respuesta HTTP 401 Unauthorized
+                send_http_error_response(client_socket, "Not Found", 404);
+                return false;
+            }
         }
         lock.unlock();
         if (authMethod == "none") {
@@ -352,8 +424,8 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
             // Hay que autenticar. Se redirige al usuario a la página de login.
             string scheme = https ? "https://" : "http://";
             string url = scheme + host + request.request.uri;
-            string url_encoded = urlEncode(url);
-            string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod;
+            string url_encoded = url_encode(url);
+            string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod + (!wildcard.empty() ? ("&wildcard=" + url_encode(wildcard)) : "");
             string response = "HTTP/1.1 302 Found\r\n"
                                 "Location: " + redirect_url + "\r\n"
                                 "Connection: close\r\n"
@@ -364,7 +436,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         } else if (authMethod == "api-keys") {
             auto it = request.headers.find("x-api-key");
             if (it != request.headers.end()) {
-                const string auth_api_key = "{\"apiKey\": \"" + it->second + "\", \"subdomain\": \"" + host + "\"}";
+                const string auth_api_key = "{\"apiKey\": \"" + it->second + "\", \"subdomain\": \"" + host + (!wildcard.empty() ? ("\", \"wildcard\": \"" + wildcard) : "") +"\"}";
                 string url = rest_api + "/auth/validate/apikey";
                 unordered_map<string, string> headers_map = {
                     {"Content-Type", "application/json"},
@@ -518,22 +590,49 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 // Función para agregar un URI al caché de un host específico.
 void add_to_cache_by_host(const string& host, const string& key, const string& filename, size_t size) {
     // Adquirir un bloqueo de lectura compartida para acceder a los subdominios
-     shared_lock<shared_mutex> read_lock(subdomain_mutex);
+    int ttl;
+    uint64_t cache_size;
+    string replacement_policy;
 
-    const Value& subdomain_object = subdomains[host.c_str()];
+    shared_lock<shared_mutex> read_lock(subdomain_mutex);
+    if (subdomains.HasMember(host.c_str())) {
+        // Si el host está en los subdominios, se obtiene la información del subdominio.
+        const Value& subdomain_object = subdomains[host.c_str()];
+        // Leer campo de TTL
+        ttl = subdomain_object["ttl"].GetInt();
+        cout << "\033[1;33mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
 
-    // Leer campo de TTL
-    int ttl = subdomain_object["ttl"].GetInt();
-    cout << "TTL for host " << host << ": " << ttl << endl;
+        // Leer tamaño de caché
+        cache_size = subdomain_object["cacheSize"].GetUint64();
+        cout << "\033[1;33mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
 
-    // Leer tamaño de caché
-    auto cache_size = subdomain_object["cacheSize"].GetUint64();
-    cout << "Cache size for host " << host << ": " << cache_size << endl;
+        // Leer política de reemplazo
+        replacement_policy = subdomain_object["replacementPolicy"].GetString();
+        cout << "\033[1;33mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
+    } else {
+        // Si el host no está en los subdominios, se busca en los wildcards.
+        shared_lock<shared_mutex> wildcard_lock(wildcard_mutex);
+        string wildcard = check_wildcard(host);
+        if (!wildcard.empty()) {
+            cout << "\033[0;36mWildcard found: " << wildcard << "\033[0m" << endl;
+            // Si se encuentra un wildcard, se obtiene el método de autenticación del wildcard.
+            const Value& wildcard_obj = wildcards[wildcard.c_str()];
+            // Leer campo de TTL
+            ttl = wildcard_obj["ttl"].GetInt();
+            cout << "\033[1;36mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
 
-    // Leer política de reemplazo
-    string replacement_policy = subdomain_object["replacementPolicy"].GetString();
-    cout << "Replacement policy for host " << host << ": " << replacement_policy << endl;
-    // Liberar el bloqueo de lectura compartida antes de escribir en la caché
+            // Leer tamaño de caché
+            cache_size = wildcard_obj["cacheSize"].GetUint64();
+            cout << "\033[1;36mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
+
+            // Leer política de reemplazo
+            replacement_policy = wildcard_obj["replacementPolicy"].GetString();
+            cout << "\033[1;36mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
+        } else {            
+            cerr << "\033[0;36mSubdomain not found: failed to cache\033[0m" << endl;
+            return;
+        }
+    }
     read_lock.unlock();
     
     // Adquirir un bloqueo exclusivo para escribir en la caché
@@ -557,7 +656,7 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
     int times_used = 0;
     // Revisar si el URI ya existe en la caché del host.
     if (requests_object.HasMember(key.c_str())) {
-        cout << "URI already exists in cache for host: " << host << endl;
+        cout << "\033[1;33mURI already exists in cache for host: " << host << "\033[0m" << endl;
         // Si el URI ya existe, se borra para actualizarlo
         Value& old_uri_obj = requests_object[key.c_str()];
         received = old_uri_obj["received"].GetString();
@@ -576,6 +675,7 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
         string key_to_delete = replacementPolicies(requests_object, cache_mutex, replacement_policy);
 
         if (!key_to_delete.empty()) {
+            cout << "\033[1;33mLeast recently used URI: " << key_to_delete << "\033[0m" << endl;
             host_size -= requests_object[key_to_delete.c_str()]["size"].GetUint64();
             Value& uri_obj = requests_object[key_to_delete.c_str()];
             uri_obj["filename"].SetNull();
@@ -584,28 +684,27 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
             uri_obj["time_to_live"].SetNull();
             requests_object.RemoveMember(key_to_delete.c_str());
         } else {
-            cout << "Could not remove key to add space. " << host << endl;
-            host_object["size"].SetUint64(host_size);
+            cout << "\033[1;33mCould not remove key to add space. " << host << "\033[0m" << endl;
             return;
         }    
     }
-    // Create a new URI object if it doesn't exist
+    // Crear objeto URI para almacenar la información
     Value uri_obj(kObjectType);
 
-    // Add fields to the URI object
+    // Agregar campos al objeto URI
     auto now_time = chrono::system_clock::now();
     auto now = chrono::system_clock::to_time_t(now_time);
     string current_timestamp = ctime(&now);
-    current_timestamp.pop_back(); // Remove the newline character
+    current_timestamp.pop_back(); // Eliminar cambio de línea
 
-    // Calculate the time-to-live (TTL) as 1 hour from now
-    auto ttl_time_point = now_time + chrono::milliseconds(ttl); // Add milliseconds to the time_point
-    auto ttl_time_t = chrono::system_clock::to_time_t(ttl_time_point); // Convert to time_t
+    // Calcular TTL
+    auto ttl_time_point = now_time + chrono::milliseconds(ttl); // Sumar el TTL en milisegundos
+    auto ttl_time_t = chrono::system_clock::to_time_t(ttl_time_point); // Convertir a time_t
     string ttl_timestamp = ctime(&ttl_time_t);
     ttl_timestamp.pop_back();
 
     if (received.empty()) {
-        received = current_timestamp; // If no previous received time, use current time
+        received = current_timestamp; // Si no hay un tiempo previo, usar el tiempo actual
     }
     uri_obj.AddMember("received", Value().SetString(received.c_str(), allocator), allocator);
     uri_obj.AddMember("most_recent_use", Value().SetString(current_timestamp.c_str(), allocator), allocator);
@@ -614,16 +713,17 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
     uri_obj.AddMember("filename", Value().SetString(filename.c_str(), allocator), allocator);
     uri_obj.AddMember("size", Value().SetUint64(size), allocator);
 
-    // Add the URI object to the host object
+    // Agregar el objeto URI al objeto de solicitudes del host
     requests_object.AddMember(Value().SetString(key.c_str(), allocator), uri_obj, allocator);
-    host_object["size"].SetUint64(host_size + size); // Update the size field of the host object
+    host_object["size"].SetUint64(host_size + size); // Actualizar el tamaño ocupado de la caché para el subdominio.
+    cout << "\033[1;33mAdded URI to cache for host: " << host << "\033[0m" << endl;
 
     StringBuffer buffer;
     Writer<StringBuffer> writer(buffer);
     cache.Accept(writer);
     
 
-    cout << "\033[1;34mCache Object: " << buffer.GetString() << "\033[0m" << endl;
+    cout << "\033[1;33mCache Object: " << buffer.GetString() << "\033[0m" << endl;
 }
 
 bool get_response(const int &client_socket, HttpRequest request ){
@@ -690,15 +790,38 @@ bool get_response(const int &client_socket, HttpRequest request ){
     vector<string> file_types;
     {
         shared_lock<shared_mutex> lock(subdomain_mutex);
-        const Value& subdomain_obj = subdomains[host.c_str()];
-        if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
-            destination = subdomain_obj["destination"].GetString();
-            https = subdomain_obj["https"].GetBool();
-            file_types.clear();
-            for (const auto& file_type : subdomain_obj["fileTypes"].GetArray()) {
-                if (file_type.IsString()) {
-                    file_types.push_back(file_type.GetString());
+        if (subdomains.HasMember(host.c_str())) {
+            const Value& subdomain_obj = subdomains[host.c_str()];
+            if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
+                destination = subdomain_obj["destination"].GetString();
+                https = subdomain_obj["https"].GetBool();
+                file_types.clear();
+                for (const auto& file_type : subdomain_obj["fileTypes"].GetArray()) {
+                    if (file_type.IsString()) {
+                        file_types.push_back(file_type.GetString());
+                    }
                 }
+            }
+        } else {
+            lock.unlock();
+            shared_lock<shared_mutex> lock(wildcard_mutex);
+            const string wildcard = check_wildcard(host);
+            if (!wildcard.empty()){
+                cout << "Wildcard found: " << wildcard << endl;
+                const Value& wildcard_obj = wildcards[wildcard.c_str()];
+                if (wildcard_obj.HasMember("destination") && wildcard_obj["destination"].IsString()) {
+                    destination = wildcard_obj["destination"].GetString();
+                    https = wildcard_obj["https"].GetBool();
+                    file_types.clear();
+                    for (const auto& file_type : wildcard_obj["fileTypes"].GetArray()) {
+                        if (file_type.IsString()) {
+                            file_types.push_back(file_type.GetString());
+                        }
+                    }
+                }
+            } else {
+                cerr << "Host not found in subdomains." << endl;
+                return false;
             }
         }
     }
@@ -710,7 +833,6 @@ bool get_response(const int &client_socket, HttpRequest request ){
     if (response) {
         cout << "Response received. Status code: " << response->status_code << endl;
         string response_str = build_http_response(response);
-        cout << "Response: " << response_str << endl;
         // HttpResponse http_response;
         // try {
         //     http_response = parse_http_response(response->memory, response->size);
@@ -742,7 +864,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
             if (is_allowed) {
                 cout << "Content-Type is allowed." << endl;
                 // Guardar la respuesta en el cache.
-                string filename = hashString(url + to_string(time(nullptr))) + ".ksh";
+                string filename = hash_string(url + to_string(time(nullptr))) + ".ksh";
                 cout << filename << endl;
                 string directory = CACHE_FOLDER + host + "/";
                 // Crear el directorio

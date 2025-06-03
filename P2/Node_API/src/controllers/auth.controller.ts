@@ -163,7 +163,7 @@ export const loginSubdomainUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { username, password, subdomain } = req.body;
+    const { username, password, subdomain, wildcard } = req.body;
     console.log(username, password, subdomain);
     let subdomainURL: URL;
     try {
@@ -173,9 +173,13 @@ export const loginSubdomainUser = async (
       res.status(400).json({ message: "URL del subdominio inválido" });
       return;
     }
-    const docRef = firestore
-      .collection("subdomains")
-      .doc(subdomainURL.hostname);
+    let docRef;
+    if (!wildcard) {
+      docRef = firestore.collection("subdomains").doc(subdomainURL.hostname);
+    } else {
+      docRef = firestore.collection("wildcards").doc(wildcard);
+    }
+
     const doc = await docRef.get();
     if (!doc.exists) {
       res.status(401).json({ message: "Unauthorized. No domain." });
@@ -234,7 +238,7 @@ export const loginSubdomainUser = async (
 
 export const loginSubdomainApiKey = async (req: Request, res: Response) => {
   try {
-    const { apiKey, subdomain } = req.body;
+    const { apiKey, subdomain, wildcard } = req.body;
     console.log(apiKey, subdomain);
     let subdomainURL: URL;
     try {
@@ -244,9 +248,12 @@ export const loginSubdomainApiKey = async (req: Request, res: Response) => {
       res.status(400).json({ message: "URL del subdominio inválido" });
       return;
     }
-    const docRef = firestore
-      .collection("subdomains")
-      .doc(subdomainURL.hostname);
+    let docRef;
+    if (!wildcard) {
+      docRef = firestore.collection("subdomains").doc(subdomainURL.hostname);
+    } else {
+      docRef = firestore.collection("wildcards").doc(wildcard);
+    }
     const doc = await docRef.get();
     if (!doc.exists) {
       res.status(401).json({ message: "Unauthorized. No domain." });
@@ -342,9 +349,14 @@ export const hashApiKey = (apiKey: string): string => {
 
 export const validateSubdomainApiKey = async (req: Request, res: Response) => {
   try {
-    const { apiKey, subdomain } = req.body;
+    const { apiKey, subdomain, wildcard } = req.body;
 
-    const docRef = firestore.collection("subdomains").doc(subdomain);
+    let docRef;
+    if (!wildcard) {
+      docRef = firestore.collection("subdomains").doc(subdomain);
+    } else {
+      docRef = firestore.collection("wildcards").doc(wildcard);
+    }
     const doc = await docRef.get();
     if (!doc.exists) {
       res.status(401).json({ message: "Unauthorized. No domain." });
