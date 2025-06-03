@@ -436,18 +436,16 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
     } else if (replacement_policy == "LFU") {
         // Least Frequently Used
         cout << "Implementing LFU replacement policy." << endl;
-        string least_frequently_used_key;
         int least_used_count = std::numeric_limits<int>::max();
 
         for (auto itr = requests_object.MemberBegin(); itr != requests_object.MemberEnd(); ++itr) {
             Value& uri_obj = itr->value;
 
             int times_used = uri_obj["times_used"].GetInt();
-
             // Actualizar la entrada menos usada
             if (times_used < least_used_count) {
                 least_used_count = times_used;
-                least_frequently_used_key = itr->name.GetString();
+                key_to_delete = itr->name.GetString();
             }
         }
     } else if (replacement_policy == "FIFO") {
@@ -497,7 +495,6 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             }
         }
     } else if (replacement_policy == "Random") {
-        // Random
         cout << "Implementing Random replacement policy." << endl;
         if (requests_object.MemberCount() == 0) {
             cout << "No URIs to remove in the host object." << endl;
@@ -505,6 +502,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
         }
 
         // Generar índice random
+        srand(time(nullptr));
         size_t random_index = rand() % requests_object.MemberCount();
 
         // Iterar hasta el índice random
@@ -513,6 +511,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
         key_to_delete = itr->name.GetString();
     } 
+    cout << "Key to delete: " << key_to_delete << endl;
     return key_to_delete;
 }
 
@@ -562,7 +561,7 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
         // Si el URI ya existe, se borra para actualizarlo
         Value& old_uri_obj = requests_object[key.c_str()];
         received = old_uri_obj["received"].GetString();
-        times_used = old_uri_obj["times_used"].GetInt();
+        times_used = old_uri_obj["times_used"].GetInt() + 1;
         host_size -= old_uri_obj["size"].GetUint64();
         old_uri_obj["filename"].SetNull();
         old_uri_obj["most_recent_use"].SetNull();
@@ -577,7 +576,6 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
         string key_to_delete = replacementPolicies(requests_object, cache_mutex, replacement_policy);
 
         if (!key_to_delete.empty()) {
-            cout << "Least recently used URI: " << key_to_delete << endl;
             host_size -= requests_object[key_to_delete.c_str()]["size"].GetUint64();
             Value& uri_obj = requests_object[key_to_delete.c_str()];
             uri_obj["filename"].SetNull();
@@ -753,10 +751,10 @@ bool get_response(const int &client_socket, HttpRequest request ){
                 if (out_file) {
                     out_file.write(response_str.c_str(), response_str.length());
                     out_file.close();
-                    cout << "Response saved to cache as: " << filename << endl;
+                    cout << "Response of size " << response_str.length() << " saved to cache as: " << filename << endl;
 
                     // Agregar a la cache
-                    add_to_cache_by_host(host, request.request.method + "-" + request.request.uri, filename, response_str.length());
+                    add_to_cache_by_host(host, request.request.method + "-" + url, filename, response_str.length());
                 } else {
                     perror("Failed to open cache file for writing");
                 }
