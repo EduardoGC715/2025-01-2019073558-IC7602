@@ -297,7 +297,7 @@ export default function SubdomainForm() {
     <div className="bg-lightgrey1 text-secondary max-w-xl mx-auto mt-10 p-6 rounded-2xl shadow-lg">
       <button
         onClick={() => navigate(-1)}
-        className="mb-4 p-2 hover:bg-lightgrey2 rounded-full transition-colors"
+        className="mb-4 p-2 hover:bg-lightgrey2 rounded-full transition-colors cursor-pointer"
       >
         <ArrowLeft size={24} />
       </button>
@@ -520,14 +520,14 @@ export default function SubdomainForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 border border-lightgrey rounded-md hover:bg-lightgrey2 transition-colors"
+            className="px-4 py-2 border border-lightgrey rounded-md hover:bg-lightgrey2 transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="w-full px-4 py-2 bg-primary text-light rounded-md hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+            className="w-full px-4 py-2 bg-primary text-light rounded-md hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors cursor-pointer"
           >
             {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear'}
           </button>
