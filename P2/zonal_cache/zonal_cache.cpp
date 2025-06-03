@@ -585,6 +585,7 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
             requests_object.RemoveMember(key_to_delete.c_str());
         } else {
             cout << "Could not remove key to add space. " << host << endl;
+            host_object["size"].SetUint64(host_size);
             return;
         }    
     }
