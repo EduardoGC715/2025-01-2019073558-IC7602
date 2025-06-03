@@ -111,9 +111,13 @@ export const logoutUser = async () => {
 
 export const changePassword = async (changePasswordData) => {
   try {
-    const response = await api.post("/auth/change-password", changePasswordData, {
-      withCredentials: true,
-    });
+    const response = await api.post(
+      "/auth/change-password",
+      changePasswordData,
+      {
+        withCredentials: true,
+      }
+    );
     console.log("Response from changePassword", response);
     if (response.status === 200) {
       return {
@@ -128,7 +132,8 @@ export const changePassword = async (changePasswordData) => {
   } catch (error) {
     return {
       success: false,
-      message: error.response?.data?.message || "Error al cambiar la contraseña",
+      message:
+        error.response?.data?.message || "Error al cambiar la contraseña",
     };
   }
 };

@@ -6,11 +6,13 @@ import {
   getSubdomainsByDomain,
   deleteSubdomain,
   updateSubdomain,
-  getSubdomainByName
+  getSubdomainByName,
+  getWildcardSubdomains,
 } from "../controllers/subdomain.controller";
 import { authenticateJWT } from "../middlewares";
 const router = Router();
 router.get("/all", getAllSubdomains);
+router.get("/wildcards", getWildcardSubdomains);
 
 router.post("/register", authenticateJWT, registerSubdomain);
 
