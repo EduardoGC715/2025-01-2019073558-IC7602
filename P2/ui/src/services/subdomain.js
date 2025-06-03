@@ -81,7 +81,7 @@ export const updateSubdomain = async (domain, subdomainName, updateData) => {
     const payload = {
       ...updateData,
       domain,
-      subdomain: subdomainName,
+      subdomain: subdomainName === "_root_" ? "": subdomainName, 
     };
 
     const response = await api.put(

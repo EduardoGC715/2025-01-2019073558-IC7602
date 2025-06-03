@@ -8,10 +8,11 @@ import {
   getSubdomainByName,
 } from '../services/subdomain';
 import ms from 'ms';
+import { set } from 'react-hook-form';
 
 export default function SubdomainForm() {
-  const { domain, subdomain: subParam, isRoot } = useParams();
-  const isEdit = Boolean(subParam);
+  const { domain, subdomain: subParam } = useParams();
+  const isEdit = subParam !== undefined;
   const navigate = useNavigate();
   const [createdKeys, setCreatedKeys] = useState(null);
   const [showCreatedModal, setShowCreatedModal] = useState(false);
@@ -47,13 +48,14 @@ export default function SubdomainForm() {
   ];
 
   const addApiKey = () => {
+    console.log('Adding new API Key', nextApiKeyId);
     setForm(f => ({
       ...f,
       apiKeys: [
         ...f.apiKeys,
         {
           id: nextApiKeyId,
-          name: '',        // user will type the “nickname”
+          name: '',        
           isExisting: false,
         },
       ],
@@ -110,7 +112,6 @@ export default function SubdomainForm() {
       setLoading(true);
       try {
         const data = await getSubdomainByName(domain, subParam);
-
         const apiKeysData = data.apiKeys || {};
         const apiKeys = Object.entries(apiKeysData).map(([hashedKey, name], i) => ({
           id: i,
@@ -120,11 +121,12 @@ export default function SubdomainForm() {
         }));
         if (!apiKeys.length) {
           apiKeys.push({
-            id:         0,
-            name:       '',
+            id: 0,
+            name: '',
             isExisting: false,
           });
         }
+        setNextApiKeyId(apiKeys.length);
 
         const users = Object.entries(data.users || {}).map(([u, p], i) => ({
           id: i,
@@ -140,9 +142,11 @@ export default function SubdomainForm() {
             isExisting: false,
           });
         }
+        setNextUserId(users.length);
 
+        const subdomain = subParam === '_root_' ? '' : subParam;
         setForm({
-          subdomain: isRoot ? "" : subParam,
+          subdomain: subdomain,
           protocol: data.https ? 'https' : 'http',
           destination: data.destination || '',
           cacheSize: data.cacheSize ? String(data.cacheSize / 1000000): '',
@@ -262,6 +266,7 @@ export default function SubdomainForm() {
       const result = isEdit ? await updateSubdomain(domain, subParam, payload): await createSubdomain(domain, payload);
 
       if (result.success) {
+        console.log('Subdomain operation successful:', result.data);
         if (result.data?.createdApiKeys) {
           setCreatedKeys(result.data.createdApiKeys);
           setShowCreatedModal(true);
@@ -298,7 +303,7 @@ export default function SubdomainForm() {
       </button>
 
       <h2 className="text-2xl font-bold mb-6">
-        {isRoot ? `Editar Subdominio` : isEdit ? `Editar Subdominio "${subParam}"` : `Agregar Subdominio a ${domain}`}
+        {isEdit ? `Editar Subdominio ${subParam}` : `Agregar Subdominio a ${domain}`}
       </h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">

@@ -227,7 +227,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       .collection(targetCollection)
       .doc(docId);
     
-    const domainRefDocId = subdomain === "" ? "root" : subdomain;
+    const domainRefDocId = subdomain === "" ? "_root_" : subdomain;
     const domainRef = firestore
       .collection("users")
       .doc(session.user)
@@ -348,7 +348,6 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       });
       return;
     }
-
     if (authMethod === "api-keys") {
       if (
         typeof apiKeys !== "object" ||
@@ -469,9 +468,13 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       destination,
     };
 
-    await subdomainRef.set(subdomainData, { merge: true });
-
-    res.status(200).json({ message: "Subdominio actualizado exitosamente" });
+    await subdomainRef.set(subdomainData);
+    
+    const response: any = { message: "Subdomain creado exitosamente" };
+    if (authMethod === "api-keys" && Object.keys(createdApiKeys).length > 0) {
+      response.createdApiKeys = createdApiKeys;
+    }
+    res.status(200).json(response);
   } catch (error) {
     console.error("Error updating subdomain:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -509,7 +512,7 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
       .collection("domains")
       .doc(domain)
       .collection("subdomains")
-      .doc(isRoot ? "root" : cleaned);
+      .doc(isRoot ? "_root_" : cleaned);
 
     const batch = firestore.batch();
 
@@ -587,7 +590,7 @@ export const getSubdomainByName = async (req: Request, res: Response) => {
       return;
     }
 
-    const isRoot = subdomainName === "root";
+    const isRoot = subdomainName === "_root_";
     const isWildcard = subdomainName.includes("*");
 
     const cleaned = subdomainName === "*" ? "*" : subdomainName.startsWith("*.") ? subdomainName.slice(2) : subdomainName;

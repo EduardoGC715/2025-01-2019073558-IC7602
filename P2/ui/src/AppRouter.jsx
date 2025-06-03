@@ -73,7 +73,7 @@ function AppRouter() {
                   element={<SubdomainForm />}
                 />
                 <Route
-                  path="/domains/:domain/subdomains/:subdomain/:isRoot"
+                  path="/domains/:domain/subdomains/:subdomain"
                   element={<SubdomainForm />}
                 />
               </Route>
