@@ -76,7 +76,7 @@ def check_wildcard_cache(domain):
     global wildcard_lock
     with wildcard_lock:
         for key in wildcard_cache.keys():
-            if domain.endswith(key):
+            if domain.endswith("." + key):
                 return True
     return False
 
@@ -231,14 +231,11 @@ def dns_resolver():
         data = request.get_data(as_text=True)
         # Código obtenido de https://www.geeksforgeeks.org/base64-b64decode-in-python/
         dns_query = base64.b64decode(data)
-        logger.debug(dns_query)
-        logger.debug(dns_server)
         # Crea un socket UDP para enviar la consulta DNS
         # Código obtenido de https://wiki.python.org/moin/UdpCommunicatione
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(dns_query, dns_server)
             data, _ = s.recvfrom(512)
-            logger.debug(f"Recibida la respuesta DNS: {data}")
         codified_data = base64.b64encode(data).decode("utf-8")
         return codified_data
 

@@ -132,7 +132,7 @@ string check_wildcard(const string &subdomain) {
     for (auto wildcard_itr = wildcards.MemberBegin(); wildcard_itr != wildcards.MemberEnd(); ) {
         const string wildcard_str = wildcard_itr->name.GetString();
         // Verificar si el subdominio termina con el wildcard
-        if (subdomain.ends_with(wildcard_str)) {
+        if (subdomain.ends_with("." + wildcard_str)) {
             // Si el wildcard es más largo que el actual, actualizar la longitud
             if (wildcard_str.length() > length) {
                 length = wildcard_str.length();
@@ -353,7 +353,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
             shared_lock<shared_mutex> wildcard_lock(wildcard_mutex);
             wildcard = check_wildcard(host);
             if (!wildcard.empty()) {
-                cout << "\033[0;36mPRINT 1.5: Wildcard found: " << wildcard << "\033[0m" << endl;
+                cout << "\033[0;35mPRINT 1.5: Wildcard found: " << wildcard << "\033[0m" << endl;
                 // Si se encuentra un wildcard, se obtiene el método de autenticación del wildcard.
                 const Value& wildcard_obj = wildcards[wildcard.c_str()];
                 if (wildcard_obj.HasMember("authMethod") && wildcard_obj["authMethod"].IsString()) {
@@ -614,22 +614,22 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
         shared_lock<shared_mutex> wildcard_lock(wildcard_mutex);
         string wildcard = check_wildcard(host);
         if (!wildcard.empty()) {
-            cout << "\033[0;36mWildcard found: " << wildcard << "\033[0m" << endl;
+            cout << "\033[0;35mWildcard found: " << wildcard << "\033[0m" << endl;
             // Si se encuentra un wildcard, se obtiene el método de autenticación del wildcard.
             const Value& wildcard_obj = wildcards[wildcard.c_str()];
             // Leer campo de TTL
             ttl = wildcard_obj["ttl"].GetInt();
-            cout << "\033[1;36mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
+            cout << "\033[1;35mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
 
             // Leer tamaño de caché
             cache_size = wildcard_obj["cacheSize"].GetUint64();
-            cout << "\033[1;36mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
+            cout << "\033[1;35mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
 
             // Leer política de reemplazo
             replacement_policy = wildcard_obj["replacementPolicy"].GetString();
-            cout << "\033[1;36mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
+            cout << "\033[1;35mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
         } else {            
-            cerr << "\033[0;36mSubdomain not found: failed to cache\033[0m" << endl;
+            cerr << "\033[0;35mSubdomain not found: failed to cache\033[0m" << endl;
             return;
         }
     }
@@ -726,6 +726,12 @@ void add_to_cache_by_host(const string& host, const string& key, const string& f
     cout << "\033[1;33mCache Object: " << buffer.GetString() << "\033[0m" << endl;
 }
 
+string extract_host(const string &url) {
+    size_t start = url.find("/");
+    if (start == string::npos) return url;
+    return url.substr(0, start);
+}
+
 bool get_response(const int &client_socket, HttpRequest request ){
     const string host = request.headers.at("host");
     if (cache.HasMember(host.c_str())) {
@@ -807,7 +813,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
             shared_lock<shared_mutex> lock(wildcard_mutex);
             const string wildcard = check_wildcard(host);
             if (!wildcard.empty()){
-                cout << "Wildcard found: " << wildcard << endl;
+                cout << "\033[0;35mWildcard found: " << wildcard << "\033[0m" << endl;
                 const Value& wildcard_obj = wildcards[wildcard.c_str()];
                 if (wildcard_obj.HasMember("destination") && wildcard_obj["destination"].IsString()) {
                     destination = wildcard_obj["destination"].GetString();
