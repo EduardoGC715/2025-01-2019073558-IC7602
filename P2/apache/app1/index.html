@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Calculadora simpler</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <h1>Calculadora simple para el Apache</h1>
     <div class="calculator">
-      <input type="text" id="display" readonly>
+      <input type="text" id="display" readonly />
       <div class="buttons">
         <button onclick="append('7')">7</button>
         <button onclick="append('8')">8</button>
@@ -26,9 +26,15 @@
         <button onclick="append('.')">.</button>
         <button class="equal" onclick="calculate()">=</button>
         <button class="operator" onclick="append('+')">+</button>
-        <button class="clear" onclick="clearDisplay()" style="grid-column: span 4;">Limpiar</button>
+        <button
+          class="clear"
+          onclick="clearDisplay()"
+          style="grid-column: span 4"
+        >
+          Limpiar
+        </button>
       </div>
     </div>
-    <script src="script.js"></script>
+    <script src="calculator.js"></script>
   </body>
 </html>

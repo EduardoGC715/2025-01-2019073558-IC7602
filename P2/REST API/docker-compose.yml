@@ -1,9 +1,12 @@
 version: "3.8"
 services:
   pokemon-api:
-    build: .
+    build:
+      context: .
+      tags:
+        - dandiego235/rest-p2:1
+        - dandiego235/rest-p2:latest
+
     ports:
       - "5000:5000"
-    volumes:
-      - ./pokedex.json:/app/pokedex.json
     restart: unless-stopped
