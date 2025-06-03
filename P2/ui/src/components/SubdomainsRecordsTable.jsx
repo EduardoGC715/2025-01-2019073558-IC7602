@@ -76,7 +76,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
                   <button
                     onClick={() =>
                       navigate(
-                        rec.isRoot ? `/domains/${rec.domain}/subdomains/root/true`: `/domains/${rec.domain}/subdomains/${rec.subdomain}/false`
+                        rec.isRoot ? `/domains/${rec.domain}/subdomains/_root_`: `/domains/${rec.domain}/subdomains/${rec.subdomain}`
                       )
                     }
                     className="p-1 text-accentBlue hover:text-secondary hover:cursor-pointer transition-colors"
@@ -99,7 +99,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
       </div>
       <DeleteConfirmationModal
         isOpen={!!deletionTarget}
-        name={deletionTarget ? deletionTarget.subdomain === "" ? "root" : `${deletionTarget.subdomain}.${deletionTarget.domain}` : ""}
+        name={deletionTarget ? deletionTarget.subdomain === "" ? "_root_" : `${deletionTarget.subdomain}.${deletionTarget.domain}` : ""}
         type="subdomain"
         onClose={() => setDeletionTarget(null)}
         onConfirm={confirmDelete}
