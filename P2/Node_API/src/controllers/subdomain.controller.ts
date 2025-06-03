@@ -39,6 +39,7 @@ interface registerSubdomainRequestBody {
   apiKeys?: Record<string, string>; // apiKey: true
   newApiKeys?: string[]; // New API keys to add
   users?: Record<string, string>; // username: password
+  newUsers?: Record<string, string>; // New users to add
   https?: boolean; // Optional, true if HTTPS is enabled
   destination: string; // e.g., "https://example.com"
 }
@@ -60,7 +61,6 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       replacementPolicy,
       authMethod,
       apiKeys,
-      newApiKeys,
       users,
       https,
       destination,
@@ -290,6 +290,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       apiKeys,
       newApiKeys,
       users,
+      newUsers, 
       https,
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
@@ -349,53 +350,53 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return;
     }
     if (authMethod === "api-keys") {
+      const existingKeysObj =
+        typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys)
+          ? (apiKeys as Record<string, string>)
+          : {};
+      const newKeysArr =
+        Array.isArray(req.body.newApiKeys) && req.body.newApiKeys !== null
+          ? (req.body.newApiKeys as string[])
+          : [];
+
       if (
-        typeof apiKeys !== "object" ||
-        apiKeys === null ||
-        Array.isArray(apiKeys) ||
-        Object.keys(apiKeys).length === 0
+        Object.keys(existingKeysObj).length === 0 &&
+        newKeysArr.length === 0
       ) {
-        res.status(400).json({
-          message:
-            "Debe proporcionar llaves de autenticación con el método API keys",
-        });
+        res.status(400).json({ message: "Debe proporcionar llaves al menos una API Key" });
         return;
       }
-      if (!Array.isArray(newApiKeys)) {
-        res.status(400).json({
-          message: 'El campo "newApiKeys" debe ser un arreglo de nombres',
-        });
-        return;
-      }
-      if (Array.isArray(users) && users.length > 0) {
-        res.status(400).json({
-          message:
-            "La lista de usuarios debe estar vacía cuando el método es API keys",
-        });
+
+      if (
+        typeof users === "object" &&
+        users !== null &&
+        !Array.isArray(users) &&
+        Object.keys(users).length > 0
+      ) {
+        res.status(400).json({ message: "La lista de usuarios debe estar vacía cuando el método es API keys" });
         return;
       }
     } else if (authMethod === "user-password") {
+      const existingUsersObj = typeof users === "object" && users !== null && !Array.isArray(users) ? (users as Record<string, string>) : {};
+      const newUsersObj =  typeof (req.body.newUsers) === "object" && req.body.newUsers !== null ? (req.body.newUsers as Record<string, string>) : {};
+      
       if (
-        typeof users !== "object" ||
-        users === null ||
-        Array.isArray(users) ||
-        Object.keys(users).length === 0
+        Object.keys(existingUsersObj).length === 0 &&
+        Object.keys(newUsersObj).length === 0
       ) {
-        res.status(400).json({
-          message: "Debe proporcionar usuarios con el método usuario/password",
-        });
+        res.status(400).json({ message: "Debe proporcionar usuarios existentes o nuevos con el método usuario/password"});
         return;
       }
+      
       if (
-        typeof apiKeys === "object" &&
-        apiKeys !== null &&
-        !Array.isArray(apiKeys) &&
-        Object.keys(apiKeys).length > 0
+        (typeof apiKeys === "object" &&
+          apiKeys !== null &&
+          !Array.isArray(apiKeys) &&
+          Object.keys(apiKeys).length > 0) ||
+        (Array.isArray(req.body.newApiKeys) &&
+          (req.body.newApiKeys as string[]).length > 0)
       ) {
-        res.status(400).json({
-          message:
-            "La lista de API keys debe estar vacía cuando el método es usuario/password",
-        });
+        res.status(400).json({ message: "La lista de API keys debe estar vacía cuando el método es usuario/password" });
         return;
       }
     } else if (!authMethod || authMethod === "none") {
@@ -423,14 +424,21 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const usersMap = users as Record<string, string>;
-
+    const existingUsersMap = (users as Record<string, string>) || {};
+    const newUsersMap = (newUsers as Record<string, string>) || {};
+    const usersMap: Record<string, string> = {};
     if (authMethod === "user-password") {
-      for (const [username, password] of Object.entries(usersMap)) {
-        if (!password.startsWith("$2")) {
-          const salt = bcrypt.genSaltSync(10);
-          usersMap[username] = bcrypt.hashSync(password, salt);
+      for (const [username, hashedPassword] of Object.entries(existingUsersMap)) {
+        usersMap[username] = hashedPassword;
+      }
+      // 2) Hash each new user/password pair and add
+      for (const [username, plainPwd] of Object.entries(newUsersMap)) {
+        if (!username || typeof plainPwd !== "string" || plainPwd.length < 6) {
+          res.status(400).json({ message: 'Cada nuevo usuario debe tener un nombre válido y una contraseña (mín. 6 caracteres)'});
+          return;
         }
+        const salt = bcrypt.genSaltSync(10);
+        usersMap[username] = bcrypt.hashSync(plainPwd, salt);
       }
     }
 
@@ -452,7 +460,6 @@ export const updateSubdomain = async (req: Request, res: Response) => {
     }
 
     const primaryColl = isWildcard ? "wildcards" : "subdomains";
-
     const topDocId = isWildcard ? cleanedSub === "" ? domain : `${cleanedSub}.${domain}` : subdomain === "" ? domain : `${subdomain}.${domain}`;
     const subdomainRef = firestore.collection(primaryColl).doc(topDocId);
 

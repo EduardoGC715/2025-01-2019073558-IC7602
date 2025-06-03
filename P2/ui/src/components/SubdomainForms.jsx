@@ -26,7 +26,7 @@ export default function SubdomainForm() {
     replacementPolicy: '',
     authMethod: '',
     apiKeys: [{ id: 0, name: '', isExisting: false }],
-    users:   [{ id: 0, username: '', password: '', isExisting: false }],
+    users:   [{ id: 0, username: '', password: '', isExisting: false, resetting: false }],
     protocol: 'https',
   });
   const [loading, setLoading] = useState(isEdit);
@@ -85,18 +85,19 @@ export default function SubdomainForm() {
   const addUser = () => {
     setForm(f => ({
       ...f,
-      users: [...f.users, { id: nextUserId, username: '', password: '' }],
+      users: [
+        ...f.users,
+        { id: nextUserId, username: '', password: '', isExisting: false },
+      ],
     }));
     setNextUserId(id => id + 1);
   };
   const deleteUser = idToRemove => {
     setForm(f => {
-      const users = f.users.filter(u => u.id !== idToRemove);
+      const rest = f.users.filter(u => u.id !== idToRemove);
       return {
         ...f,
-        users: users.length
-          ? users
-          : [ { id: nextUserId, username: '', password: '' } ],
+        users: rest.length ? rest : [ { id: nextUserId, username: '', password: '', isExisting: false } ],
       };
     });
     setNextUserId(id => id + 1);
@@ -133,6 +134,7 @@ export default function SubdomainForm() {
           username: u,
           password: p,
           isExisting: true,
+          resetting: false,
         }));
         if (!users.length) {
           users.push({
@@ -140,6 +142,7 @@ export default function SubdomainForm() {
             username: '',
             password: '',
             isExisting: false,
+            resetting: false,
           });
         }
         setNextUserId(users.length);
@@ -224,17 +227,22 @@ export default function SubdomainForm() {
       if (users.some(u => !u) || pwds.some(p => !p)) {
         return toast.error('Todos los usuarios y contraseñas deben estar completos.');
       }
+      if (pwds.some(p => p.length < 6)) {
+        return toast.error('Cada contraseña debe tener al menos 6 caracteres.');
+      }
       const dupUser = users.find((u, i, arr) => arr.indexOf(u) !== i);
       if (dupUser) {
         return toast.error(`Usuario duplicado detectado: "${dupUser}".`);
       }
     }
+
     
     setSaving(true);
     try {
-      let payloadUsers = {};
       let existingKeysMap = {};
       let newKeyNames = [];
+      let existingUsersMap = {};
+      let newUsersMap = {};
 
       if (form.authMethod === 'api-keys') {
         existingKeysMap = form.apiKeys.filter(k => k.isExisting).reduce((m, { key, name }) => {
@@ -243,10 +251,14 @@ export default function SubdomainForm() {
         }, {});
         newKeyNames = form.apiKeys.filter(k => !k.isExisting && k.name.trim() !== '').map(k => k.name.trim());
       } else if (form.authMethod === 'user-password') {
-        payloadUsers = form.users.reduce((m, { username, password }) => {
-          m[username.trim()] = password;
+        existingUsersMap = form.users.filter(u => u.isExisting && !u.resetting).reduce((m, { username, password }) => {
+          m[username] = password;
           return m;
         }, {});
+        newUsersMap = form.users.filter(u => (!u.isExisting && u.username.trim() && u.password.trim()) || (u.isExisting && u.resetting && u.password.trim())).reduce((m, { username, password }) => {
+            m[username] = password;
+            return m;
+          }, {});
       }
 
       const payload = {
@@ -259,8 +271,9 @@ export default function SubdomainForm() {
         replacementPolicy: form.replacementPolicy,
         authMethod: form.authMethod,
         apiKeys: existingKeysMap,
-        users: payloadUsers,
-        newApiKeys: newKeyNames
+        newApiKeys: newKeyNames,
+        users: existingUsersMap,
+        newUsers: newUsersMap,
       };
       
       const result = isEdit ? await updateSubdomain(domain, subParam, payload): await createSubdomain(domain, payload);
@@ -483,23 +496,58 @@ export default function SubdomainForm() {
                   readOnly={item.isExisting}
                   disabled={item.isExisting}
                 />
-                <input
-                  type="text"
-                  defaultValue={item.password}
-                  placeholder="Contraseña"
-                  className="flex-1 p-2 border rounded"
-                  onBlur={e => {
-                    const password = e.target.value;
-                    setForm(f => ({
-                      ...f,
-                      users: f.users.map(u =>
-                        u.id === item.id ? { ...u, password } : u
-                      ),
-                    }));
-                  }}
-                  readOnly={item.isExisting}
-                  disabled={item.isExisting}
-                />
+                  {item.isExisting ? (
+                    item.resetting ? (
+                      <input
+                        type="text"
+                        value={item.password}
+                        placeholder="Nueva contraseña"
+                        className="flex-1 p-2 border rounded"
+                        onChange={e => {
+                          const password = e.target.value;
+                          setForm(f => ({
+                            ...f,
+                            users: f.users.map(u =>
+                              u.id === item.id ? { ...u, password } : u
+                            ),
+                          }));
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm(f => ({
+                            ...f,
+                            users: f.users.map(u =>
+                              u.id === item.id
+                                ? { ...u, resetting: true, password: '' }
+                                : u
+                            ),
+                          }))
+                        }
+                        className="px-3 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 cursor-pointer transition-colors"
+                      >
+                        Reset password
+                      </button>
+                    )
+                  ) : (
+                    <input
+                      type="text"
+                      value={item.password}
+                      placeholder="Contraseña"
+                      className="flex-1 p-2 border rounded"
+                      onChange={e => {
+                        const password = e.target.value;
+                        setForm(f => ({
+                          ...f,
+                          users: f.users.map(u =>
+                            u.id === item.id ? { ...u, password } : u
+                          ),
+                        }));
+                      }}
+                    />
+                  )}
                 <button
                   type="button"
                   onClick={() => deleteUser(item.id)}
