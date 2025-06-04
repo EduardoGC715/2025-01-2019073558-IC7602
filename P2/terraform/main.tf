@@ -44,40 +44,76 @@ module "dns_instance" {
 
   user_data = templatefile("${path.module}/scripts/install.tftpl", {
     DOCKER_COMPOSE_YML = data.template_file.dns_docker_compose.rendered
-    checkers           = var.checkers
   })
 
   vpc_id    = module.networking.vpc_id
   subnet_id = module.networking.public_subnet_id
 }
 
-# data "template_file" "ui_docker_compose" {
-#   template = file("${path.module}/scripts/docker-compose-ui.tpl.yml")
+data "template_file" "private_docker_compose" {
+  template = file("${path.module}/scripts/docker-compose-private.tpl.yml")
+  vars = {
+    api_port    = var.api_port
+    apache_port = var.apache_port
+  }
+}
+
+module "private_instance" {
+  source   = "./modules/private_instance"
+  aws_ami  = var.aws_ami
+  api_port = var.api_port
+  apache_port = var.apache_port
+
+  user_data = templatefile("${path.module}/scripts/install.tftpl", {
+    DOCKER_COMPOSE_YML = data.template_file.private_docker_compose.rendered
+  })
+
+  vpc_id    = module.networking.vpc_id
+  public_subnet_id = module.networking.public_subnet_id
+  public_subnet_cidr_block = module.networking.public_subnet_cidr_block
+  private_subnet_id = module.networking.private_subnet_id
+
+  depends_on = [module.networking.nat_gateway_id]
+}
+
+module "zonal_cache_instance" {
+  for_each = toset(var.countries)
+
+  source   = "./modules/dns_instance"
+  aws_ami  = var.aws_ami
+  api_port = var.api_port
+
+  user_data = templatefile("${path.module}/scripts/install.tftpl", {
+    DOCKER_COMPOSE_YML = templatefile("${path.module}/scripts/docker-compose-zonal-cache.tpl.yml", {
+      vercel_api    = var.vercel_api
+      country       = each.key
+      fetch_interval = var.fetch_interval
+      vercel_ui     = var.vercel_ui
+    })
+  })
+
+  vpc_id    = module.networking.vpc_id
+  subnet_id = module.networking.public_subnet_id
+}
+
+
+# data "template_file" "zonal_cache_docker_compose" {
+#   template = file("${path.module}/scripts/docker-compose-zonal-cache.tpl.yml")
 #   vars = {
-#     dns_api_host = coalesce(var.api_host, module.dns_instance.public_ip)
-#     dns_api_port = var.api_port
+#     vercel_api    = var.vercel_api
+#     country = var.country
+#     fetch_interval = var.fetch_interval
+#     vercel_ui = var.vercel_ui
 #   }
 # }
-# # https://developer.hashicorp.com/terraform/language/functions/coalesce
 
-# module "ui_instance" {
-#   source  = "./modules/ui_instance"
-#   aws_ami = var.aws_ami
+# module "zonal_cache_instance" {
+#   source   = "./modules/dns_instance"
+#   aws_ami  = var.aws_ami
+#   api_port = var.api_port
 
-#   user_data = templatefile("${path.module}/scripts/install_ui.tftpl", {
-#     DOCKER_COMPOSE_YML = data.template_file.ui_docker_compose.rendered
-#   })
-
-#   vpc_id    = module.networking.vpc_id
-#   subnet_id = module.networking.public_subnet_id
-# }
-
-# module "checker_instance" {
-#   source  = "./modules/checker_instance"
-#   aws_ami = var.aws_ami
-
-#   user_data = templatefile("${path.module}/scripts/install_checkers.tftpl", {
-#     checkers = var.checkers
+#   user_data = templatefile("${path.module}/scripts/install.tftpl", {
+#     DOCKER_COMPOSE_YML = data.template_file.zonal_cache_docker_compose.rendered
 #   })
 
 #   vpc_id    = module.networking.vpc_id

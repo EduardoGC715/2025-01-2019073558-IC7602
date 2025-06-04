@@ -1,25 +1,12 @@
 aws_ami  = "ami-0f9de6e2d2f067fca"
-api_port = 443
-checkers = [
-  {
-    id        = "europe"
-    lat       = "48.8566"
-    lon       = "2.3522"
-    country   = "France"
-    continent = "Europe"
-  },
-  {
-    id        = "central-america"
-    lat       = "9.9281"
-    lon       = "-84.0907"
-    country   = "Costa Rica"
-    continent = "Central America"
-  }
+api_port = 5000
+apache_port = 80
+countries = [
+  "CR",
+  "US"
 ]
-dns_server = {
-  host = "8.8.8.8"
-  port = 53
-}
+vercel_ui = "https://vercelui-eight.vercel.app"
+vercel_api = "2025-01-2019073558-ic-7602.vercel.app"
 
 # {
 #   id        = "us-east"

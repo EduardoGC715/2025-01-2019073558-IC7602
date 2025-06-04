@@ -18,3 +18,8 @@ variable "vpc_id" {
   description = "The ID of the VPC to launch the instance in"
   type        = string
 }
+
+variable "country" {
+  description = "The country code for the zonal cache instance"
+  type        = string
+}

@@ -1,0 +1,19 @@
+services:
+  cache:
+    image: "dandiego235/zonal_cache:latest"
+    container_name: zonal_cache
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    environment:
+      REST_API: ${vercel_api} # "host.docker.internal:3000"
+      APP_ID: "zonal_cache_${country}" # "zonal_cache_dev"
+      # API_KEY: "12345"
+      FETCH_INTERVAL: ${fetch_interval} # "1"
+      VERCEL_UI: ${vercel_ui} # "http://localhost:5173"
+    volumes:
+      - subdomain_cache_data:/app/subdomain_cache
+
+volumes:
+  subdomain_cache_data:

@@ -3,37 +3,35 @@ variable "aws_ami" {
   type        = string
 }
 
-variable "api_host" {
-  description = "Nombre de host de la API que usará la instancia"
-  type        = string
-  default     = null
-}
-
 variable "api_port" {
   description = "Puerto de la API que usará la instancia"
   type        = number
+  default = 5000
 }
 
-variable "checkers" {
-  description = "Lista de configuraciones para  of health checker configs"
-  type = list(object({
-    id        = string
-    lat       = string
-    lon       = string
-    country   = string
-    continent = string
-  }))
+variable "apache_port" {
+  description = "Puerto del apache que usará la instancia"
+  type        = number
+  default = 80
 }
-# https://dev.to/pwd9000/terraform-complex-variable-types-173e
 
-variable "dns_server" {
-  description = "Dirección del servidor DNS que usará el DNS API para resolver nombres desconocidos"
-  type = object({
-    host = string
-    port = number
-  })
-  default = {
-    host = "8.8.8.8",
-    port = 53
-  }
+variable "countries" {
+  description = "Lista de códigos de países para los que se creará una instancia de caché zonal"
+  type = list(string)
+}
+
+variable "vercel_ui" {
+  description = "Dirección de la interfaz de usuario de Vercel"
+  type = string
+}
+
+variable "vercel_api" {
+  description = "Dirección de la API de Vercel"
+  type = string
+}
+
+variable "fetch_interval" {
+  description = "Intervalo de tiempo en el que la caché zonal actualiza la información"
+  type        = number
+  default     = 3
 }
