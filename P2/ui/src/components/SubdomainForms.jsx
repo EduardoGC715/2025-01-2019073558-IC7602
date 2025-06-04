@@ -327,6 +327,7 @@ export default function SubdomainForm() {
             name="subdomain"
             value={form.subdomain}
             onChange={handleChange}
+            disabled={isEdit}
             className="w-full p-2 border border-lightgrey rounded-md text-secondary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           />
         </div>
