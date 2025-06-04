@@ -316,7 +316,7 @@ export default function SubdomainForm() {
       </button>
 
       <h2 className="text-2xl font-bold mb-6">
-        {isEdit ? `Editar Subdominio ${subParam}` : `Agregar Subdominio a ${domain}`}
+        {isEdit ? `Editar Subdominio ${subParam === '_root_' ? domain : `${subParam}.${domain}`}` : `Agregar Subdominio a ${domain}`}
       </h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
