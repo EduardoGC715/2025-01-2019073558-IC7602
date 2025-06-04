@@ -23,10 +23,11 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
 
     if (result.success) {
       toast.success(result.message);
+      onDelete(deletionTarget);
     } else {
       toast.error(result.message);
     }
-
+    
     setIsDeleting(false);
     setDeletionTarget(null);
   };

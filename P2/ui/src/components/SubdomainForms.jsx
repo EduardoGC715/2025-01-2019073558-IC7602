@@ -8,7 +8,7 @@ import {
   getSubdomainByName,
 } from '../services/subdomain';
 import ms from 'ms';
-import { set } from 'react-hook-form';
+import CreatedApiKeysModal from './CreatedApiKeysModal';
 
 export default function SubdomainForm() {
   const { domain, subdomain: subParam } = useParams();
@@ -581,39 +581,12 @@ export default function SubdomainForm() {
           </button>
         </div>
       </form>
-      {/* Modal showing newly generated raw API keys */}
-      {showCreatedModal && createdKeys && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full">
-            <h3 className="text-xl font-bold mb-4">Nuevas API Keys</h3>
-            <p className="mb-4">
-              Copia estas claves ahora; solo se muestran una vez:
-            </p>
-            <div className="space-y-2 max-h-60 overflow-auto">
-              {Object.entries(createdKeys).map(([rawKey, name]) => (
-                <div key={rawKey} className="border p-2 rounded bg-gray-50">
-                  <div>
-                    <span className="font-medium">Nombre:</span> {name}
-                  </div>
-                  <div className="mt-1">
-                    <span className="font-medium">Key:</span>{' '}
-                    <code className="break-all">{rawKey}</code>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={() => {
-                setShowCreatedModal(false);
-                navigate(`/domains/${domain}/subdomains`);
-              }}
-              className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
+      <CreatedApiKeysModal
+        isOpen={showCreatedModal}
+        createdKeys={createdKeys}
+        domain={domain}
+        onClose={() => setShowCreatedModal(false)}
+      />
     </div>
   );
 }

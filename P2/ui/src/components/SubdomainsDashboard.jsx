@@ -19,7 +19,6 @@ function SubdomainsDashboard() {
         setIsLoading(true);
         try {
           const dataObj = await getSubdomainsByDomain(domain);
-          console.log('Subdomains data:', dataObj);
           const records = Object.entries(dataObj).map(([full, info]) => {
           let sub;
           let root = false;
@@ -32,29 +31,22 @@ function SubdomainsDashboard() {
           }
             return { subdomain: sub, isRoot: root, domain, ...info };
           });
-          console.log('Processed subdomains:', records);
           setSubdomains(records);
         } catch (err) {
-        console.error('Error fetching subdomains:', err);
+            toast.error(`Error al cargar los subdominios: ${err.message}`);
         } finally {
         setIsLoading(false);
         }
     };
 
-    const handleDelete = async (rec) => {
-    const fullName = rec.subdomain === "" ? rec.domain : `${rec.subdomain}.${rec.domain}`;
-    const confirm = window.confirm(`¿Estás seguro de eliminar ${fullName}?`);
-    if (!confirm) return;
-
-    const result = await deleteSubdomainAPI(rec.domain, rec.subdomain);
-    if (result.success) {
-        toast.success(result.message);
-        setSubdomains((prev) => prev.filter(s => s.subdomain !== rec.subdomain));
-    } else {
-        toast.error(result.message);
-    }
+    const handleDelete = (rec) => {
+        setSubdomains(prev =>
+          prev.filter(
+            s => s.subdomain !== rec.subdomain || s.isRoot !== rec.isRoot
+          )
+        );
     };
-
+    
     return (
         <div className="min-h-screen bg-light p-4 pt-16">
             <div className="max-w-7xl mx-auto">
