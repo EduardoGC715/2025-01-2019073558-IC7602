@@ -549,25 +549,21 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
     }
 
     const isWildcard = subdomain.includes("*");
-    const cleaned =
-      subdomain === "*"
-        ? "*"
-        : subdomain.startsWith("*.")
-        ? subdomain.slice(2)
-        : subdomain;
-
     const isRoot = subdomain === domain;
-    const fullDomain = isWildcard
-      ? cleaned === "*"
-        ? domain
-        : `${cleaned}.${domain}`
-      : isRoot
-      ? domain
-      : `${cleaned}.${domain}`;
-    const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
     const primaryColl = isWildcard ? "wildcards" : "subdomains";
 
-    const subdomainRef = firestore.collection(primaryColl).doc(fullDomain);
+    const cleanedSub = isWildcard
+      ? subdomain.startsWith("*.")
+        ? subdomain.slice(2)
+        : ""
+      : subdomain;
+
+    const topDocId = isWildcard ? cleanedSub === "" ? domain : `${cleanedSub}.${domain}` : subdomain === "" ? domain : `${subdomain}.${domain}`;
+
+    const fullDomain = subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
+    const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
+
+    const subdomainRef = firestore.collection(primaryColl).doc(topDocId);
 
     const domainRef = firestore
       .collection("users")
@@ -575,20 +571,15 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
       .collection("domains")
       .doc(domain)
       .collection("subdomains")
-      .doc(isRoot ? "_root_" : cleaned);
+      .doc(isRoot ? "_root_" : subdomain);
 
     const batch = firestore.batch();
 
     batch.delete(subdomainRef);
     batch.delete(domainRef);
-
     await batch.commit();
 
-    if (isRoot) {
-      await database.ref(`domains/${flippedDomain}/_enabled`).remove();
-    } else {
-      await database.ref(`domains/${flippedDomain}`).remove();
-    }
+    await database.ref(`domains/${flippedDomain}/_enabled`).remove();
 
     res.status(200).json({ message: "Subdominio eliminado exitosamente" });
   } catch (error) {
