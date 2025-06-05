@@ -1,22 +1,21 @@
 CC = g++
 CFLAGS = -std=c++20 -g -Wall -I.
 UNIT_TEST = -DUNIT_TEST
-all: zonal_cache
+all: zonal_cache test
+
 
 zonal_cache: zonal_cache.cpp http_client.cpp
 	$(CC) $(CFLAGS) -o zonal_cache zonal_cache.cpp http_client.cpp -pthread -lcurl -lssl -lcrypto
 
-test: test_interceptor.c
-	$(CC) $(CFLAGS) $(UNIT_TEST) -o test_interceptor \
-	test_interceptor.c interceptor.c b64/cencode.c b64/cdecode.c \
-	-pthread -lcurl -lcheck -lsubunit -lm -lrt -lssl -lcrypto
-	./test_interceptor
+test: zonal_cache_test.cpp http_client.cpp catch2/catch_amalgamated.cpp
+	$(CC) $(CFLAGS) $(UNIT_TEST) -o test zonal_cache_test.cpp http_client.cpp \
+	      catch2/catch_amalgamated.cpp -pthread -lcurl -lssl -lcrypto
 
 run: zonal_cache
 	./zonal_cache
 
 clean:
-	rm -f zonal_cache
+	rm -f zonal_cache test            # ← also remove the test binary
 
 push:
 	@echo "Pushing to DockerHub"
