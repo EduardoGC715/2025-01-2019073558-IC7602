@@ -129,7 +129,7 @@ string check_wildcard(const string &subdomain) {
     size_t length = 0;
     string response;
     // Iterar sobre los wildcards
-    for (auto wildcard_itr = wildcards.MemberBegin(); wildcard_itr != wildcards.MemberEnd(); ) {
+    for (auto wildcard_itr = wildcards.MemberBegin(); wildcard_itr != wildcards.MemberEnd(); ++wildcard_itr) {
         const string wildcard_str = wildcard_itr->name.GetString();
         // Verificar si el subdominio termina con el wildcard
         if (subdomain.ends_with("." + wildcard_str)) {
