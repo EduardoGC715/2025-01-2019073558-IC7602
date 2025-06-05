@@ -26,8 +26,9 @@ export const setAuthToken = (token) => {
 // https://www.regex-tutorial.com/getCookieWithRegex.html
 export const getAuthToken = () => {
   const cookies = document.cookie;
+  console.log("Cookies:", cookies);
   const match = cookies.match(/(?:^|;\s*)token=([^;]*)/);
-
+  console.log("Match:", match);
   if (match) {
     const token = decodeURIComponent(match[1]);
     return token;
@@ -52,7 +53,6 @@ api.interceptors.response.use(
 
 // DNS Records API
 export const dnsApi = {
-
   checkHealth: async (domain, direction) => {
     try {
       // Asegura que el dominio empiece con "www."
