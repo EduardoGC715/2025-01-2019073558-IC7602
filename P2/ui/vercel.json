@@ -4,6 +4,10 @@
     {
       "source": "/(.*)",
       "destination": "/index.html"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://2025-01-2019073558-ic-7602.vercel.app/$1"
     }
   ]
 }
