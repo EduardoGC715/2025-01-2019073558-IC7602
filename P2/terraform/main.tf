@@ -31,7 +31,7 @@ module "networking" {
 data "template_file" "dns_docker_compose" {
   template = file("${path.module}/scripts/docker-compose-dns.tpl.yml")
   vars = {
-    dns_api_port    = var.api_port
+    dns_api_port    = var.dns_api_port
     dns_server_host = var.dns_server.host
     dns_server_port = var.dns_server.port
   }
@@ -40,7 +40,7 @@ data "template_file" "dns_docker_compose" {
 module "dns_instance" {
   source   = "./modules/dns_instance"
   aws_ami  = var.aws_ami
-  api_port = var.api_port
+  dns_api_port = var.dns_api_port
 
   user_data = templatefile("${path.module}/scripts/install.tftpl", {
     DOCKER_COMPOSE_YML = data.template_file.dns_docker_compose.rendered
@@ -77,11 +77,11 @@ module "private_instance" {
 }
 
 module "zonal_cache_instance" {
-  for_each = toset(var.countries)
+  for_each = var.countries
 
-  source   = "./modules/dns_instance"
+  source   = "./modules/zonal_cache_instance"
   aws_ami  = var.aws_ami
-  api_port = var.api_port
+  country = each.key
 
   user_data = templatefile("${path.module}/scripts/install.tftpl", {
     DOCKER_COMPOSE_YML = templatefile("${path.module}/scripts/docker-compose-zonal-cache.tpl.yml", {
@@ -89,6 +89,8 @@ module "zonal_cache_instance" {
       country       = each.key
       fetch_interval = var.fetch_interval
       vercel_ui     = var.vercel_ui
+      vercel_token  = var.vercel_token
+      vercel_edge_config_id = var.vercel_edge_config_id
     })
   })
 

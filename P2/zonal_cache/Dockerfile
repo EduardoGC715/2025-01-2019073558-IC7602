@@ -1,5 +1,5 @@
 # Base image
-FROM debian:bullseye
+FROM ubuntu:noble
 
 # Instalar build essentials y GCC
 RUN apt-get update && \
@@ -15,16 +15,24 @@ RUN apt-get update && \
       openssl && \
     rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /app/subdomain_caches
+
 WORKDIR /app
 
-COPY interceptor.h /app
-COPY interceptor.c /app
-COPY ./b64/ /app/b64/
-COPY test_interceptor.c /app
-COPY Makefile /app
 
-RUN make test
+COPY ./httpparser/ /app/httpparser/
+COPY ./rapidjson/ /app/rapidjson/
+COPY Makefile /app
+COPY init.sh /app
+COPY zonal_cache.h /app
+COPY zonal_cache.cpp /app
+COPY http_client.h /app
+COPY http_client.cpp /app
+
+# RUN make test
 RUN make all
 
+RUN chmod +x init.sh
+RUN chmod +x zonal_cache
 
-CMD ["./interceptor"]
+CMD ["./init.sh"]

@@ -1,4 +1,9 @@
 aws_ami  = "ami-0f9de6e2d2f067fca"
+dns_api_port = 443
+dns_server = {
+  host = "8.8.8.8"
+  port = 53
+}
 api_port = 5000
 apache_port = 80
 countries = [
@@ -7,6 +12,8 @@ countries = [
 ]
 vercel_ui = "https://vercelui-eight.vercel.app"
 vercel_api = "2025-01-2019073558-ic-7602.vercel.app"
+vercel_edge_config_id = "ecfg_ywndfxposwmc2jpmd6jv47mgjwji"
+fetch_interval = 3
 
 # {
 #   id        = "us-east"

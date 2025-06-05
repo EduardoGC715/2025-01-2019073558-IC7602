@@ -20,8 +20,8 @@ resource "aws_vpc_security_group_ingress_rule" "allow_dns_dns_instance" {
 resource "aws_vpc_security_group_ingress_rule" "allow_api_dns_instance" {
   security_group_id = aws_security_group.dns_instance_sg.id
   cidr_ipv4         = "0.0.0.0/0"
-  from_port         = var.api_port
-  to_port           = var.api_port
+  from_port         = var.dns_api_port
+  to_port           = var.dns_api_port
   ip_protocol       = "tcp"
 }
 

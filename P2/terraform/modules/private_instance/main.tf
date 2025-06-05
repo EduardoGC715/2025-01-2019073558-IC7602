@@ -10,7 +10,7 @@ resource "aws_security_group" "private_instance_sg" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "allow_apache" {
-  security_group_id = aws_security_group.apache_sg.id
+  security_group_id = aws_security_group.private_instance_sg.id
   cidr_ipv4         = var.public_subnet_cidr_block
   from_port         = var.apache_port
   to_port           = var.apache_port
@@ -18,7 +18,7 @@ resource "aws_vpc_security_group_ingress_rule" "allow_apache" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "allow_api" {
-  security_group_id = aws_security_group.apache_sg.id
+  security_group_id = aws_security_group.private_instance_sg.id
   cidr_ipv4         = var.public_subnet_cidr_block
   from_port         = var.api_port
   to_port           = var.api_port

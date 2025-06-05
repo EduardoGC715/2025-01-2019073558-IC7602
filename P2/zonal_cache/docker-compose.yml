@@ -6,6 +6,24 @@ services:
       tags:
         - dandiego235/zonal_cache:1
         - dandiego235/zonal_cache:latest
+    image: "dandiego235/zonal_cache:latest"
+    container_name: zonal_cache
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    environment:
+      REST_API: "host.docker.internal:3000" # "host.docker.internal:3000"
+      APP_ID: "zonal_cache_CR" # "zonal_cache_dev"
+      # API_KEY: "12345"
+      FETCH_INTERVAL: "1" # "1"
+      VERCEL_UI: "https://vercelui-eight.vercel.app" # "http://localhost:5173"
+      VERCEL_TOKEN: "Rg7EZ7ORM8tSRfdQ23wLEPhx"
+      VERCEL_EDGE_CONFIG_ID: "ecfg_ywndfxposwmc2jpmd6jv47mgjwji"
+      COUNTRY: "DE"
+    volumes:
+      - subdomain_cache_data:/app/subdomain_cache
+
   dev:
     build:
       context: .
@@ -24,3 +42,6 @@ services:
       API_KEY: "12345"
       FETCH_INTERVAL: "1"
       VERCEL_UI: "http://localhost:5173"
+
+volumes:
+  subdomain_cache_data:

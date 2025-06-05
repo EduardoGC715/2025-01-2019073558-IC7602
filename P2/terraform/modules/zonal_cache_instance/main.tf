@@ -2,10 +2,10 @@
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group
 resource "aws_security_group" "zonal_cache_instance_sg" {
   vpc_id = var.vpc_id
-  name   = "zonal_cache_instance_sg"
+  name   = "zonal_cache_instance_sg_${var.country}"	
 
   tags = {
-    Name = "Zonal Cache Instance Security Group"
+    Name = "Zonal Cache Instance Security Group ${var.country}"	
   }
 }
 

@@ -4,9 +4,9 @@ variable "aws_ami" {
 }
 # https://cloud-images.ubuntu.com/locator/ec2/
 
-variable "api_port" {
+variable "dns_api_port" {
   description = "The port for the DNS API"
-  default     = 5000
+  default     = 443
 }
 
 variable "user_data" {

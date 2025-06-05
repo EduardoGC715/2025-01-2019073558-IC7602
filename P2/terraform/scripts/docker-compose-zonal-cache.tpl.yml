@@ -12,6 +12,9 @@ services:
       # API_KEY: "12345"
       FETCH_INTERVAL: ${fetch_interval} # "1"
       VERCEL_UI: ${vercel_ui} # "http://localhost:5173"
+      VERCEL_TOKEN: ${vercel_token}
+      VERCEL_EDGE_CONFIG_ID: ${vercel_edge_config_id}
+      COUNTRY: ${country} # "DE"
     volumes:
       - subdomain_cache_data:/app/subdomain_cache
 
