@@ -88,6 +88,14 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       res.status(400).json({ message: "El dominio es requerido" });
       return;
     }
+    
+    if (
+      !validator.isFQDN(destination, { require_tld: false }) &&
+      !validator.isIP(destination)
+    ) {
+      res.status(400).json({ message: "Destino debe ser un nombre de dominio válido o una dirección IP." });
+      return;
+    }
 
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     if (
@@ -99,9 +107,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const fullDomain =
-      subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
-
+    const fullDomain = subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
     if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
@@ -340,6 +346,14 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    if (
+      !validator.isFQDN(destination, { require_tld: false }) &&
+      !validator.isIP(destination)
+    ) {
+      res.status(400).json({ message: "Destino debe ser un nombre de dominio válido o una dirección IP." });
+      return;
+    }
+
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     const isWildcard = wildcardRe.test(subdomain);
     const cleanedSub = isWildcard
@@ -347,80 +361,55 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         ? subdomain.slice(2)
         : ""
       : subdomain;
-    if (
-      subdomain !== "" &&
-      !validator.isFQDN(subdomain, { require_tld: false }) &&
-      !wildcardRe.test(subdomain)
-    ) {
+    if (subdomain !== "" && !validator.isFQDN(subdomain, { require_tld: false }) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Subdominio inválido" });
       return;
     }
 
-    const fullDomain =
-      subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
+    const fullDomain = subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
     if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
     }
 
     if (typeof cacheSize !== "number" || isNaN(cacheSize)) {
-      res
-        .status(400)
-        .json({ message: "El tamaño de caché debe ser un número válido" });
+      res.status(400).json({ message: "El tamaño de caché debe ser un número válido" });
       return;
     }
 
     if (typeof ttl !== "number" || Number.isNaN(ttl) || ttl <= 0) {
-      res.status(400).json({
-        message:
-          "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)",
-      });
+      res.status(400).json({ message: "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)" });
       return;
     }
 
     if (typeof https !== "boolean") {
-      res
-        .status(400)
-        .json({ message: "El campo useHttps debe ser true o false" });
+      res.status(400).json({ message: "El campo useHttps debe ser true o false" });
       return;
     }
 
     const allowedPolicies = ["LRU", "LFU", "FIFO", "MRU", "Random"];
     if (!allowedPolicies.includes(replacementPolicy)) {
-      res.status(400).json({
-        message: `La política de reemplazo debe ser una de las siguientes: ${allowedPolicies.join(
-          ", "
-        )}`,
-      });
+      res.status(400).json({ message: `La política de reemplazo debe ser una de las siguientes: ${allowedPolicies.join(", ")}` });
       return;
     }
     if (authMethod === "api-keys") {
-      const existingKeysObj =
-        typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys)
+      const existingKeysObj = typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys)
           ? (apiKeys as Record<string, string>)
           : {};
-      const newKeysArr =
-        Array.isArray(req.body.newApiKeys) && req.body.newApiKeys !== null
+      const newKeysArr = Array.isArray(req.body.newApiKeys) && req.body.newApiKeys !== null
           ? (req.body.newApiKeys as string[])
           : [];
 
-      if (
-        Object.keys(existingKeysObj).length === 0 &&
-        newKeysArr.length === 0
-      ) {
+      if (Object.keys(existingKeysObj).length === 0 && newKeysArr.length === 0) {
         res.status(400).json({ message: "Debe proporcionar llaves al menos una API Key" });
         return;
       }
 
-      if (
-        typeof users === "object" &&
-        users !== null &&
-        !Array.isArray(users) &&
-        Object.keys(users).length > 0
-      ) {
+      if (typeof users === "object" && users !== null && !Array.isArray(users) && Object.keys(users).length > 0) {
         res.status(400).json({ message: "La lista de usuarios debe estar vacía cuando el método es API keys" });
         return;
       }
+      
     } else if (authMethod === "user-password") {
       const existingUsersObj = typeof users === "object" && users !== null && !Array.isArray(users) ? (users as Record<string, string>) : {};
       const newUsersObj =  typeof (req.body.newUsers) === "object" && req.body.newUsers !== null ? (req.body.newUsers as Record<string, string>) : {};
@@ -434,10 +423,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       }
       
       if (
-        (typeof apiKeys === "object" &&
-          apiKeys !== null &&
-          !Array.isArray(apiKeys) &&
-          Object.keys(apiKeys).length > 0) ||
+        (typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys) && Object.keys(apiKeys).length > 0) ||
         (Array.isArray(req.body.newApiKeys) &&
           (req.body.newApiKeys as string[]).length > 0)
       ) {
@@ -577,6 +563,7 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
 
     batch.delete(subdomainRef);
     batch.delete(domainRef);
+
     await batch.commit();
 
     await database.ref(`domains/${flippedDomain}/_enabled`).remove();

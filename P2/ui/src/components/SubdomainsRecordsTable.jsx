@@ -100,7 +100,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
       </div>
       <DeleteConfirmationModal
         isOpen={!!deletionTarget}
-        name={deletionTarget ? deletionTarget.subdomain === "" ? "_root_" : `${deletionTarget.subdomain}.${deletionTarget.domain}` : ""}
+        name={deletionTarget ? deletionTarget.subdomain === "" ? deletionTarget.domain : `${deletionTarget.subdomain}.${deletionTarget.domain}` : ""}
         type="subdomain"
         onClose={() => setDeletionTarget(null)}
         onConfirm={confirmDelete}
