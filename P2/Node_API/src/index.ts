@@ -2,9 +2,13 @@ import express, { Request, Response } from "express";
 import cookieParser from "cookie-parser";
 import logger from "morgan";
 import cors from "cors";
-import { apiKeyCache, initializeApiKeyListener } from "./utils/apiKeyCache";
 import { authenticateServer, authenticateJWT } from "./middlewares";
-import { authRoutes, domainRoutes, subdomainRoutes } from "./routes";
+import {
+  authRoutes,
+  domainRoutes,
+  subdomainRoutes,
+  cacheRoutes,
+} from "./routes";
 import fs from "fs";
 import https from "https";
 
@@ -32,6 +36,8 @@ app.use("/auth", authRoutes);
 app.use("/domain", authenticateJWT, domainRoutes);
 
 app.use("/subdomain", subdomainRoutes);
+
+app.use("/cache", cacheRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.listen(port, () => {
