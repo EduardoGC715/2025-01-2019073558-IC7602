@@ -7,8 +7,7 @@ dns_server = {
 api_port = 5000
 apache_port = 80
 countries = [
-  "CR",
-  "US"
+  "CR"
 ]
 vercel_ui = "https://vercelui-eight.vercel.app"
 vercel_api = "2025-01-2019073558-ic-7602.vercel.app"
