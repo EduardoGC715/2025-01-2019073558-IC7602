@@ -279,7 +279,6 @@ SSL_CTX *create_ssl_context() {
 
 // Función para configurar el contexto SSL con el certificado y la clave privada.
 void configure_ssl_context(SSL_CTX *ctx) {
-    /* Set the key and cert */
     if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
