@@ -521,6 +521,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
 
     const primaryColl = isWildcard ? "wildcards" : "subdomains";
     const topDocId = isWildcard ? cleanedSub === "" ? domain : `${cleanedSub}.${domain}` : subdomain === "" ? domain : `${subdomain}.${domain}`;
+    console.log("Primary Collection:", primaryColl, " Top Doc ID:", topDocId, " Domain:", domain, " Subdomain:", subdomain);
     const subdomainRef = firestore.collection(primaryColl).doc(topDocId);
 
     const subdomainData: any = {
@@ -564,7 +565,7 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
     }
 
     const isWildcard = subdomain.includes("*");
-    const isRoot = subdomain === domain;
+    const isRoot = subdomain === "_root_";
     const primaryColl = isWildcard ? "wildcards" : "subdomains";
 
     const cleanedSub = isWildcard
@@ -573,9 +574,9 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
         : ""
       : subdomain;
 
-    const topDocId = isWildcard ? cleanedSub === "" ? domain : `${cleanedSub}.${domain}` : subdomain === "" ? domain : `${subdomain}.${domain}`;
-
-    const fullDomain = subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
+    const topDocId = isWildcard ? cleanedSub === "" ? domain : `${cleanedSub}.${domain}` : isRoot ? domain : `${subdomain}.${domain}`;
+    console.log("Primary Collection:", primaryColl, " Top Doc ID:", topDocId, " Domain:", domain, " Subdomain:", subdomain);
+    const fullDomain = isRoot ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
     const flippedDomain = fullDomain.trim().split(".").reverse().join("/");
 
     const subdomainRef = firestore.collection(primaryColl).doc(topDocId);
