@@ -54,7 +54,7 @@ function SubdomainsDashboard() {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => navigate('/dashboard')}
-                            className="p-2 hover:bg-lightgrey2 rounded-full transition-colors"
+                            className="p-2 hover:bg-lightgrey2 rounded-full transition-colors cursor-pointer"
                         >
                             <ArrowLeft size={24} className="text-secondary" />
                         </button>
