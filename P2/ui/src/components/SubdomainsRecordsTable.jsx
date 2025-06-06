@@ -17,7 +17,7 @@ export default function SubdomainsRecordsTable({ subdomains, onDelete }) {
     setIsDeleting(true);
 
     const { domain, subdomain } = deletionTarget;
-    const subToSend = subdomain === "" ? domain : subdomain;
+    const subToSend = subdomain === "" ? "_root_" : subdomain;
 
     const result = await deleteSubdomain(domain, subToSend);
 

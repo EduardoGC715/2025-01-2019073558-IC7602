@@ -22,6 +22,7 @@ from geopy.distance import geodesic
 import os
 import threading
 import time
+from datetime import datetime, timezone
 
 zonal_caches = {}
 zonal_caches_lock = threading.Lock()
@@ -113,6 +114,37 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def update_expired_sessions():
+    while True:
+        logger.debug("Checking for expired sessions...")
+        try:
+            sessions_ref = firestore_client.collection("sessions")
+            sessions = sessions_ref.stream()
+
+            now = datetime.now(timezone.utc)
+
+            for session in sessions:
+                session_data = session.to_dict()
+                if session_data and "expiresAt" in session_data:
+                    try:
+                        expires_at = datetime.fromisoformat(session_data["expiresAt"].replace("Z", "+00:00"))
+
+                        if expires_at < now:
+                            logger.debug(f"Session {session.id} has expired. Deleting it.")
+                            session.reference.delete()
+
+                    except Exception as parse_error:
+                        logger.debug(f"Could not parse 'expiresAt' for session {session.id}: {parse_error}")
+
+            logger.debug("Finished checking and updating expired sessions.")
+        except Exception as e:
+            logger.debug(f"Error while updating expired sessions: {e}")
+
+        time.sleep(30)
+update_sessions_thread = threading.Thread(target=update_expired_sessions, daemon=True)
+update_sessions_thread.start()
 
 app = Flask(__name__)
 
@@ -321,8 +353,9 @@ def get_firebase_status():
         return jsonify([]), 200
 
     except Exception as e:
-        print("Error accediendo a Firebase:", e)
+        logger.debug("Error accediendo a Firebase:" + e)
         return jsonify([]), 500
+
 
 
 if __name__ == "__main__":
