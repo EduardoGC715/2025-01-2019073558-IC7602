@@ -520,7 +520,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
 
 // Función que maneja las políticas de reemplazo de caché.
 string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, const string& replacement_policy) {
-    string key_to_delete;
+    string key_to_delete = "";
 
     if (replacement_policy == "LRU") {
         // Least Recently Used
@@ -532,6 +532,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             string most_recent_use = uri_obj["most_recent_use"].GetString();
+            cout << "The request: " << itr->name.GetString() << " has most_recent_use: " << most_recent_use << endl;
 
             // Convertir el "most_recent_use" string a time_t
             struct tm tm;
@@ -540,6 +541,9 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
                 // Actualizar la entrada menos recientemente usada
                 if (most_recent_use_time < oldest_time) {
+                    cout << "Old Key To Delete: " << key_to_delete << endl;
+                    cout << "Updating oldest time for key: " << itr->name.GetString() << endl;
+                    cout << "Oldest time: " << ctime(&oldest_time) << " with most_recent_use: " << most_recent_use << endl;
                     oldest_time = most_recent_use_time;
                     key_to_delete = itr->name.GetString();
                     least_recently_used_time = most_recent_use;
@@ -555,8 +559,12 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             int times_used = uri_obj["times_used"].GetInt();
+            cout << "The request: " << itr->name.GetString() << " has times_used: " << times_used << endl;
             // Actualizar la entrada menos usada
             if (times_used < least_used_count) {
+                cout << "Old Key To Delete: " << key_to_delete << endl;
+                cout << "Updating least used count for key: " << itr->name.GetString() << endl;
+                cout << "Least used count: " << least_used_count << " with times_used: " << times_used << endl;
                 least_used_count = times_used;
                 key_to_delete = itr->name.GetString();
             }
@@ -571,6 +579,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             string received = uri_obj["received"].GetString();
+            cout << "The request: " << itr->name.GetString() << " has received: " << received << endl;
 
             struct tm tm;
             if (strptime(received.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
@@ -578,6 +587,9 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
                 // Actualizar la entrada más antigua
                 if (received_time < oldest_time) {
+                    cout << "Old Key To Delete: " << key_to_delete << endl;
+                    cout << "Updating oldest time for key: " << itr->name.GetString() << endl;
+                    cout << "Oldest time: " << ctime(&oldest_time) << " with received: " << received << endl;
                     oldest_time = received_time;
                     key_to_delete = itr->name.GetString();
                     first_in_time = received;
@@ -594,6 +606,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             string most_recent_use = uri_obj["most_recent_use"].GetString();
+            cout << "The request: " << itr->name.GetString() << " has most_recent_use: " << most_recent_use << endl;
 
             struct tm tm;
             if (strptime(most_recent_use.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
@@ -601,6 +614,9 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
                 // Actualizar la entrada más recientemente usada
                 if (most_recent_use_time > earliest_time) {
+                    cout << "Old Key To Delete: " << key_to_delete << endl;
+                    cout << "Updating earliest time for key: " << itr->name.GetString() << endl;
+                    cout << "Earliest time: " << ctime(&earliest_time) << " with most_recent_use: " << most_recent_use << endl;
                     earliest_time = most_recent_use_time;
                     key_to_delete = itr->name.GetString();
                     most_recently_used_time = most_recent_use;
