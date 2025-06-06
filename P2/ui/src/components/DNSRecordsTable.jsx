@@ -9,7 +9,6 @@ import {
 } from "../services/domain";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 
-// Removed onEditRecord from props
 function DNSRecordsTable({ onDeleteRecord }) {
   const [localDnsRecords, setLocalDnsRecords] = useState([]);
   const [domains, setDomains] = useState({});
