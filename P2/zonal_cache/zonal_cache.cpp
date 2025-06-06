@@ -214,6 +214,64 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
     }
 }
 
+// Función para extraer la información de un subdominio o wildcard para el manejo de una solicitud HTTP.
+bool get_subdomain_info(subdomain_info &info, const string &host) {
+    shared_lock<shared_mutex> lock(subdomain_mutex);
+    string destination;
+    bool https;
+    vector<string> file_types;
+    if (subdomains.HasMember(host.c_str())) {
+        const Value& subdomain_obj = subdomains[host.c_str()];
+        if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
+            destination = subdomain_obj["destination"].GetString();
+            https = subdomain_obj["https"].GetBool();
+            file_types.clear();
+            for (const auto& file_type : subdomain_obj["fileTypes"].GetArray()) {
+                if (file_type.IsString()) {
+                    file_types.push_back(file_type.GetString());
+                }
+            }
+            info.auth_method = subdomain_obj.HasMember("authMethod") && subdomain_obj["authMethod"].IsString() ? subdomain_obj["authMethod"].GetString() : "none";
+            info.destination = destination;
+            info.https = https;
+            info.file_types = file_types;
+            info.cache_size = subdomain_obj.HasMember("cacheSize") && subdomain_obj["cacheSize"].IsUint64() ? subdomain_obj["cacheSize"].GetUint64() : 0;
+            info.ttl = subdomain_obj.HasMember("ttl") && subdomain_obj["ttl"].IsInt() ? subdomain_obj["ttl"].GetInt() : 0;
+            info.replacement_policy = subdomain_obj.HasMember("replacementPolicy") && subdomain_obj["replacementPolicy"].IsString() ? subdomain_obj["replacementPolicy"].GetString() : "LRU";
+            return true;
+        }
+        return false;
+    } else {
+        lock.unlock();
+        shared_lock<shared_mutex> lock(wildcard_mutex);
+        const string wildcard = check_wildcard(host);
+        if (!wildcard.empty()){
+            cout << "\033[0;35mWildcard found: " << wildcard << "\033[0m" << endl;
+            const Value& wildcard_obj = wildcards[wildcard.c_str()];
+            if (wildcard_obj.HasMember("destination") && wildcard_obj["destination"].IsString()) {
+                destination = wildcard_obj["destination"].GetString();
+                https = wildcard_obj["https"].GetBool();
+                file_types.clear();
+                for (const auto& file_type : wildcard_obj["fileTypes"].GetArray()) {
+                    if (file_type.IsString()) {
+                        file_types.push_back(file_type.GetString());
+                    }
+                }
+                info.auth_method = wildcard_obj.HasMember("authMethod") && wildcard_obj["authMethod"].IsString() ? wildcard_obj["authMethod"].GetString() : "none";
+                info.destination = destination;
+                info.https = https;
+                info.file_types = file_types;
+                info.cache_size = wildcard_obj.HasMember("cacheSize") && wildcard_obj["cacheSize"].IsUint64() ? wildcard_obj["cacheSize"].GetUint64() : 0;
+                info.ttl = wildcard_obj.HasMember("ttl") && wildcard_obj["ttl"].IsInt() ? wildcard_obj["ttl"].GetInt() : 0;
+                info.replacement_policy = wildcard_obj.HasMember("replacementPolicy") && wildcard_obj["replacementPolicy"].IsString() ? wildcard_obj["replacementPolicy"].GetString() : "LRU";
+                info.wildcard = wildcard;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // Función para extraer el token de las cookies de la solicitud HTTP.
 string get_token_from_cookies(const std::string &cookies) {
     const string key = "token=";
@@ -328,62 +386,36 @@ string hash_string(const string& input) {
 }
 
 // Función que autentica una solicitud HTTP entrante.
-bool authenticate_request(const int &client_socket, const HttpRequest &request, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
+bool authenticate_request(const int &client_socket, const HttpRequest &request, subdomain_info &info, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
     auto host_it = request.headers.find("host");
     if (host_it != request.headers.end()) {
-        cout << "\033[0;36mPRINT 1: Host header found: " << host_it->second << "\033[0m" << endl;
+        cout << "\033[1;36mSTEP 1: Host header found: " << host_it->second << "\033[0m" << endl;
         // Obtener el host
         const string &host = host_it->second;
-        shared_lock<shared_mutex> lock(subdomain_mutex);
-        string authMethod;
-        string wildcard;
         // Verificar si el host es un subdominio registrado en el objeto subdomains.
-        if (subdomains.HasMember(host.c_str()) && subdomains[host.c_str()].IsObject()) {
-            const Value& subdomain_obj = subdomains[host.c_str()];
-            if (subdomain_obj.HasMember("authMethod") && subdomain_obj["authMethod"].IsString()) {
-                // Obtener el método de autenticación del subdominio.
-                authMethod = subdomain_obj["authMethod"].GetString();
-            } else {
-                cerr << "\033[0;31mAuth method not found in subdomain object.\033[0m" << endl;
-                // Enviar respuesta HTTP 401 Unauthorized
-                send_http_error_response(client_socket, "Not Found", 404);
-                return false;
-            }
-        } else {
-            shared_lock<shared_mutex> wildcard_lock(wildcard_mutex);
-            wildcard = check_wildcard(host);
-            if (!wildcard.empty()) {
-                cout << "\033[0;35mPRINT 1.5: Wildcard found: " << wildcard << "\033[0m" << endl;
-                // Si se encuentra un wildcard, se obtiene el método de autenticación del wildcard.
-                const Value& wildcard_obj = wildcards[wildcard.c_str()];
-                if (wildcard_obj.HasMember("authMethod") && wildcard_obj["authMethod"].IsString()) {
-                    authMethod = wildcard_obj["authMethod"].GetString();
-                } else {
-                    cerr << "\033[0;31mAuth method not found in wildcard object.\033[0m" << endl;
-                    // Enviar respuesta HTTP 401 Unauthorized
-                    send_http_error_response(client_socket, "Not Found", 404);
-                    return false;
-                }
-            } else {            
-                cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
-                // Enviar respuesta HTTP 401 Unauthorized
-                send_http_error_response(client_socket, "Not Found", 404);
-                return false;
-            }
+        // Se guarda el resultado en el objeto info.
+        bool exists = get_subdomain_info(info, host);
+        if (!exists) {
+            cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
+            // Enviar respuesta HTTP 401 Unauthorized
+            send_http_error_response(client_socket, "Not Found", 404);
+            return false;
         }
-        lock.unlock();
-        if (authMethod == "none") {
+        string auth_method = info.auth_method;
+        string wildcard = info.wildcard;
+        cout << "\033[1;36mSTEP 1: Auth method found: " << auth_method << "\033[0m" << endl;
+        if (auth_method == "none") {
             // Si no hay autenticación, se permite la solicitud.
             return true;
-        } else if (authMethod == "user-password") {
+        } else if (auth_method == "user-password") {
             // Si el método de autenticación es user-password, se verifica si hay un cookie con el token de autenticación.
             auto it = request.headers.find("cookie");
             if (it != request.headers.end()) {
-                cout << "\033[0;34mPRINT 3: Cookie header found.\033[0m" << endl;
                 const string &cookies = it->second;
                 string token = get_token_from_cookies(cookies);
                 if (!token.empty()) {
-                    // Si se encuentra el token, se envía una solicitud al Rest API para validarlo.
+                    cout << "\033[1;36mSTEP 3: Token Cookie found.\033[0m" << endl;
+                    // Paso 3: Si se encuentra el token, se envía una solicitud al Rest API para validarlo.
                     string url = rest_api + "/auth/validate";
                     unordered_map<string, string> headers_map = {
                         {"Content-Type", "application/json"},
@@ -396,20 +428,23 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                     memory_struct * response = send_https_request(url.c_str(), NULL, 0, headers_map, true, "GET", false);
                     if (response && response->status_code == 200) {
                         // Si la respuesta es válida, se autentica la solicitud.
-                        cout << "\033[1;32mRequest authenticated successfully.\033[0m" << endl << flush;
+                        cout << "\033[1;32mSTEP 4: Request authenticated successfully.\033[0m" << endl << flush;
                         delete response;
                         return true;
                     }
                     delete response;
                 }
-            } else if (request.request.uri.find("/_auth/callback") != string::npos) {
-                cout << "\033[0;36mPRINT 2: Auth callback found in URI.\033[0m" << endl;
+            }
+            // Paso 2: Si no se encuentra el token, se verifica si hay un query parameter "token" en la URI.
+            // Este viene en el callback de autenticación _auth/callback.
+            if (request.request.uri.find("/_auth/callback") != string::npos) {
+                cout << "\033[1;36mSTEP 2: Auth callback found in URI.\033[0m" << endl;
                 string token = get_query_parameter(request.request.uri, "token");
                 string next = url_decode(get_query_parameter(request.request.uri, "next"));
                 string exp = get_query_parameter(request.request.uri, "exp");
-                cout << "Token: " << token << endl;
-                cout << "Next: " << next << endl;
-                cout << "Exp: " << exp << endl;
+                cout << "\033[1;36mToken: " << token << "\033[0m" << endl;
+                cout << "\033[1;36mNext: " << next << "\033[0m" << endl;
+                cout << "\033[1;36mExp: " << exp << "\033[0m" <<endl;
                 // Enviar la respuesta con el Cookie al cliente por el socket.
                 string response = "HTTP/1.1 302 Found\r\n"
                                 "Location: " + next + "\r\n"
@@ -417,23 +452,25 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                                 "Connection: close\r\n"
                                 "Content-Length: 0\r\n"
                                 "\r\n";
-                cout << "\033[0;36mPRINT 2.5: \033[0m" << response << endl;
+                cout << "\033[1;36mSTEP 2: \033[0m" << response << endl;
                 send(client_socket, response.c_str(), response.size(), 0);
                 return false;
             }
-            // Hay que autenticar. Se redirige al usuario a la página de login.
+            // Paso 1: Hay que autenticar. Se redirige al usuario a la página de login.
             string scheme = https ? "https://" : "http://";
             string url = scheme + host + request.request.uri;
             string url_encoded = url_encode(url);
-            string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + authMethod + (!wildcard.empty() ? ("&wildcard=" + url_encode(wildcard)) : "");
+            string redirect_url = vercel_ui + "/login?subdomain=" + url_encoded + "&authMethod=" + auth_method + (!wildcard.empty() ? ("&wildcard=" + url_encode(wildcard)) : "");
             string response = "HTTP/1.1 302 Found\r\n"
                                 "Location: " + redirect_url + "\r\n"
                                 "Connection: close\r\n"
                                 "Content-Length: 0\r\n"
                                 "\r\n";
+            cout << "\033[1;36mSTEP 1: Redirecting to login page: " << redirect_url << "\033[0m" << endl;
             send(client_socket, response.c_str(), response.size(), 0);
             return false;
-        } else if (authMethod == "api-keys") {
+        } else if (auth_method == "api-keys") {
+            // Si el método de autenticación es api-keys, se verifica si hay un header "x-api-key" en la solicitud.
             auto it = request.headers.find("x-api-key");
             if (it != request.headers.end()) {
                 const string auth_api_key = "{\"apiKey\": \"" + it->second + "\", \"subdomain\": \"" + host + (!wildcard.empty() ? ("\", \"wildcard\": \"" + wildcard) : "") +"\"}";
@@ -465,7 +502,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 return false;
             }
         } else {
-            cerr << "\033[1;31mUnknown authentication method: " << authMethod << "\033[0m" << endl;
+            cerr << "\033[1;31mUnknown authentication method: " << auth_method << "\033[0m" << endl;
             // Enviar respuesta HTTP 500 Internal Server Error
             send_http_error_response(client_socket, "Internal Server Error", 500);
             return false;
@@ -588,53 +625,15 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 }
 
 // Función para agregar un URI al caché de un host específico.
-void add_to_cache_by_host(const string& host, const string& key, const string& filename, size_t size) {
+void add_to_cache_by_host(const string& host, const subdomain_info &info, const string& key, const string& filename, size_t size) {
     // Adquirir un bloqueo de lectura compartida para acceder a los subdominios
-    int ttl;
-    uint64_t cache_size;
-    string replacement_policy;
+    int ttl = info.ttl;
+    uint64_t cache_size = info.cache_size;
+    string replacement_policy = info.replacement_policy;
+    cout << "\033[1;33mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
+    cout << "\033[1;33mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
+    cout << "\033[1;33mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
 
-    shared_lock<shared_mutex> read_lock(subdomain_mutex);
-    if (subdomains.HasMember(host.c_str())) {
-        // Si el host está en los subdominios, se obtiene la información del subdominio.
-        const Value& subdomain_object = subdomains[host.c_str()];
-        // Leer campo de TTL
-        ttl = subdomain_object["ttl"].GetInt();
-        cout << "\033[1;33mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
-
-        // Leer tamaño de caché
-        cache_size = subdomain_object["cacheSize"].GetUint64();
-        cout << "\033[1;33mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
-
-        // Leer política de reemplazo
-        replacement_policy = subdomain_object["replacementPolicy"].GetString();
-        cout << "\033[1;33mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
-    } else {
-        // Si el host no está en los subdominios, se busca en los wildcards.
-        shared_lock<shared_mutex> wildcard_lock(wildcard_mutex);
-        string wildcard = check_wildcard(host);
-        if (!wildcard.empty()) {
-            cout << "\033[0;35mWildcard found: " << wildcard << "\033[0m" << endl;
-            // Si se encuentra un wildcard, se obtiene el método de autenticación del wildcard.
-            const Value& wildcard_obj = wildcards[wildcard.c_str()];
-            // Leer campo de TTL
-            ttl = wildcard_obj["ttl"].GetInt();
-            cout << "\033[1;35mTTL for host " << host << ": " << ttl << "\033[0m" << endl;
-
-            // Leer tamaño de caché
-            cache_size = wildcard_obj["cacheSize"].GetUint64();
-            cout << "\033[1;35mCache size for host " << host << ": " << cache_size << "\033[0m" << endl;
-
-            // Leer política de reemplazo
-            replacement_policy = wildcard_obj["replacementPolicy"].GetString();
-            cout << "\033[1;35mReplacement policy for host " << host << ": " << replacement_policy << "\033[0m" << endl;
-        } else {            
-            cerr << "\033[0;35mSubdomain not found: failed to cache\033[0m" << endl;
-            return;
-        }
-    }
-    read_lock.unlock();
-    
     // Adquirir un bloqueo exclusivo para escribir en la caché
     unique_lock<shared_mutex> write_lock(cache_mutex);
 
@@ -732,17 +731,20 @@ string extract_host(const string &url) {
     return url.substr(0, start);
 }
 
-bool get_response(const int &client_socket, HttpRequest request ){
+bool get_response(const int &client_socket, HttpRequest request, const subdomain_info &info ){
     const string host = request.headers.at("host");
+    const string destination = info.destination;
+    const bool https = info.https;
+    const vector<string> &file_types = info.file_types;
     if (cache.HasMember(host.c_str())) {
         Value& host_object = cache[host.c_str()];
         cout << "Host object found in cache." << endl;
-        cout << "Request URI: " << request.request.method << request.request.uri << endl;
+        cout << "Request URI: " << request.request.method << destination << request.request.uri << endl;
         
-        const string cache_key = (request.request.method + "-" + request.request.uri);
+        const string cache_key = (request.request.method + "-" + destination + request.request.uri);
         Value& requests_object = host_object["requests"];
         if (requests_object.HasMember(cache_key.c_str())) {
-            cout << "URI object found in cache." << endl;
+            cout << "\033[1;33mURI object found in cache.\033[0m" << endl;
             Value& entry = requests_object[cache_key.c_str()];
             
             // Revisar la cache para ver si el request está en el cache.
@@ -751,11 +753,11 @@ bool get_response(const int &client_socket, HttpRequest request ){
             ifstream file(filepath, ios::binary | ios::ate);
             
             if (!file.is_open()) {
-                cerr << "Failed to open file: " << filepath << endl;
+                cerr << "\033[1;33mFailed to open file: " << filepath << "\033[0m" << endl;
                 if (file.fail()) {
-                    cerr << "File stream failed. Possible reasons: file does not exist, insufficient permissions, or invalid path." << endl;
+                    cerr << "\033[1;33mFile stream failed. Possible reasons: file does not exist, insufficient permissions, or invalid path.\033[0m" << endl;
                 }
-                cerr << "Error: " << strerror(errno) << endl; // Prints the specific error message
+                cerr << "\033[1;33mError: " << strerror(errno) << "\033[0m" << endl; // Prints the specific error message
                 return false;
             }
 
@@ -765,7 +767,7 @@ bool get_response(const int &client_socket, HttpRequest request ){
             vector<char> content(size);
             
             if (file.read(content.data(), size)) {
-                cout << "Read " << size << " bytes from " << filepath << endl;
+                cout << "\033[1;33mRead " << size << " bytes from " << filepath << "\033[0m" << endl;
                 // Check if the entry is still valid based on time_to_live
                 auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
                 string currentTimestamp = ctime(&now);
@@ -785,52 +787,12 @@ bool get_response(const int &client_socket, HttpRequest request ){
                 send(client_socket, content.data(), size, 0);
                 return true;
             } else {
-                cerr << "Failed to read cache file: " << filepath << endl;
+                cerr << "Failed to read cache file: " << filepath << "\033[0m" << endl;
                 return false;
             }
         } 
     }
     // Si no está en el cache, se hace una solicitud al destino.
-    string destination;
-    bool https;
-    vector<string> file_types;
-    {
-        shared_lock<shared_mutex> lock(subdomain_mutex);
-        if (subdomains.HasMember(host.c_str())) {
-            const Value& subdomain_obj = subdomains[host.c_str()];
-            if (subdomain_obj.HasMember("destination") && subdomain_obj["destination"].IsString()) {
-                destination = subdomain_obj["destination"].GetString();
-                https = subdomain_obj["https"].GetBool();
-                file_types.clear();
-                for (const auto& file_type : subdomain_obj["fileTypes"].GetArray()) {
-                    if (file_type.IsString()) {
-                        file_types.push_back(file_type.GetString());
-                    }
-                }
-            }
-        } else {
-            lock.unlock();
-            shared_lock<shared_mutex> lock(wildcard_mutex);
-            const string wildcard = check_wildcard(host);
-            if (!wildcard.empty()){
-                cout << "\033[0;35mWildcard found: " << wildcard << "\033[0m" << endl;
-                const Value& wildcard_obj = wildcards[wildcard.c_str()];
-                if (wildcard_obj.HasMember("destination") && wildcard_obj["destination"].IsString()) {
-                    destination = wildcard_obj["destination"].GetString();
-                    https = wildcard_obj["https"].GetBool();
-                    file_types.clear();
-                    for (const auto& file_type : wildcard_obj["fileTypes"].GetArray()) {
-                        if (file_type.IsString()) {
-                            file_types.push_back(file_type.GetString());
-                        }
-                    }
-                }
-            } else {
-                cerr << "Host not found in subdomains." << endl;
-                return false;
-            }
-        }
-    }
     string url = destination + request.request.uri;
     cout << "Fetching from URL: " << url << endl;
     request.headers["host"] = destination;
@@ -839,16 +801,6 @@ bool get_response(const int &client_socket, HttpRequest request ){
     if (response) {
         cout << "Response received. Status code: " << response->status_code << endl;
         string response_str = build_http_response(response);
-        // HttpResponse http_response;
-        // try {
-        //     http_response = parse_http_response(response->memory, response->size);
-        // } catch (const exception &e) {
-        //     cerr << "Error parsing HTTP response: " << e.what() << endl;
-        //     send_http_error_response(client_socket, "Internal Server Error", 500);
-        //     response->headers(response->memory);
-        //     response->headers(response);
-        //     return false;
-        // }
         auto it = response->headers.find("content-type");
         if (it != response->headers.end()) {
             string content_type_header = it->second;
@@ -883,15 +835,15 @@ bool get_response(const int &client_socket, HttpRequest request ){
                     cout << "Response of size " << response_str.length() << " saved to cache as: " << filename << endl;
 
                     // Agregar a la cache
-                    add_to_cache_by_host(host, request.request.method + "-" + url, filename, response_str.length());
+                    add_to_cache_by_host(host, info, request.request.method + "-" + url, filename, response_str.length());
                 } else {
                     perror("Failed to open cache file for writing");
                 }
             } else {
-                cerr << "Content-Type not allowed: " << content_type << endl;
+                cerr << "Content-Type not allowed: " << content_type << "\033[0m" << endl;
             }
         } else {
-            cerr << "Content-Type header not found in response." << endl;
+            cerr << "Content-Type header not found in response.\033[0m" << endl;
         }
         send(client_socket, response_str.c_str(), response_str.length(), 0);
         delete response;
@@ -930,13 +882,14 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 send_http_error_response(client_socket, "Bad Request", 400);
                 break;
             }
-            bool authenticated = authenticate_request(client_socket, request, rest_api, app_id, api_key, vercel_ui, false);
+            subdomain_info info;
+            bool authenticated = authenticate_request(client_socket, request, info, rest_api, app_id, api_key, vercel_ui, false);
             if (!authenticated) {
                 // Si no está autenticado, salir, porque la respuesta ya se envió.
                 break;
             }
 
-            const bool set_response = get_response(client_socket, request);
+            const bool set_response = get_response(client_socket, request, info);
             if (!set_response) {
                 // Si no se pudo obtener la respuesta, enviar un error.
                 send_http_error_response(client_socket, "Internal Server Error", 500);

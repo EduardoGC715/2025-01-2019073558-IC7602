@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -std=c++20 -g -Wall -I.
 UNIT_TEST = -DUNIT_TEST
-all: zonal_cache test
+all: zonal_cache
 
 
 zonal_cache: zonal_cache.cpp http_client.cpp
