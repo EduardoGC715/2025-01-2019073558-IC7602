@@ -5,6 +5,9 @@
 #include <string>
 #include "httpparser/request.h"
 #include "httpparser/response.h"
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 using namespace std;
 using namespace httpparser;
 
@@ -46,6 +49,10 @@ struct HttpResponse {
 memory_struct *send_https_request( const string &url, const char *data, int length, unordered_map<string, string> headers_map, bool use_https, const string& method, bool write_headers = false);
 HttpRequest parse_http_request(const char *request_buffer, size_t request_size);
 HttpResponse parse_http_response(const char *response_buffer, size_t response_size);
-void send_http_error_response (int client_socket, const string &error_message, int status_code);
+void send_http_error_response (int client_socket, const string &error_message, int status_code, bool is_ssl = false, SSL* ssl = nullptr);
+void send_http_response(int client_socket, const char *response, size_t response_size, bool is_ssl = false, SSL* ssl = nullptr);
 string build_http_response(const memory_struct *response_mem);
+SSL_CTX *create_ssl_context();
+void configure_ssl_context(SSL_CTX *ctx);
+
 #endif // HTTP_CLIENT_H

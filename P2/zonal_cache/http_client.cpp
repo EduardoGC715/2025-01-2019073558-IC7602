@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <cctype>
 #include <stdexcept>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 using namespace httpparser;
 
@@ -231,12 +233,61 @@ string build_http_response(const memory_struct * response_mem) {
 }
 
 // Enviar una respuesta HTTP de error al cliente
-void send_http_error_response (int client_socket, const std::string &error_message, int status_code) {
+void send_http_error_response (int client_socket, const std::string &error_message, int status_code, bool is_ssl, SSL* ssl) {
     std::string response = "HTTP/1.1 " + std::to_string(status_code) + " Error\r\n"
                            "Content-Type: text/plain\r\n"
                            "Content-Length: " + std::to_string(error_message.size()) + "\r\n"
                            "\r\n" +
                            error_message;
-    send(client_socket, response.c_str(), response.size(), 0);
+    if (is_ssl && ssl) {
+        // Si se usa SSL, usar SSL_write
+        SSL_write(ssl, response.c_str(), response.size());
+    } else {
+        // Si no se usa SSL, usar send
+        send(client_socket, response.c_str(), response.size(), 0);
+    }
+}
+
+void send_http_response(int client_socket, const char * response, size_t response_size, bool is_ssl, SSL* ssl) {
+    if (is_ssl && ssl) {
+        // Si se usa SSL, usar SSL_write
+        SSL_write(ssl, response, response_size);
+    } else {
+        // Si no se usa SSL, usar send
+        send(client_socket, response, response_size, 0);
+    }
+}
+
+// Funciones para manejar SSL/TLS
+// Obtenidas de: https://github.com/openssl/openssl/wiki/Simple_TLS_Server
+// Función para crear un contexto SSL.
+SSL_CTX *create_ssl_context() {
+    const SSL_METHOD *method;
+    SSL_CTX *ctx;
+
+    method = TLS_server_method();
+
+    ctx = SSL_CTX_new(method);
+    if (!ctx) {
+        perror("Unable to create SSL context");
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    return ctx;
+}
+
+// Función para configurar el contexto SSL con el certificado y la clave privada.
+void configure_ssl_context(SSL_CTX *ctx) {
+    /* Set the key and cert */
+    if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0 ) {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
 }
 #endif

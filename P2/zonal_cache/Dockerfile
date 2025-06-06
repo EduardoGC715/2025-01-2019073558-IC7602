@@ -19,6 +19,14 @@ RUN mkdir -p /app/subdomain_caches
 
 WORKDIR /app
 
+RUN openssl req \
+  -newkey rsa:2048 \
+  -nodes \
+  -keyout key.pem \
+  -x509 \
+  -days 365 \
+  -out cert.pem \
+  -subj "/C=US/ST=Florida/L=Miami/O=Twins/OU=Software/CN=redesproject"
 
 COPY ./httpparser/ /app/httpparser/
 COPY ./rapidjson/ /app/rapidjson/

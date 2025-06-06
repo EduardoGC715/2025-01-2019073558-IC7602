@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <curl/curl.h>
@@ -26,11 +27,14 @@
 #include <vector>
 #include <ctime>
 #include <filesystem>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 using namespace std;
 using namespace rapidjson;
 
 #define HTTP_PORT 80
+#define HTTPS_PORT 443
 #define REQUEST_BUFFER_SIZE 8192
 #define CACHE_FOLDER "subdomain_caches/"
 // Referencias para threads:
@@ -386,7 +390,7 @@ string hash_string(const string& input) {
 }
 
 // Función que autentica una solicitud HTTP entrante.
-bool authenticate_request(const int &client_socket, const HttpRequest &request, subdomain_info &info, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https = false) {
+bool authenticate_request(const int &client_socket, const HttpRequest &request, subdomain_info &info, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, bool https, const bool is_ssl, SSL* ssl) {
     auto host_it = request.headers.find("host");
     if (host_it != request.headers.end()) {
         cout << "\033[1;36mSTEP 1: Host header found: " << host_it->second << "\033[0m" << endl;
@@ -398,7 +402,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         if (!exists) {
             cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
             // Enviar respuesta HTTP 401 Unauthorized
-            send_http_error_response(client_socket, "Not Found", 404);
+            send_http_error_response(client_socket, "Not Found", 404, is_ssl, ssl);
             return false;
         }
         string auth_method = info.auth_method;
@@ -453,7 +457,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                                 "Content-Length: 0\r\n"
                                 "\r\n";
                 cout << "\033[1;36mSTEP 2: \033[0m" << response << endl;
-                send(client_socket, response.c_str(), response.size(), 0);
+                send_http_response(client_socket, response.c_str(), response.size(), is_ssl, ssl);
                 return false;
             }
             // Paso 1: Hay que autenticar. Se redirige al usuario a la página de login.
@@ -467,7 +471,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                                 "Content-Length: 0\r\n"
                                 "\r\n";
             cout << "\033[1;36mSTEP 1: Redirecting to login page: " << redirect_url << "\033[0m" << endl;
-            send(client_socket, response.c_str(), response.size(), 0);
+            send_http_response(client_socket, response.c_str(), response.size(), is_ssl, ssl);
             return false;
         } else if (auth_method == "api-keys") {
             // Si el método de autenticación es api-keys, se verifica si hay un header "x-api-key" en la solicitud.
@@ -491,26 +495,26 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
                 } else {
                     cerr << "\033[1;31mAuthentication failed with API key.\033[0m" << endl;
                     // Enviar respuesta HTTP 401 Unauthorized
-                    send_http_error_response(client_socket, "Unauthorized", 401);
+                    send_http_error_response(client_socket, "Unauthorized", 401, is_ssl, ssl);
                     delete response;
                     return false;
                 }
             } else {
                 cerr << "\033[1;31mAPI key not found in request headers.\033[0m" << endl;
                 // Enviar respuesta HTTP 401 Unauthorized
-                send_http_error_response(client_socket, "Unauthorized", 401);
+                send_http_error_response(client_socket, "Unauthorized", 401, is_ssl, ssl);
                 return false;
             }
         } else {
             cerr << "\033[1;31mUnknown authentication method: " << auth_method << "\033[0m" << endl;
             // Enviar respuesta HTTP 500 Internal Server Error
-            send_http_error_response(client_socket, "Internal Server Error", 500);
+            send_http_error_response(client_socket, "Internal Server Error", 500, is_ssl, ssl);
             return false;
         }
     } 
     cerr << "\033[1;31mHost not found.\033[0m" << endl;
     // Enviar respuesta HTTP 401 Unauthorized
-    send_http_error_response(client_socket, "Bad Request", 400);
+    send_http_error_response(client_socket, "Bad Request", 400, is_ssl, ssl);
     return false;
 }
 
@@ -731,7 +735,7 @@ string extract_host(const string &url) {
     return url.substr(0, start);
 }
 
-bool get_response(const int &client_socket, HttpRequest request, const subdomain_info &info ){
+bool get_response(const int &client_socket, HttpRequest request, const subdomain_info &info, bool is_ssl, SSL* ssl) {
     const string host = request.headers.at("host");
     const string destination = info.destination;
     const bool https = info.https;
@@ -784,7 +788,7 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
                     // If times_used doesn't exist or is not an integer, initialize it
                     entry.AddMember("times_used", 1, allocator);
                 }
-                send(client_socket, content.data(), size, 0);
+                send_http_response(client_socket, content.data(), size, is_ssl, ssl);
                 return true;
             } else {
                 cerr << "Failed to read cache file: " << filepath << "\033[0m" << endl;
@@ -845,7 +849,7 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
         } else {
             cerr << "Content-Type header not found in response.\033[0m" << endl;
         }
-        send(client_socket, response_str.c_str(), response_str.length(), 0);
+        send_http_response(client_socket, response_str.c_str(), response_str.length(), is_ssl, ssl);
         delete response;
         return true;
     }
@@ -862,6 +866,9 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
         close(client_socket);
         return;
     }
+
+    bool is_ssl = false;
+    SSL* ssl = nullptr;
     // Variable para determinar si la conexión debe mantenerse viva.
     // Se establece con el header de Connection: keep-alive
     // Si no se encuentra el header, se cierra la conexión después de enviar la respuesta.
@@ -879,20 +886,20 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
                 request = parse_http_request(request_buffer, bytes_received);
             } catch (const exception &e) {
                 cerr << "Error parsing HTTP request: " << e.what() << endl;
-                send_http_error_response(client_socket, "Bad Request", 400);
+                send_http_error_response(client_socket, "Bad Request", 400, is_ssl, ssl);
                 break;
             }
             subdomain_info info;
-            bool authenticated = authenticate_request(client_socket, request, info, rest_api, app_id, api_key, vercel_ui, false);
+            bool authenticated = authenticate_request(client_socket, request, info, rest_api, app_id, api_key, vercel_ui, false, is_ssl, ssl);
             if (!authenticated) {
                 // Si no está autenticado, salir, porque la respuesta ya se envió.
                 break;
             }
 
-            const bool set_response = get_response(client_socket, request, info);
+            const bool set_response = get_response(client_socket, request, info, is_ssl, ssl);
             if (!set_response) {
                 // Si no se pudo obtener la respuesta, enviar un error.
-                send_http_error_response(client_socket, "Internal Server Error", 500);
+                send_http_error_response(client_socket, "Internal Server Error", 500, is_ssl, ssl);
                 break;
             }
             if (request.request.keepAlive) {
@@ -900,15 +907,6 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             } else {
                 keep_alive = false;
             }
-            
-            // // Enviar respuesta HTTP 200 OK
-            // string response = "HTTP/1.1 200 OK\r\n"
-            //                     "Content-Type: application/json\r\n"
-            //                     "Content-Length: " + to_string(37) + "\r\n"
-            //                     "\r\n" +
-            //                     "{\"message\": \"Zonal cache is running\"}";
-            // send(client_socket, response.c_str(), response.size(), 0);
-            cout << endl;
         } else {
             perror("recv failed\n");
             break;
@@ -917,6 +915,73 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
     close(client_socket);
     free(request_buffer);
 }
+
+// Función para procesar una solicitud HTTPS entrante.
+// Lectura por SSL basado en: https://github.com/openssl/openssl/blob/master/demos/sslecho/main.c
+void handle_https_request(const int client_socket, const string &rest_api, const string &app_id, const string &api_key, const string &vercel_ui, SSL *ssl) {
+    cout << "Handling HTTPS request on socket: " << client_socket << endl;
+
+    // Buffer para almacenar la solicitud HTTP entrante.
+    char * request_buffer = (char *) malloc(REQUEST_BUFFER_SIZE * sizeof(char));
+    if (!request_buffer) {
+        perror("malloc failed");
+        close(client_socket);
+        return;
+    }
+
+    bool is_ssl = true; // Indica que es una solicitud HTTPS.
+
+    // Variable para determinar si la conexión debe mantenerse viva.
+    // Se establece con el header de Connection: keep-alive
+    // Si no se encuentra el header, se cierra la conexión después de enviar la respuesta.
+    bool keep_alive = false;
+    do {
+        // Recibir la solicitud HTTPS del cliente.
+        int bytes_received = SSL_read(ssl, request_buffer, REQUEST_BUFFER_SIZE - 1);
+        if (bytes_received > 0){
+            request_buffer[bytes_received] = '\0'; // Null-terminate la request
+            cout << "Received request: " << request_buffer << endl;
+
+            // Parsear la HTTP request
+            HttpRequest request;
+            try {
+                request = parse_http_request(request_buffer, bytes_received);
+            } catch (const exception &e) {
+                cerr << "Error parsing HTTP request: " << e.what() << endl;
+                send_http_error_response(client_socket, "Bad Request", 400, is_ssl, ssl);
+                break;
+            }
+            subdomain_info info;
+            bool authenticated = authenticate_request(client_socket, request, info, rest_api, app_id, api_key, vercel_ui, true, is_ssl, ssl);
+            if (!authenticated) {
+                // Si no está autenticado, salir, porque la respuesta ya se envió.
+                break;
+            }
+
+            const bool set_response = get_response(client_socket, request, info, is_ssl, ssl);
+            if (!set_response) {
+                // Si no se pudo obtener la respuesta, enviar un error.
+                send_http_error_response(client_socket, "Internal Server Error", 500, is_ssl, ssl);
+                break;
+            }
+            if (request.request.keepAlive) {
+                keep_alive = true;
+            } else {
+                keep_alive = false;
+            }
+            
+            cout << endl;
+        } else {
+            perror("recv failed\n");
+            break;
+        }
+    } while (keep_alive);
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    close(client_socket);
+    free(request_buffer);
+}
+
 // Referencias para sockets:
 // https://dev.to/jeffreythecoder/how-i-built-a-simple-http-server-from-scratch-using-c-739
 // Para env variables:
@@ -948,6 +1013,9 @@ int main() {
     const string api_key(api_key_env);
     const string vercel_ui(vercel_ui_env);
 
+    // Inicialización CURL
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+
     // Crear un thread para obtener los subdominios
     thread([&rest_api, &app_id, &api_key, fetch_interval]() {
             fetch_subdomains(rest_api, app_id, api_key, fetch_interval);
@@ -959,7 +1027,9 @@ int main() {
     // Abrir socket para escuchar solicitudes HTTP
     int socket_fd;
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    
+    int opt = 1;
+    setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(HTTP_PORT); // HTTP port
@@ -977,9 +1047,72 @@ int main() {
         return 1;
     }
 
-    cout << "Zonal cache is running on port " << HTTP_PORT << "...\n";
-    // Inicialización CURL
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+    cout << "Zonal cache (HTTP) is running on port " << HTTP_PORT << "...\n";
+
+    thread([&rest_api, &app_id, &api_key, &vercel_ui]() {
+        int https_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (https_socket_fd < 0) {
+            perror("Failed to create HTTPS socket");
+            return;
+        }
+
+        int opt = 1;
+        setsockopt(https_socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        struct sockaddr_in https_addr;
+        https_addr.sin_family = AF_INET;
+        https_addr.sin_port = htons(HTTPS_PORT);
+        https_addr.sin_addr.s_addr = INADDR_ANY;
+
+        if (bind(https_socket_fd, (struct sockaddr*)&https_addr, sizeof(https_addr)) < 0) {
+            perror("Bind failed (HTTPS)");
+            close(https_socket_fd);
+            return;
+        }
+
+        if (listen(https_socket_fd, 10) < 0) {
+            perror("Listen failed (HTTPS)");
+            close(https_socket_fd);
+            return;
+        }
+
+        cout << "Zonal cache (HTTPS) is running on port " << HTTPS_PORT << "..." << endl;
+
+        // Configurar OpenSSL para manejar conexiones HTTPS
+        SSL_CTX *ctx;
+        ctx = create_ssl_context();
+        configure_ssl_context(ctx);
+
+        while (true) {
+            struct sockaddr_in client_addr;
+            socklen_t client_len = sizeof(client_addr);
+
+            SSL *ssl;
+
+            int client_socket = accept(https_socket_fd, (struct sockaddr*)&client_addr, &client_len);
+            if (client_socket < 0) {
+                perror("Accept failed (HTTPS)");
+                continue;
+            }
+
+            ssl = SSL_new(ctx);
+            SSL_set_fd(ssl, client_socket);
+        
+            if (SSL_accept(ssl) > 0) {
+                thread([client_socket, &rest_api, &app_id, &api_key, &vercel_ui, ssl]() {
+                    handle_https_request(client_socket, rest_api, app_id, api_key, vercel_ui, ssl);
+                }).detach();
+            } else {
+                cerr << "SSL accept failed: " << SSL_get_error(ssl, SSL_accept(ssl)) << endl;
+                SSL_shutdown(ssl);
+                SSL_free(ssl);
+                close(client_socket);
+            }
+        }
+
+        close(https_socket_fd);
+    }).detach();
+
 
     while (1) {
         struct sockaddr_in client_addr;

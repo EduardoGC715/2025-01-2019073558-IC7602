@@ -14,7 +14,8 @@
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 #include "http_client.h"
-
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 typedef struct {
     char * data;
     int length;
