@@ -170,7 +170,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                 for (auto uri_itr = requests_object.MemberBegin(); uri_itr != requests_object.MemberEnd(); ) {
                     Value& uri_obj = uri_itr->value;
                 
-                    cout << "\033[0;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m\n";
+                    cout << "\033[1;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m\n";
                     
                     // Revisar si el TTL ya expiró
                     if (uri_obj.HasMember("time_to_live") && uri_obj["time_to_live"].IsString()) {
@@ -186,7 +186,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                             uri_obj["received"].SetNull();
                             uri_obj["time_to_live"].SetNull();
                             uri_itr = requests_object.RemoveMember(uri_itr);
-                            cout << "\033[0;31mRemoved expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
+                            cout << "\033[1;31mRemoved expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
                             // Liberar los bloqueos.
                             write_lock.unlock();
                             read_lock.lock();
@@ -202,7 +202,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                     read_lock.unlock();
                     unique_lock<shared_mutex> write_lock(cache_mutex);
 
-                    cout << "\033[0;31mRemoving empty host: " << host_itr->name.GetString() << "\033[0m" << endl;
+                    cout << "\033[1;31mRemoving empty host: " << host_itr->name.GetString() << "\033[0m" << endl;
                     host_itr = cache.RemoveMember(host_itr);
 
                     write_lock.unlock();
@@ -400,7 +400,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         // Se guarda el resultado en el objeto info.
         bool exists = get_subdomain_info(info, host);
         if (!exists) {
-            cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
+            cerr << "\033[1;31mSubdomain not found.\033[0m" << endl;
             // Enviar respuesta HTTP 401 Unauthorized
             send_http_error_response(client_socket, "Not Found", 404, is_ssl, ssl);
             return false;
@@ -824,10 +824,9 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
             }
             // Si el Content-Type es permitido, se guarda la respuesta en el cache.
             if (is_allowed) {
-                cout << "Content-Type is allowed." << endl;
+                cout << "\033[1;33mContent-Type is allowed.\033[0m" << endl;
                 // Guardar la respuesta en el cache.
                 string filename = hash_string(url + to_string(time(nullptr))) + ".ksh";
-                cout << filename << endl;
                 string directory = CACHE_FOLDER + host + "/";
                 // Crear el directorio
                 filesystem::create_directories(directory);
@@ -836,7 +835,7 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
                 if (out_file) {
                     out_file.write(response_str.c_str(), response_str.length());
                     out_file.close();
-                    cout << "Response of size " << response_str.length() << " saved to cache as: " << filename << endl;
+                    cout << "\033[1;33mResponse of size " << response_str.length() << " saved to cache as: " << filename << "\033[0m" << endl;
 
                     // Agregar a la cache
                     add_to_cache_by_host(host, info, request.request.method + "-" + url, filename, response_str.length());
@@ -907,6 +906,9 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             } else {
                 keep_alive = false;
             }
+        } else if (bytes_received == 0) {
+            cout << "Client disconnected normally." << endl;
+            break;
         } else {
             perror("recv failed\n");
             break;
@@ -938,7 +940,8 @@ void handle_https_request(const int client_socket, const string &rest_api, const
     do {
         // Recibir la solicitud HTTPS del cliente.
         int bytes_received = SSL_read(ssl, request_buffer, REQUEST_BUFFER_SIZE - 1);
-        if (bytes_received > 0){
+        int err = SSL_get_error(ssl, bytes_received);
+        if (err == SSL_ERROR_NONE && bytes_received > 0){
             request_buffer[bytes_received] = '\0'; // Null-terminate la request
             cout << "Received request: " << request_buffer << endl;
 
@@ -971,8 +974,17 @@ void handle_https_request(const int client_socket, const string &rest_api, const
             }
             
             cout << endl;
-        } else {
-            perror("recv failed\n");
+        } else if (err == SSL_ERROR_ZERO_RETURN) {
+            cout << "Client disconnected normally." << endl;
+            break;
+        } else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            cout << "SSL read operation would block, waiting for more data..." << endl;
+            continue;
+        } else if (err == SSL_ERROR_SYSCALL) {
+            perror("SSL read syscall error");
+            break;
+        } else if (err == SSL_ERROR_SSL) {
+            cerr << "SSL error occurred: " << ERR_error_string(ERR_get_error(), nullptr) << endl;
             break;
         }
     } while (keep_alive);
@@ -990,9 +1002,6 @@ void handle_https_request(const int client_socket, const string &rest_api, const
 #ifndef UNIT_TEST
 
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    
     filesystem::create_directories(CACHE_FOLDER);
 
     // Leer variables de entorno
@@ -1047,7 +1056,7 @@ int main() {
         return 1;
     }
 
-    cout << "Zonal cache (HTTP) is running on port " << HTTP_PORT << "...\n";
+    cout << "Zonal cache (HTTP) is running on port " << HTTP_PORT << "..." << endl;
 
     thread([&rest_api, &app_id, &api_key, &vercel_ui]() {
         int https_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
