@@ -79,7 +79,9 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       replacementPolicy,
       authMethod,
       apiKeys,
+      newApiKeys,
       users,
+      newUsers,
       https,
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
@@ -149,11 +151,12 @@ export const registerSubdomain = async (req: Request, res: Response) => {
 
     const hashedApiKeys: Record<string, string> = {};
     const createdApiKeys: Record<string, string> = {};
+    let usersMap: Record<string, string> = {};
 
     if (authMethod === "api-keys") {
       if (
-        !Array.isArray(req.body.newApiKeys) ||
-        req.body.newApiKeys.length === 0
+        !Array.isArray(newApiKeys) ||
+        newApiKeys.length === 0
       ) {
         res.status(400).json({
           message:
@@ -175,7 +178,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
         return;
       }
       // Generate & hash each new API key name
-      for (const nickname of req.body.newApiKeys as string[]) {
+      for (const nickname of newApiKeys as string[]) {
         if (!nickname || typeof nickname !== "string") {
           res.status(400).json({
             message:
@@ -189,39 +192,50 @@ export const registerSubdomain = async (req: Request, res: Response) => {
         createdApiKeys[rawKey] = nickname.trim();
       }
     } else if (authMethod === "user-password") {
+      // 1) Extrae newUsers
+      const newUsersObj = typeof newUsers === "object" && newUsers !== null ? (newUsers as Record<string, string>) : {};
+
+      // 2) Validaciones iniciales
+      if (Object.keys(newUsersObj).length === 0) {
+        res.status(400).json({
+          message:
+            'Debe proporcionar un objeto "newUsers" con los pares usuario/contraseña.',
+        });
+        return;
+      }
+
       if (
-        typeof users !== "object" ||
-        users === null ||
-        Array.isArray(users) ||
-        Object.keys(users).length === 0
+        typeof apiKeys === "object" &&
+        apiKeys !== null &&
+        !Array.isArray(apiKeys) &&
+        Object.keys(apiKeys).length > 0
       ) {
         res.status(400).json({
           message:
-            'Debe proporcionar usuarios cuando el método de autenticación sea por usuario y password"',
+            "La lista de API keys debe estar vacía cuando el método de autenticación sea usuario/contraseña",
         });
         return;
       }
-      if (Array.isArray(apiKeys) && apiKeys.length > 0) {
-        res.status(400).json({
-          message:
-            "La lista de API keys debe estar vacía cuando el método de autenticación sea por usuario y password",
-        });
-        return;
-      }
-      for (const [username, password] of Object.entries(users)) {
-        if (!username || typeof password !== "string") {
+
+      // 3) Validar cada nuevo usuario antes de hacer hash
+      for (const [username, plainPwd] of Object.entries(newUsersObj)) {
+        if (!username || typeof plainPwd !== "string" || plainPwd.length < 6) {
           res.status(400).json({
             message:
-              'Cada usuario debe tener un "username" y un "password" válidos',
+              'Cada nuevo usuario debe tener un nombre válido y una contraseña (mín. 6 caracteres)',
           });
           return;
         }
+      }
 
+      // 4) Una vez validados, hacer el hash y poblar usersMap
+      usersMap = {}; 
+      for (const [username, plainPwd] of Object.entries(newUsersObj)) {
         const salt = bcrypt.genSaltSync(10);
-        users[username] = bcrypt.hashSync(password, salt);
+        usersMap[username] = bcrypt.hashSync(plainPwd, salt);
       }
     } else if (!authMethod || authMethod === "none") {
-      if (
+              if (
         (Array.isArray(apiKeys) && apiKeys.length > 0) ||
         (Array.isArray(users) && users.length > 0)
       ) {
@@ -238,6 +252,9 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       });
       return;
     }
+
+
+
 
     const isWildcard = wildcardRe.test(subdomain);
     const cleanedSub = isWildcard
@@ -291,7 +308,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       replacementPolicy,
       authMethod,
       apiKeys: authMethod === "api-keys" ? hashedApiKeys : {},
-      users: authMethod === "user-password" ? users : {},
+      users: authMethod === "user-password" ? usersMap : {},
       https,
       destination,
     };
@@ -319,6 +336,7 @@ export const registerSubdomain = async (req: Request, res: Response) => {
 
 export const updateSubdomain = async (req: Request, res: Response) => {
   try {
+    // Revisar si la sesión es válida
     const session = req.session;
     if (!session || !session.user) {
       res.status(401).json({ message: "Unauthorized" });
@@ -341,11 +359,13 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       destination,
     }: registerSubdomainRequestBody = req.body as registerSubdomainRequestBody;
 
+    // Validar que se proporcionen los parámetros necesarios
     if (typeof domain !== "string" || domain.trim() === "") {
       res.status(400).json({ message: "El dominio es requerido" });
       return;
     }
 
+    // Validar que el destino sea un dominio válido o una dirección IP
     if (
       !validator.isFQDN(destination, { require_tld: false }) &&
       !validator.isIP(destination)
@@ -354,6 +374,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    // Validar que el subdominio sea un FQDN válido o un wildcard
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     const isWildcard = wildcardRe.test(subdomain);
     const cleanedSub = isWildcard
@@ -366,38 +387,44 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       return;
     }
 
+    // Validar que el dominio completo sea un FQDN válido
     const fullDomain = subdomain === "" ? domain.trim() : `${subdomain.trim()}.${domain.trim()}`;
     if (!validator.isFQDN(fullDomain) && !wildcardRe.test(subdomain)) {
       res.status(400).json({ message: "Dominio inválido" });
       return;
     }
 
+    // Validar que cacheSize sea un número
     if (typeof cacheSize !== "number" || isNaN(cacheSize)) {
       res.status(400).json({ message: "El tamaño de caché debe ser un número válido" });
       return;
     }
 
+
+    // Validar que ttl sea un número positivo
     if (typeof ttl !== "number" || Number.isNaN(ttl) || ttl <= 0) {
       res.status(400).json({ message: "El Time to Live debe ser un número de milisegundos o una duración válida (ej. 5m, 1h)" });
       return;
     }
 
+    // Validar que https sea un booleano
     if (typeof https !== "boolean") {
       res.status(400).json({ message: "El campo useHttps debe ser true o false" });
       return;
     }
 
+    // Validar que replacementPolicy sea uno de los valores permitidos
     const allowedPolicies = ["LRU", "LFU", "FIFO", "MRU", "Random"];
     if (!allowedPolicies.includes(replacementPolicy)) {
       res.status(400).json({ message: `La política de reemplazo debe ser una de las siguientes: ${allowedPolicies.join(", ")}` });
       return;
     }
-    if (authMethod === "api-keys") {
+    if (authMethod === "api-keys") { // Validar que se proporcionen las API keys
       const existingKeysObj = typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys)
           ? (apiKeys as Record<string, string>)
           : {};
-      const newKeysArr = Array.isArray(req.body.newApiKeys) && req.body.newApiKeys !== null
-          ? (req.body.newApiKeys as string[])
+      const newKeysArr = Array.isArray(newApiKeys) && newApiKeys !== null
+          ? (newApiKeys as string[])
           : [];
 
       if (Object.keys(existingKeysObj).length === 0 && newKeysArr.length === 0) {
@@ -410,27 +437,27 @@ export const updateSubdomain = async (req: Request, res: Response) => {
         return;
       }
       
-    } else if (authMethod === "user-password") {
+    } else if (authMethod === "user-password") { // Validar que se proporcionen los usuarios
       const existingUsersObj = typeof users === "object" && users !== null && !Array.isArray(users) ? (users as Record<string, string>) : {};
-      const newUsersObj =  typeof (req.body.newUsers) === "object" && req.body.newUsers !== null ? (req.body.newUsers as Record<string, string>) : {};
+      const newUsersObj = typeof newUsers === "object" && newUsers !== null ? (newUsers as Record<string, string>) : {};
       
       if (
         Object.keys(existingUsersObj).length === 0 &&
         Object.keys(newUsersObj).length === 0
       ) {
-        res.status(400).json({ message: "Debe proporcionar usuarios existentes o nuevos con el método usuario/password"});
+        res.status(400).json({ message: "Debe proporcionar usuarios existentes o nuevos con el método usuario/contraseña"});
         return;
       }
       
       if (
         (typeof apiKeys === "object" && apiKeys !== null && !Array.isArray(apiKeys) && Object.keys(apiKeys).length > 0) ||
-        (Array.isArray(req.body.newApiKeys) &&
-          (req.body.newApiKeys as string[]).length > 0)
+        (Array.isArray(newApiKeys) &&
+          (newApiKeys as string[]).length > 0)
       ) {
-        res.status(400).json({ message: "La lista de API keys debe estar vacía cuando el método es usuario/password" });
+        res.status(400).json({ message: "La lista de API keys debe estar vacía cuando el método es usuario/contraseña" });
         return;
       }
-    } else if (!authMethod || authMethod === "none") {
+    } else if (!authMethod || authMethod === "none") { // Validar que no se proporcionen usuarios ni API keys
       if (
         (typeof apiKeys === "object" &&
           apiKeys !== null &&
@@ -454,15 +481,16 @@ export const updateSubdomain = async (req: Request, res: Response) => {
       });
       return;
     }
-
+    
     const existingUsersMap = (users as Record<string, string>) || {};
     const newUsersMap = (newUsers as Record<string, string>) || {};
     const usersMap: Record<string, string> = {};
+
     if (authMethod === "user-password") {
+      // Verificar que los usuarios existentes y nuevos sean válidos
       for (const [username, hashedPassword] of Object.entries(existingUsersMap)) {
         usersMap[username] = hashedPassword;
       }
-      // 2) Hash each new user/password pair and add
       for (const [username, plainPwd] of Object.entries(newUsersMap)) {
         if (!username || typeof plainPwd !== "string" || plainPwd.length < 6) {
           res.status(400).json({ message: 'Cada nuevo usuario debe tener un nombre válido y una contraseña (mín. 6 caracteres)'});
@@ -478,6 +506,7 @@ export const updateSubdomain = async (req: Request, res: Response) => {
     const createdApiKeys: Record<string, string> = {};
 
     if (authMethod === "api-keys") {
+      // Verificar que las API keys existentes y nuevas sean válidas
       for (const [alreadyHashedKey, name] of Object.entries(existingKeysMap)) {
         hashedApiKeys[alreadyHashedKey] = name;
       }
@@ -530,7 +559,7 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
 
     const { domain, subdomain } = req.params;
     if (!domain || !subdomain) {
-      res.status(400).json({ message: "Domain and subdomain are required" });
+      res.status(400).json({ message: "Se requiere un Dominio y Subdomino" });
       return;
     }
 
@@ -570,7 +599,7 @@ export const deleteSubdomain = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "Subdominio eliminado exitosamente" });
   } catch (error) {
-    console.error("Error deleting subdomain:", error);
+    console.error("Error eliminando subdominio:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -586,7 +615,7 @@ export const getSubdomainsByDomain = async (req: Request, res: Response) => {
     const domain = req.query.domain as string;
 
     if (!domain) {
-      res.status(400).json({ message: "Domain is required" });
+      res.status(400).json({ message: "Se requiere un Dominio" });
       return;
     }
 
@@ -594,14 +623,12 @@ export const getSubdomainsByDomain = async (req: Request, res: Response) => {
     const wildcardsSnapshot = await firestore.collection("wildcards").get();
     const result: Record<string, any> = {};
 
-    // 1) Regular subdomains
     subdomainsSnapshot.forEach((doc) => {
       if (doc.id === domain || doc.id.endsWith(`.${domain}`)) {
         result[doc.id] = doc.data();
       }
     });
 
-    // 2) Wildcard subdomains: prepend "*." when returning
     wildcardsSnapshot.forEach((doc) => {
       if (doc.id === domain || doc.id.endsWith(`.${domain}`)) {
         const key = doc.id === domain ? `*.${domain}` : `*.${doc.id}`;
