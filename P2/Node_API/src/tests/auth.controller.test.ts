@@ -4,7 +4,6 @@ import { registerUser, loginUser, loginSubdomainUser, loginSubdomainApiKey, logo
 import { firestore } from '../firebase';
 import bcrypt from 'bcryptjs';
 
-// Mock modules
 vi.mock('../firebase', () => ({
     firestore: {
         collection: vi.fn(() => ({
@@ -131,7 +130,6 @@ describe('Auth Controller', () => {
 
     describe('logoutUser', () => {
         it('se debe cerrar sesión exitosamente', async () => {
-            // Create a valid JWT token format
             const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uSWQiOiJ0ZXN0LXNlc3Npb24taWQifQ.signature';
 
             mockRequest = {

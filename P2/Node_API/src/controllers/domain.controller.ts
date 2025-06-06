@@ -128,15 +128,36 @@ export const deleteDomain = async (req: Request, res: Response) => {
       return;
     }
 
-    const flipped_domain = domain.trim().split(".").reverse().join("/");
-    const domainRef = database.ref(`domains/${flipped_domain}`);
-    await domainRef.remove();
+    const subdomainsSnapshot = await firestore.collection("subdomains").get();
+    const wildcardsSnapshot = await firestore.collection("wildcards").get();
+    const batch = firestore.batch();
 
-    // Eliminar de Firestore
-    await userDomainRef.delete();
+    subdomainsSnapshot.forEach((doc) => {
+      if (doc.id === domain || doc.id.endsWith(`.${domain}`)) {
+        batch.delete(doc.ref);
+      }
+    });
+
+    wildcardsSnapshot.forEach((doc) => {
+      if (doc.id === domain || doc.id.endsWith(`.${domain}`)) {
+        batch.delete(doc.ref);
+      }
+    });
+
+    const userSubdomainsSnapshot = await userDomainRef.collection("subdomains").get();
+    userSubdomainsSnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    const flipped_domain = domain.trim().split(".").reverse().join("/");
+    await database.ref(`domains/${flipped_domain}`).remove();
+
+    batch.delete(userDomainRef);
+
+    await batch.commit();
 
     res.status(200).json({
-      message: "Dominio eliminado exitosamente",
+      message: "Dominio y sus subdominios eliminados exitosamente",
       domain,
     });
   } catch (error) {
@@ -155,7 +176,6 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
   }
 
   try {
-
     const domainsSnapshot = await firestore
       .collection("users")
       .doc(session.user)
@@ -163,10 +183,11 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
       .where("validated", "==", false)
       .get();
 
-
     if (domainsSnapshot.empty) {
       console.log("No hay dominios para verificar");
-      res.status(200).json({ message: "No hay dominios pendientes de verificar" });
+      res
+        .status(200)
+        .json({ message: "No hay dominios pendientes de verificar" });
       return;
     }
 
@@ -177,7 +198,10 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
       const data = doc.data();
 
       if (!data?.validation) {
-        results[domain] = { verified: false, error: "Faltan datos de validación" };
+        results[domain] = {
+          verified: false,
+          error: "Faltan datos de validación",
+        };
         continue;
       }
 
@@ -188,7 +212,10 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
         const txtRecords: string[][] = await dns.resolveTxt(fullDomain);
 
         if (!txtRecords.length) {
-          results[domain] = { verified: false, error: "No se encontró el registro TXT" };
+          results[domain] = {
+            verified: false,
+            error: "No se encontró el registro TXT",
+          };
           continue;
         }
 
@@ -200,21 +227,22 @@ export const verifyDomainOwnership = async (req: Request, res: Response) => {
         }
 
         await doc.ref.update({ validated: true });
-        results[domain] = { verified: true, message: "Dominio verificado correctamente" };
-
+        results[domain] = {
+          verified: true,
+          message: "Dominio verificado correctamente",
+        };
       } catch (dnsError) {
         results[domain] = {
           verified: false,
-          error: "Error al resolver registro TXT"
+          error: "Error al resolver registro TXT",
         };
       }
     }
 
     res.status(200).json({
       message: "Proceso de verificación completado",
-      results
+      results,
     });
-
   } catch (err) {
     console.error("Error general en verificación:", err);
     res.status(500).json({ message: "Error interno del servidor" });

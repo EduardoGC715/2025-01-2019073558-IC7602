@@ -59,7 +59,7 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
       try {
         const result = await deleteDomain(deleteModal.record.domain);
         if (result.success) {
-          await refreshDomains(); // Refresh the domains list after deletion
+          await refreshDomains();
         } else {
           alert(result.message);
         }
