@@ -90,13 +90,44 @@ export const registerSubdomain = async (req: Request, res: Response) => {
       res.status(400).json({ message: "El dominio es requerido" });
       return;
     }
-    
-    if (
-      !validator.isFQDN(destination, { require_tld: false }) &&
-      !validator.isIP(destination)
-    ) {
-      res.status(400).json({ message: "Destino debe ser un nombre de dominio válido o una dirección IP." });
+
+    const destinationRegex = /^([^:]+)(:(\d{1,5}))?$/;
+    if (typeof destination !== "string") {
+      res
+        .status(400)
+        .json({ message: "Destino debe ser un string válida." });
       return;
+    }
+
+    const match = destination.match(destinationRegex);
+    if (!match) {
+      res
+        .status(400)
+        .json({ message: "Destino inválido." });
+      return;
+    }
+
+    const host = match[1];
+    const port = match[3];
+
+    const isValidHost =
+      validator.isFQDN(host, { require_tld: false }) ||
+      validator.isIP(host);
+    if (!isValidHost) {
+      res
+        .status(400)
+        .json({ message: "Host inválido: debe ser un dominio o IP." });
+      return;
+    }
+
+    if (port !== undefined) {
+      const portNum = Number(port);
+      if (!(portNum >= 1 && portNum <= 65535)) {
+        res
+          .status(400)
+          .json({ message: "Puerto inválido: debe estar entre 1 y 65535." });
+        return;
+      }
     }
 
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
@@ -366,14 +397,46 @@ export const updateSubdomain = async (req: Request, res: Response) => {
     }
 
     // Validar que el destino sea un dominio válido o una dirección IP
-    if (
-      !validator.isFQDN(destination, { require_tld: false }) &&
-      !validator.isIP(destination)
-    ) {
-      res.status(400).json({ message: "Destino debe ser un nombre de dominio válido o una dirección IP." });
+
+    const destinationRegex = /^([^:]+)(:(\d{1,5}))?$/;
+    if (typeof destination !== "string") {
+      res
+        .status(400)
+        .json({ message: "Destino debe ser un string válida." });
       return;
     }
 
+    const match = destination.match(destinationRegex);
+    if (!match) {
+      res
+        .status(400)
+        .json({ message: "Destino inválido." });
+      return;
+    }
+
+    const host = match[1];
+    const port = match[3];
+
+    const isValidHost =
+      validator.isFQDN(host, { require_tld: false }) ||
+      validator.isIP(host);
+    if (!isValidHost) {
+      res
+        .status(400)
+        .json({ message: "Host inválido: debe ser un dominio o IP." });
+      return;
+    }
+
+    if (port !== undefined) {
+      const portNum = Number(port);
+      if (!(portNum >= 1 && portNum <= 65535)) {
+        res
+          .status(400)
+          .json({ message: "Puerto inválido: debe estar entre 1 y 65535." });
+        return;
+      }
+    }
+    
     // Validar que el subdominio sea un FQDN válido o un wildcard
     const wildcardRe = /^(\*|\*\.[a-zA-Z0-9][a-zA-Z0-9-]*?)$/;
     const isWildcard = wildcardRe.test(subdomain);
