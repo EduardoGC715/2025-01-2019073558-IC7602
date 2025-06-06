@@ -12,7 +12,7 @@ countries = [
 vercel_ui = "https://vercelui-eight.vercel.app"
 vercel_api = "2025-01-2019073558-ic-7602.vercel.app"
 vercel_edge_config_id = "ecfg_ywndfxposwmc2jpmd6jv47mgjwji"
-fetch_interval = 3
+fetch_interval = 1
 
 # {
 #   id        = "us-east"
