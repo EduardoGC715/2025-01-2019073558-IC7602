@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Edit2,
-  Trash2,
-  RefreshCw,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { Trash2, RefreshCw } from "lucide-react"; // Removed Edit2
 import { dnsApi } from "../services/api";
 import {
   getUserDomains,
@@ -15,7 +9,8 @@ import {
 } from "../services/domain";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 
-function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
+// Removed onEditRecord from props
+function DNSRecordsTable({ onDeleteRecord }) {
   const [localDnsRecords, setLocalDnsRecords] = useState([]);
   const [domains, setDomains] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -164,7 +159,7 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                     <th className="px-4 py-2">Subdominios</th>
                     <th className="px-4 py-2">Validación</th>
                     <th className="px-4 py-2">Ownership</th>
-                    <th className="px-4 py-2">Acciones</th>
+                    <th className="px-4 py-2 text-center">Eliminar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,31 +222,18 @@ function DNSRecordsTable({ onEditRecord, onDeleteRecord }) {
                             </button>
                           </div>
                         </td>
-                        <td className="px-4 py-2">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() =>
-                                onEditRecord({
-                                  domain: domainName,
-                                  ...domainData,
-                                })
-                              }
-                              className="p-1 text-lightgrey hover:text-secondary hover:cursor-pointer transition-colors duration-200"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeleteClick({
-                                  domain: domainName,
-                                  ...domainData,
-                                })
-                              }
-                              className="p-1 text-warning hover:text-secondary hover:cursor-pointer transition-colors duration-200"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            onClick={() =>
+                              handleDeleteClick({
+                                domain: domainName,
+                                ...domainData,
+                              })
+                            }
+                            className="p-1 text-warning hover:text-secondary hover:cursor-pointer transition-colors duration-200"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </td>
                       </tr>
                     )
