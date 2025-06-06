@@ -43,7 +43,7 @@ curl --retry 10 -f --retry-all-errors --retry-delay  5 -s -o /dev/null \
 
 sleep 10
 
-PUBLIC_IP="127.0.0.1" # $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 export PUBLIC_IP
 
 echo "Public IP of the instance: $PUBLIC_IP"

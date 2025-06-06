@@ -170,7 +170,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                 for (auto uri_itr = requests_object.MemberBegin(); uri_itr != requests_object.MemberEnd(); ) {
                     Value& uri_obj = uri_itr->value;
                 
-                    cout << "\033[0;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m\n";
+                    cout << "\033[1;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m\n";
                     
                     // Revisar si el TTL ya expiró
                     if (uri_obj.HasMember("time_to_live") && uri_obj["time_to_live"].IsString()) {
@@ -186,7 +186,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                             uri_obj["received"].SetNull();
                             uri_obj["time_to_live"].SetNull();
                             uri_itr = requests_object.RemoveMember(uri_itr);
-                            cout << "\033[0;31mRemoved expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
+                            cout << "\033[1;31mRemoved expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
                             // Liberar los bloqueos.
                             write_lock.unlock();
                             read_lock.lock();
@@ -202,7 +202,7 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                     read_lock.unlock();
                     unique_lock<shared_mutex> write_lock(cache_mutex);
 
-                    cout << "\033[0;31mRemoving empty host: " << host_itr->name.GetString() << "\033[0m" << endl;
+                    cout << "\033[1;31mRemoving empty host: " << host_itr->name.GetString() << "\033[0m" << endl;
                     host_itr = cache.RemoveMember(host_itr);
 
                     write_lock.unlock();
@@ -400,7 +400,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
         // Se guarda el resultado en el objeto info.
         bool exists = get_subdomain_info(info, host);
         if (!exists) {
-            cerr << "\033[0;31mSubdomain not found.\033[0m" << endl;
+            cerr << "\033[1;31mSubdomain not found.\033[0m" << endl;
             // Enviar respuesta HTTP 401 Unauthorized
             send_http_error_response(client_socket, "Not Found", 404, is_ssl, ssl);
             return false;
@@ -520,7 +520,7 @@ bool authenticate_request(const int &client_socket, const HttpRequest &request, 
 
 // Función que maneja las políticas de reemplazo de caché.
 string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, const string& replacement_policy) {
-    string key_to_delete;
+    string key_to_delete = "";
 
     if (replacement_policy == "LRU") {
         // Least Recently Used
@@ -532,6 +532,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             string most_recent_use = uri_obj["most_recent_use"].GetString();
+            cout << "The request: " << itr->name.GetString() << " has most_recent_use: " << most_recent_use << endl;
 
             // Convertir el "most_recent_use" string a time_t
             struct tm tm;
@@ -540,6 +541,9 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
                 // Actualizar la entrada menos recientemente usada
                 if (most_recent_use_time < oldest_time) {
+                    cout << "Old Key To Delete: " << key_to_delete << endl;
+                    cout << "Updating oldest time for key: " << itr->name.GetString() << endl;
+                    cout << "Oldest time: " << ctime(&oldest_time) << " with most_recent_use: " << most_recent_use << endl;
                     oldest_time = most_recent_use_time;
                     key_to_delete = itr->name.GetString();
                     least_recently_used_time = most_recent_use;
@@ -555,8 +559,12 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             int times_used = uri_obj["times_used"].GetInt();
+            cout << "The request: " << itr->name.GetString() << " has times_used: " << times_used << endl;
             // Actualizar la entrada menos usada
             if (times_used < least_used_count) {
+                cout << "Old Key To Delete: " << key_to_delete << endl;
+                cout << "Updating least used count for key: " << itr->name.GetString() << endl;
+                cout << "Least used count: " << least_used_count << " with times_used: " << times_used << endl;
                 least_used_count = times_used;
                 key_to_delete = itr->name.GetString();
             }
@@ -571,6 +579,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             string received = uri_obj["received"].GetString();
+            cout << "The request: " << itr->name.GetString() << " has received: " << received << endl;
 
             struct tm tm;
             if (strptime(received.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
@@ -578,6 +587,9 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
                 // Actualizar la entrada más antigua
                 if (received_time < oldest_time) {
+                    cout << "Old Key To Delete: " << key_to_delete << endl;
+                    cout << "Updating oldest time for key: " << itr->name.GetString() << endl;
+                    cout << "Oldest time: " << ctime(&oldest_time) << " with received: " << received << endl;
                     oldest_time = received_time;
                     key_to_delete = itr->name.GetString();
                     first_in_time = received;
@@ -594,6 +606,7 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
             Value& uri_obj = itr->value;
 
             string most_recent_use = uri_obj["most_recent_use"].GetString();
+            cout << "The request: " << itr->name.GetString() << " has most_recent_use: " << most_recent_use << endl;
 
             struct tm tm;
             if (strptime(most_recent_use.c_str(), "%a %b %d %H:%M:%S %Y", &tm)) {
@@ -601,6 +614,9 @@ string replacementPolicies(Value& requests_object, shared_mutex& cache_mutex, co
 
                 // Actualizar la entrada más recientemente usada
                 if (most_recent_use_time > earliest_time) {
+                    cout << "Old Key To Delete: " << key_to_delete << endl;
+                    cout << "Updating earliest time for key: " << itr->name.GetString() << endl;
+                    cout << "Earliest time: " << ctime(&earliest_time) << " with most_recent_use: " << most_recent_use << endl;
                     earliest_time = most_recent_use_time;
                     key_to_delete = itr->name.GetString();
                     most_recently_used_time = most_recent_use;
@@ -824,10 +840,9 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
             }
             // Si el Content-Type es permitido, se guarda la respuesta en el cache.
             if (is_allowed) {
-                cout << "Content-Type is allowed." << endl;
+                cout << "\033[1;33mContent-Type is allowed.\033[0m" << endl;
                 // Guardar la respuesta en el cache.
                 string filename = hash_string(url + to_string(time(nullptr))) + ".ksh";
-                cout << filename << endl;
                 string directory = CACHE_FOLDER + host + "/";
                 // Crear el directorio
                 filesystem::create_directories(directory);
@@ -836,7 +851,7 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
                 if (out_file) {
                     out_file.write(response_str.c_str(), response_str.length());
                     out_file.close();
-                    cout << "Response of size " << response_str.length() << " saved to cache as: " << filename << endl;
+                    cout << "\033[1;33mResponse of size " << response_str.length() << " saved to cache as: " << filename << "\033[0m" << endl;
 
                     // Agregar a la cache
                     add_to_cache_by_host(host, info, request.request.method + "-" + url, filename, response_str.length());
@@ -907,6 +922,9 @@ void handle_http_request(const int client_socket, const string &rest_api, const 
             } else {
                 keep_alive = false;
             }
+        } else if (bytes_received == 0) {
+            cout << "Client disconnected normally." << endl;
+            break;
         } else {
             perror("recv failed\n");
             break;
@@ -938,7 +956,8 @@ void handle_https_request(const int client_socket, const string &rest_api, const
     do {
         // Recibir la solicitud HTTPS del cliente.
         int bytes_received = SSL_read(ssl, request_buffer, REQUEST_BUFFER_SIZE - 1);
-        if (bytes_received > 0){
+        int err = SSL_get_error(ssl, bytes_received);
+        if (err == SSL_ERROR_NONE && bytes_received > 0){
             request_buffer[bytes_received] = '\0'; // Null-terminate la request
             cout << "Received request: " << request_buffer << endl;
 
@@ -971,8 +990,17 @@ void handle_https_request(const int client_socket, const string &rest_api, const
             }
             
             cout << endl;
-        } else {
-            perror("recv failed\n");
+        } else if (err == SSL_ERROR_ZERO_RETURN) {
+            cout << "Client disconnected normally." << endl;
+            break;
+        } else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            cout << "SSL read operation would block, waiting for more data..." << endl;
+            continue;
+        } else if (err == SSL_ERROR_SYSCALL) {
+            perror("SSL read syscall error");
+            break;
+        } else if (err == SSL_ERROR_SSL) {
+            cerr << "SSL error occurred: " << ERR_error_string(ERR_get_error(), nullptr) << endl;
             break;
         }
     } while (keep_alive);
@@ -990,9 +1018,6 @@ void handle_https_request(const int client_socket, const string &rest_api, const
 #ifndef UNIT_TEST
 
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    
     filesystem::create_directories(CACHE_FOLDER);
 
     // Leer variables de entorno
@@ -1047,7 +1072,7 @@ int main() {
         return 1;
     }
 
-    cout << "Zonal cache (HTTP) is running on port " << HTTP_PORT << "...\n";
+    cout << "Zonal cache (HTTP) is running on port " << HTTP_PORT << "..." << endl;
 
     thread([&rest_api, &app_id, &api_key, &vercel_ui]() {
         int https_socket_fd = socket(AF_INET, SOCK_STREAM, 0);

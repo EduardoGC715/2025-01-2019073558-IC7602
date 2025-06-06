@@ -97,27 +97,3 @@ module "zonal_cache_instance" {
   vpc_id    = module.networking.vpc_id
   subnet_id = module.networking.public_subnet_id
 }
-
-
-# data "template_file" "zonal_cache_docker_compose" {
-#   template = file("${path.module}/scripts/docker-compose-zonal-cache.tpl.yml")
-#   vars = {
-#     vercel_api    = var.vercel_api
-#     country = var.country
-#     fetch_interval = var.fetch_interval
-#     vercel_ui = var.vercel_ui
-#   }
-# }
-
-# module "zonal_cache_instance" {
-#   source   = "./modules/dns_instance"
-#   aws_ami  = var.aws_ami
-#   api_port = var.api_port
-
-#   user_data = templatefile("${path.module}/scripts/install.tftpl", {
-#     DOCKER_COMPOSE_YML = data.template_file.zonal_cache_docker_compose.rendered
-#   })
-
-#   vpc_id    = module.networking.vpc_id
-#   subnet_id = module.networking.public_subnet_id
-# }
