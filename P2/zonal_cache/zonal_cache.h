@@ -41,7 +41,7 @@ struct subdomain_info {
           replacement_policy("LRU"),
           wildcard("") {}
 
-    // Param constructor (for completeness)
+    // Constructor
     subdomain_info(const std::string& auth_method,
         const std::string& destination,
         bool https,

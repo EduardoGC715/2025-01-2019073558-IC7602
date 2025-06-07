@@ -146,30 +146,6 @@ function LoginSubdomain() {
               </div>
             )}
 
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-primary focus:ring-primary border-lightgrey2 rounded"
-                />
-                <label
-                  htmlFor="remember-me"
-                  className="ml-2 block text-sm text-secondary"
-                >
-                  Recordarme
-                </label>
-              </div>
-
-              <Link
-                to="/change-password"
-                className="text-sm text-primary hover:text-secondary transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
-
             <div>
               <button
                 type="submit"
