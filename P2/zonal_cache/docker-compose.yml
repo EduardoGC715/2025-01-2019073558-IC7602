@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       tags:
-        - dandiego235/zonal_cache:2.2
+        - dandiego235/zonal_cache:3
         - dandiego235/zonal_cache:latest
     image: "dandiego235/zonal_cache:latest"
     container_name: zonal_cache

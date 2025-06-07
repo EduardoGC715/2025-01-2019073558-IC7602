@@ -9,8 +9,8 @@ adda:
 
 dest:
 	@echo "Destroying Terraform configuration"
-	terraform destroy -var-file="secrets.tfvars" $(TF_FLAGS)
+	terraform destroy -var-file="secrets.tfvars"
 
 desta:
 	@echo "Destroying Terraform configuration"
-	terraform destroy -var-file="secrets.tfvars" $(TF_FLAGS) -auto-approve
+	terraform destroy -var-file="secrets.tfvars" -auto-approve

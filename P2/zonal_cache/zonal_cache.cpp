@@ -846,8 +846,8 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
                     break;
                 }
             }
-            // Si el Content-Type es permitido, se guarda la respuesta en el cache.
-            if (is_allowed) {
+            // Si el método es GET y el Content-Type es permitido, se guarda la respuesta en el cache.
+            if (request.request.method == "GET" && is_allowed) {
                 cout << "\033[1;33mContent-Type is allowed.\033[0m" << endl;
                 // Guardar la respuesta en el cache.
                 string filename = hash_string(url + to_string(time(nullptr))) + ".ksh";
@@ -867,7 +867,7 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
                     perror("Failed to open cache file for writing");
                 }
             } else {
-                cerr << "Content-Type not allowed: " << content_type << "\033[0m" << endl;
+                cerr << "Method or Content-Type not allowed: " << content_type << "\033[0m" << endl;
             }
         } else {
             cerr << "Content-Type header not found in response.\033[0m" << endl;
