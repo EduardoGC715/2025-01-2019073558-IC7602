@@ -19,140 +19,6 @@ Diego Mora Montes, carné 2022104866
 6 de junio del 2025  
 IS 2025
 
-[**1\. Introducción 3**](#1.-introducción)
-
-[**2\. Instalación y configuración 4**](#2.-instalación-y-configuración)
-
-[2.1. Instalación de herramientas 4](#2.1.-instalación-de-herramientas)
-
-[2.2. Instalación en AWS 4](#2.2.-instalación-en-aws)
-
-[**3\. Arquitectura del sistema 6**](#3.-arquitectura-del-sistema)
-
-[**4\. Firestore 6**](#4.-firestore)
-
-[4.1 Sessions 7](#4.1-sessions)
-
-[4.2. Subdomains 7](#4.2.-subdomains)
-
-[4.3. Users 8](#4.3.-users)
-
-[4.4. Wildcards 9](#4.4.-wildcards)
-
-[4.5. Zonal_Caches 9](#4.5.-zonal_caches)
-
-[**5\. Frontend 10**](#5.-frontend)
-
-[**6\. Zonal Cache 20**](#6.-zonal-cache)
-
-[6.1. Requests HTTP 20](#6.1.-requests-http)
-
-[6.2. Configuración 22](#6.2.-configuración)
-
-[6.3. Manejo del almacenamiento 23](#6.3.-manejo-del-almacenamiento)
-
-[6.4. Políticas de reemplazo 27](#6.4.-políticas-de-reemplazo)
-
-[6.5. Expiración de la caché 27](#6.5.-expiración-de-la-caché)
-
-[6.6. Subdominios 27](#6.6.-subdominios)
-
-[6.7. Wildcards 29](#6.7.-wildcards)
-
-[6.8. Autenticación 30](#6.8.-autenticación)
-
-[6.8.1. None 30](#6.8.1.-none)
-
-[6.8.2. User/Password 30](#6.8.2.-user/password)
-
-[6.8.3. API keys 32](#6.8.3.-api-keys)
-
-[6.9. SSL Termination 32](#6.9.-ssl-termination)
-
-[**7\. Rest API Python 33**](#7.-rest-api-python)
-
-[**8\. Apache Server 35**](#8.-apache-server)
-
-[**9\. Node API 36**](#9.-node-api)
-
-[9.1 Controllers 37](#9.1-controllers)
-
-[auth.controller.ts 37](#auth.controller.ts)
-
-[domain.controller.ts 47](#domain.controller.ts)
-
-[subdomain.controller.ts 48](#subdomain.controller.ts)
-
-[**9.2. Routes 51**](#9.2.-routes)
-
-[auth.routes.ts 51](#auth.routes.ts)
-
-[domain.routes.ts 52](#domain.routes.ts)
-
-[subdomain.routes.ts 52](#subdomain.routes.ts)
-
-[9.3. Autenticación con el API 52](#9.3.-autenticación-con-el-api)
-
-[**10\. DNS Interceptor 53**](#10.-dns-interceptor)
-
-[10.1. Implementación 53](#10.1.-implementación)
-
-[10.2. API 55](#10.2.-api)
-
-[DNS Resolver 55](#dns-resolver)
-
-[Exists 55](#exists)
-
-[Status 55](#status)
-
-[Get Firebase Status 55](#get-firebase-status)
-
-[Update expired sessions 55](#update-expired-sessions)
-
-[Update Zonal Caches 55](#update-zonal-caches)
-
-[Update Wildcard Cache 55](#update-wildcard-cache)
-
-[Check Wildcard Cache 55](#check-wildcard-cache)
-
-[Get Zonal Cache 55](#get-zonal-cache)
-
-[**11\. Pruebas 56**](#11.-pruebas)
-
-[11.1. Zonal Cache 56](#11.1.-zonal-cache)
-
-[Políticas de reemplazo 56](#políticas-de-reemplazo)
-
-[LRU 56](#lru)
-
-[LFU 56](#lfu)
-
-[FIFO 56](#fifo)
-
-[MRU 57](#mru)
-
-[Random 57](#random)
-
-[Unit tests 57](#unit-tests)
-
-[11.2. Backend 58](#11.2.-backend)
-
-[Authcontroller 58](#authcontroller)
-
-[Subdomain controller 59](#subdomain-controller)
-
-[Domain Controller 60](#domain-controller)
-
-[Zonal cache controller 61](#zonal-cache-controller)
-
-[**12\. Recomendaciones 61**](#12.-recomendaciones)
-
-[**13\. Conclusiones 63**](#13.-conclusiones)
-
-[**14\. Referencias 66**](#14.-referencias)
-
-#
-
 # 1\. Introducción
 
 Este proyecto en general busca desarrollar un sistema proxy/cache con geolocalización, que permite interceptar y redirigir peticiones DNS hacia caches zonales. Esto permite optimizar el acceso a recursos web de acuerdo con la ubicación geográfica del usuario. Esta decisión se basa en la base de datos IP-to-Country, la cual permite identificar la región del origen de la solicitud. Para la solución integra las siguientes herramientas como Interceptor DNS, autenticación y autorización, REST API, servidor de Apache e interfaz web.  
@@ -164,29 +30,29 @@ Todo el sistema es desplegado utilizando tecnologías modernas como Kubernetes, 
 
 Para correr el proyecto, se deben instalar las siguientes herramientas:
 
-1. \[Windows Subsystem for Linux\](https://learn.microsoft.com/en-us/windows/wsl/install)
-2. \[Docker\](https://www.docker.com/products/docker-desktop/)
-3. \[Git Bash\](https://git-scm.com/downloads)
-4. \[Terraform\](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
-5. \[NodeJS\](https://nodejs.org/en/download)
-6. \[dig y nslookup\](https://www.tecmint.com/install-dig-and-nslookup-in-linux/): son herramientas de Linux para hacer solicitudes a servicios DNS.
+1. [Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/install)
+2. [Docker](https://www.docker.com/products/docker-desktop/)
+3. [Git Bash](https://git-scm.com/downloads)
+4. [Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+5. [NodeJS](https://nodejs.org/en/download)
+6. [dig y nslookup](https://www.tecmint.com/install-dig-and-nslookup-in-linux/): son herramientas de Linux para hacer solicitudes a servicios DNS.
 
 ## 2.2. Instalación en AWS
 
 A continuación, se describe cómo instalar el proyecto en AWS con Terraform.
 
-1. Es necesario configurar el proyecto en Terraform.  
-   1. Se deben obtener las credenciales de AWS, específicamente el AWS\_ACCESS\_KEY\_ID y el AWS\_SECRET\_ACCESS\_KEY. Estos se pueden obtener siguiendo la guía de AWS de cómo \[obtener las llaves de acceso\](https://aws.amazon.com/blogs/security/how-to-find-update-access-keys-password-mfa-aws-management-console/).  
-   2. Si se desea almacenar el estado de Terraform en un repositorio compartido, se puede realizar esto con \[HCP Terraform. Se puede seguir la guía para configurar el ambiente\](https://aws.amazon.com/blogs/security/how-to-find-update-access-keys-password-mfa-aws-management-console/).  
-   3. Si se desea almacenar el \[estado localmente, se puede seguir esta guía\](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-build). En ella, se muestra cómo configurar las variables de entorno de AWS para configurar el ambiente.  
-2. Hay que inicializar el proyecto de terraform con el comando: `terraform init`.  
-3. Hay que crear un archivo `secrets.tfvars` en el folder de “/terraform”. Este archivo debe contener el \[token para la cuenta de Vercel\](https://vercel.com/guides/how-do-i-use-a-vercel-api-access-token) donde están deployed el UI y el API. El contenido de este archivo es una línea con:  
-   1. `vercel_token = {token}`  
-4. Para desplegar la infraestructura, se ejecuta el comando: `terraform apply \-var-file="secrets.tfvars"`. Se van a desplegar una serie de cambios. Se escribe la palabra “yes” para confirmar los cambios. Alternativamente, se puede usar el comando `terraform apply \-var-file="secrets.tfvars" \-auto-approve`.  
-5. Al final, esto imprime una lista de IPs. Estos IPs son los de cada una de las instancias EC2 que se describen en la sección 3\.
+1. Es necesario configurar el proyecto en Terraform.
+   1. Se deben obtener las credenciales de AWS, específicamente el AWS_ACCESS_KEY_ID y el AWS_SECRET_ACCESS_KEY. Estos se pueden obtener siguiendo la guía de AWS de cómo [obtener las llaves de acceso](https://aws.amazon.com/blogs/security/how-to-find-update-access-keys-password-mfa-aws-management-console/).
+   2. Si se desea almacenar el estado de Terraform en un repositorio compartido, se puede realizar esto con [HCP Terraform. Se puede seguir la guía para configurar el ambiente](https://aws.amazon.com/blogs/security/how-to-find-update-access-keys-password-mfa-aws-management-console/).
+   3. Si se desea almacenar el [estado localmente, se puede seguir esta guía](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-build). En ella, se muestra cómo configurar las variables de entorno de AWS para configurar el ambiente.
+2. Hay que inicializar el proyecto de terraform con el comando: `terraform init`.
+3. Hay que crear un archivo `secrets.tfvars` en el folder de “/terraform”. Este archivo debe contener el [token para la cuenta de Vercel](https://vercel.com/guides/how-do-i-use-a-vercel-api-access-token) donde están deployed el UI y el API. El contenido de este archivo es una línea con:
+   1. `vercel_token = {token}`
+4. Para desplegar la infraestructura, se ejecuta el comando: `terraform apply -var-file="secrets.tfvars"`. Se van a desplegar una serie de cambios. Se escribe la palabra “yes” para confirmar los cambios. Alternativamente, se puede usar el comando `terraform apply -var-file="secrets.tfvars" -auto-approve`.
+5. Al final, esto imprime una lista de IPs. Estos IPs son los de cada una de las instancias EC2 que se describen en la sección 3.
 
 ![](images/image7.png)
-Para configurar la instalación, se deben modificar los valores en el archivo de  `terraform.tfvars`. Este archivo establece configuraciones de los componentes, como los puertos que usan para la comunicación, cuántos zonal caches, etc. Para consultar la lista de las variables que se pueden configurar, se debe consultar el archivo `terraform/[variables.tf](http://variables.tf)`:
+Para configurar la instalación, se deben modificar los valores en el archivo de `terraform.tfvars`. Este archivo establece configuraciones de los componentes, como los puertos que usan para la comunicación, cuántos zonal caches, etc. Para consultar la lista de las variables que se pueden configurar, se debe consultar el archivo `terraform/[variables.tf](http://variables.tf)`:
 
 - **aws_ami**: AMI ID para la instancia DNS.
 - **dns_api_port**: Puerto del DNS API que usará la instancia.
@@ -200,35 +66,37 @@ Para configurar la instalación, se deben modificar los valores en el archivo de
 - **vercel_token**: Token de acceso para la API de Vercel.
 - **vercel_edge_config_id**: ID del Edge Config de Vercel.
 
-El archivo por defecto es:  
-```  
-aws\_ami  \= "ami-0f9de6e2d2f067fca"  
-dns\_api\_port \= 443  
-dns\_server \= {  
-  host \= "8.8.8.8"  
-  port \= 53  
-}  
-api_port \= 5000  
-apache_port \= 80  
-countries \= \[  
- "US",  
- "CR"  
-\]  
-vercel\_ui \= "https://vercelui-eight.vercel.app"  
-vercel\_api \= "2025-01-2019073558-ic-7602.vercel.app"  
-vercel\_edge\_config\_id \= "ecfg\_ywndfxposwmc2jpmd6jv47mgjwji"  
-fetch\_interval \= 2  
-```  
+El archivo por defecto es:
+
+```
+aws_ami  = "ami-0f9de6e2d2f067fca"
+dns_api_port = 443
+dns_server = {
+  host = "8.8.8.8"
+  port = 53
+}
+api_port = 5000
+apache_port = 80
+countries = [
+ "US",
+ "CR"
+]
+vercel_ui = "https://vercelui-eight.vercel.app"
+vercel_api = "2025-01-2019073558-ic-7602.vercel.app"
+vercel_edge_config_id = "ecfg_ywndfxposwmc2jpmd6jv47mgjwji"
+fetch_interval = 2
+```
+
 Para desinstalar la infraestructura, se ejecuta el comando:
 
 - `terraform destroy -var-file="secrets.tfvars"`
 
-# 3\. Arquitectura del sistema
+# 3. Arquitectura del sistema
 
 En nuestra arquitectura se definieron dos subredes: una pública y una privada. En la pública se encuentran instancias para el DNS Interceptor, DNS API y cada uno de los caches zonales, que responden a solicitudes de los usuarios, redirigiendo el tráfico con base en la geolocalización utilizando la base de datos IP-To-Country. En la red privada, tenemos una instancia EC2, conectada a un NAT Gateway, que permite que se comunique con Internet desde adentro. En la instancia privada, habitan los servicios internos del sistema: Apache Server y el Rest API en Python. La subred pública se conecta al exterior mediante un Internet Gateway permitiendo tener comunicación con la web. Por otro lado el UI y el Node API, implementados en React y Node.js respectivamente, están desplegados mediante Vercel, con un despliegue automático desde el repositorio del proyecto en Github. Estos componentes se comunican con la base de datos de Firestore y Firebase Realtime Database, donde se almacenan las configuraciones, dominios, sesiones, usuarios y credenciales de autenticación. El Node API actúa como intermediario entre la base de datos, la interfaz y las caches zonales, permitiendo la administración de subdominios, la validación de usuarios, y la aplicación de políticas de autenticación seguras.
 ![](images/arquitectura.jpg)
 
-# 4\. Firestore
+# 4. Firestore
 
 Se utilizó Cloud Firestore, la base de datos más reciente de Firebase, con el objetivo de lograr un manejo más eficiente y rápido de los datos. El sistema está estructurado en seis colecciones, siendo las siguientes:
 
@@ -254,96 +122,105 @@ Las sesiones por API Key actualmente no se utilizan. No obstante, se podría ext
 
 ## 4.2. Subdomains
 
-La configuración de subdominios permite definir cómo debe comportarse un servidor proxy con caché cuando atiende solicitudes dirigidas a un dominio específico. Con las reglas específicas permite ser intermediario para varios destinos donde cada subdominio puede tener una configuración separada y personalizada. Las ventajas de esto es que cada subdominio puede tener sus propias reglas, enrutamiento y seguridad. La jerarquía del firestore es la siguiente:   
-```json  
-{  
- "subdomains": {  
- "cat.com": {  
-{  
- "apiKeys": {},  
- "authMethod": "user-password",  
- "cacheSize": 3000000,  
- "destination": "www.seaofthieves.com",  
- "fileTypes": \[  
- "text/html",  
- "text/css",  
- "application/js",  
- "application/json",  
- \],  
- "https": true,  
- "replacementPolicy": "LFU",  
- "ttl": 300000,  
- "users": {  
- "daniel": "$2b$10$kTBddpIAUtSTpSh1fo5dF.EUADvBvE9/F7dMNnAybX/b.wRI9I4Q"  
- }  
-}  
-}  
-```  
-Los usuarios que están registrados en el subdominio son parejas clave-valor en el objeto de users de la siguiente forma:  
-```json  
-{“\<username\>”: “\<hashedPassword\>”}  
-```  
+La configuración de subdominios permite definir cómo debe comportarse un servidor proxy con caché cuando atiende solicitudes dirigidas a un dominio específico. Con las reglas específicas permite ser intermediario para varios destinos donde cada subdominio puede tener una configuración separada y personalizada. Las ventajas de esto es que cada subdominio puede tener sus propias reglas, enrutamiento y seguridad. La jerarquía del firestore es la siguiente:
+
+```json
+{
+ "subdomains": {
+ "cat.com": {
+{
+ "apiKeys": {},
+ "authMethod": "user-password",
+ "cacheSize": 3000000,
+ "destination": "www.seaofthieves.com",
+ "fileTypes": [
+ "text/html",
+ "text/css",
+ "application/js",
+ "application/json",
+ ],
+ "https": true,
+ "replacementPolicy": "LFU",
+ "ttl": 300000,
+ "users": {
+ "daniel": "$2b$10$kTBddpIAUtSTpSh1fo5dF.EUADvBvE9/F7dMNnAybX/b.wRI9I4Q"
+ }
+}
+}
+```
+
+Los usuarios que están registrados en el subdominio son parejas clave-valor en el objeto de users de la siguiente forma:
+
+```json
+{ "<username>": "<hashedPassword>" }
+```
+
 Las contraseñas están encriptadas con la biblioteca bcryptjs.  
-Si el método de autenticación es por API keys, el objeto API queda de la siguiente forma:  
-```json  
-{“\<hashedApiKey\>”: “\<nickname\>”}  
-```  
+Si el método de autenticación es por API keys, el objeto API queda de la siguiente forma:
+
+```json
+{ "<hashedApiKey>": "<nickname>" }
+```
+
 El API key se encripta con el algoritmo SHA256. El nickname es un nombre que se configura en la interfaz para identificar la API key.
 
 ## 4.3. Users
 
-Esta estructura permite almacenar usuarios registrados y asignarles uno o varios dominios, con sus respectivos subdominios. La jerarquía de los datos se comporta de la siguiente manera:  
-```  
-User {  
- username: string,  
- password: string,  
- domains: {  
- \[domainName\]: {  
- subdomains: {  
- \[subdomainName\]: {}  
- }  
- }  
- }  
-}  
+Esta estructura permite almacenar usuarios registrados y asignarles uno o varios dominios, con sus respectivos subdominios. La jerarquía de los datos se comporta de la siguiente manera:
+
+```
+User {
+ username: string,
+ password: string,
+ domains: {
+ [domainName]: {
+ subdomains: {
+ [subdomainName]: {}
+ }
+ }
+ }
+}
 ```
 
 ## 4.4. Wildcards
 
-Las wildcards son muy parecidas a la configuración de los subdominios. La diferencia es que permite definir reglas o configuraciones generales que coinciden con múltiples dominios o subdominios. Permite revisar si el subdominio está correcto y encaja de forma correcta, esta es su jerarquía:  
-```  
-{  
- "domains": {  
- "test.com": {  
- "authMethod": "user-password",  
- "cacheSize": 1000000,  
- "destination": "www.hola.com",  
- "fileTypes": \[  
- "application/js",  
- "application/json"  
- \],  
- "https": true,  
- "replacementPolicy": "FIFO",  
- "ttl": 300000  
- },  
- "users": {  
-"daniel": "$2b$10$kTBddpIAUtSTpSh1fo5dF.EUADvBvE9/F7dMNnAybX/b.wRI9I4Q"  
-        }  
-}   
+Las wildcards son muy parecidas a la configuración de los subdominios. La diferencia es que permite definir reglas o configuraciones generales que coinciden con múltiples dominios o subdominios. Permite revisar si el subdominio está correcto y encaja de forma correcta, esta es su jerarquía:
+
+```
+{
+ "domains": {
+ "test.com": {
+ "authMethod": "user-password",
+ "cacheSize": 1000000,
+ "destination": "www.hola.com",
+ "fileTypes": [
+ "application/js",
+ "application/json"
+ ],
+ "https": true,
+ "replacementPolicy": "FIFO",
+ "ttl": 300000
+ },
+ "users": {
+"daniel": "$2b$10$kTBddpIAUtSTpSh1fo5dF.EUADvBvE9/F7dMNnAybX/b.wRI9I4Q"
+        }
+}
 ```
 
 ## 4.5. Zonal Caches
 
-Las zonal caches son mecanismos de almacenamiento temporal de datos distribuidos por zonas geográficas. Su propósito es reducir la latencia, mejorar el rendimiento y reducir el uso de ancho de banda global. Lo que se guarda en la base de datos es simplemente el país y su IP. Este es un ejemplo de la jerarquía:  
-```  
-{  
-CR:  
-{ IP: 127.0.0.1 }  
-}  
-```  
+Las zonal caches son mecanismos de almacenamiento temporal de datos distribuidos por zonas geográficas. Su propósito es reducir la latencia, mejorar el rendimiento y reducir el uso de ancho de banda global. Lo que se guarda en la base de datos es simplemente el país y su IP. Este es un ejemplo de la jerarquía:
+
+```
+{
+CR:
+{ IP: 127.0.0.1 }
+}
+```
 
 ![](images/image38.png)
 
-# 5\. Frontend
+# 5. Frontend
 
 Toda la interfaz del proyecto fue creada con React y Javascript con la ayuda de Vite para compilarlo. Además de esto, se implementó Tailwind con el propósito de hacer el código más liviano y facilitar la programación del CSS. Se contó con la ayuda de la inteligencia artificial, en este caso fue con el modelo “Claude Sonnet 3.5”, el cual fue accedido mediante “Claude” en la página [https://claude.ai/new](https://claude.ai/new). Este modelo permite realizar una cantidad limitada de consultas de forma gratuita.
 
@@ -387,119 +264,121 @@ Este prompt con ChatGPT: “Crea SubdomainsDashboard.jsx: lee :domain, muestra s
 ![](images/image16.png)  
 Este prompt con ChatGPT “Crea SubdomainsRecordsTable.jsx (tabla con editar/eliminar y modal de llaves/usuarios) y SubdomainRegisterCard.jsx (formulario para registrar subdominio)” y me dio ambos archivos.
 
-# 6. Zonal Cache 
+## 5.1. Comentario sobre el uso de IAs
+
+Uno de los puntos principales de este proyecto era realizar un UI totalmente con la asistencia de inteligencia artificial, como GitHub Copilot, Claude y ChatGPT, y documentar el proceso. Es increíble y aterrorizante lo buenas que son estas herramientas programando. En el grupo, muy pocos habían tenido experiencia programando con Tailwind y Vite, pero con estas herramientas la programación salió sumamente rápido. Prácticamente en una tarde teníamos un gran avance de la interfaz. No obstante, notamos que en ocasiones lo que genera tiene errores. Muchas veces no incluye bibliotecas y algunos botones que incluye quedan inservibles. También, para unos integrantes del grupo, la página aparecía blanca, pero para otros, se veía más como beige o gris. La autenticación del usuario muchas veces cuesta que agarre, por alguna razón a veces da un error de que se reinicia la conexión. Notamos que la inteligencia artificial ayuda mucho con respecto a los estilos. No obstante, podría considerarse que, por lo menos en nuestra página, la interfaz que realizó es sumamente sencilla y genérica, pero para los efectos del proyecto, es funcional. Además, la velocidad en la que lo hizo es simplemente extraordinaria. Por lo tanto, concluimos que el poder de las inteligencias artificiales es evidente y desde un punto de vista de costo, posiblemente más rentable para las grandes corporaciones codiciosas que contratar programadores. Sin embargo, lo que generan puede llegar a arrastrar errores y las interfaces pueden resultar aburridas, por lo que sigue siendo necesario un desarrollador que entienda el código y cómo funciona y artistas que le sepan dar color a los gráficos. Esperamos que en lugar de tomar nuestros trabajos, podamos trabajar en conjunto con las inteligencias artificiales y mejorar nuestra productividad.
+
+# 6. Zonal Cache
 
 Este componente implementa un servicio de caché en disco. La aplicación está escrita en GNU C++. Tiene distintas funcionalidades. Estas se explican a continuación.
 
-# 6\. Zonal Cache
-
-    Este componente implementa un servicio de caché en disco. La aplicación está escrita en GNU C++. Tiene distintas funcionalidades. Estas se explican a continuación.
-
 ## 6.1. Requests HTTP
 
-Para simplificar el manejo de los requests HTTP, se utilizó la biblioteca [httpparser](https://github.com/nekipelov/httpparser) de Alex Nekipelov y [Libcurl](https://curl.se/libcurl/c/). Para desacoplar el manejo de requests HTTP del zonal cache en sí, se hicieron archivos llamados http\_client.h y `http\_client.cpp`. El header tiene la definición de los siguientes structs:  
+Para simplificar el manejo de los requests HTTP, se utilizó la biblioteca [httpparser](https://github.com/nekipelov/httpparser) de Alex Nekipelov y [Libcurl](https://curl.se/libcurl/c/). Para desacoplar el manejo de requests HTTP del zonal cache en sí, se hicieron archivos llamados http_client.h y `http_client.cpp`. El header tiene la definición de los siguientes structs:
 
 ```
-struct memory\_struct {  
-    char\* memory;  
-    size\_t size;  
-    long status\_code;  
-    unordered\_map\<string, string\> headers;  
-    string status\_line;
+struct memory_struct {
+    char* memory;
+    size_t size;
+    long status_code;
+    unordered_map<string, string> headers;
+    string status_line;
 
     // Constructor
-    memory\_struct()
-        : memory(nullptr), size(0), status\_code(0), headers(), status\_line("") {}
+    memory_struct()
+        : memory(nullptr), size(0), status_code(0), headers(), status_line("") {}
 
     // Destructor
-    \~memory\_struct() {
+    ~memory_struct() {
         if (memory) {
             free(memory);
-            memory \= nullptr;
+            memory = nullptr;
         }
     }
 
 };
 
-struct header_info {  
- string status_line;  
- bool captured \= false;  
+struct header_info {
+ string status_line;
+ bool captured = false;
 };
 
-struct HttpRequest {  
- unordered_map\<string, string\> headers;  
- Request request;  
+struct HttpRequest {
+ unordered_map<string, string> headers;
+ Request request;
 };
 
-struct HttpResponse {  
- unordered_map\<string, string\> headers;  
- Response response;  
+struct HttpResponse {
+ unordered_map<string, string> headers;
+ Response response;
 };
 
 ```
 
-* Memory struct: Es donde se guarda la respuesta HTTP. Tiene el buffer de la memoria donde se almacena el contenido. También puede guardar los headers, el tamaño, el mensaje de estado y el código de estado.  
-* header\_info: Se usa para capturar el header de la respuesta. Más específicamente, se usa para extraer la primera línea de la respuesta HTTP, la cual contiene la versión, el código de estatus y el “reason phrase”. Esta no se puede extraer con alguna opción directa de libcurl, por lo que hay que utilizar la opción de CURLOPT\_HEADERFUNCTION para capturar esta línea en una función callback.  
-* HTTPRequest y HTTPResponse: Se usa en conjunto con la biblioteca `httpparser` para poder manejar más fácilmente los headers y el contenido del request en el zonal cache.
+- Memory struct: Es donde se guarda la respuesta HTTP. Tiene el buffer de la memoria donde se almacena el contenido. También puede guardar los headers, el tamaño, el mensaje de estado y el código de estado.
+- header_info: Se usa para capturar el header de la respuesta. Más específicamente, se usa para extraer la primera línea de la respuesta HTTP, la cual contiene la versión, el código de estatus y el “reason phrase”. Esta no se puede extraer con alguna opción directa de libcurl, por lo que hay que utilizar la opción de CURLOPT_HEADERFUNCTION para capturar esta línea en una función callback.
+- HTTPRequest y HTTPResponse: Se usa en conjunto con la biblioteca `httpparser` para poder manejar más fácilmente los headers y el contenido del request en el zonal cache.
 
-	El archivo `http\_client.cpp` procesa requests y respuestas HTTP y envía los requests.
+  El archivo `http_client.cpp` procesa requests y respuestas HTTP y envía los requests.
 
 ## 6.2. Configuración
 
 La configuración del zonal cache se almacena en Firestore, por medio de los registros explicados en esa sección. Estos enlazan el país de la caché con un IP. Para obtener la configuración de los subdominios, hay un hilo que cada cierto tiempo envía un request al Rest API en NodeJS, el cual le devuelve la información. Si la respuesta es válida, cambia todo el objeto JSON que contiene la información a uno que tiene la más nueva. Esto lo hace por medio de la función Swap() de RapidJSON. Para obtener los wildcards realiza el mismo proceso. Los wildcards se manejan por separado porque el manejo de los mismos es diferente.  
-La imagen que se utiliza dentro de las instancias EC2 en Terraform se levanta con el siguiente script de inicio:  
-```bash  
-\# Generar API key de autenticación con el API de Vercel  
-API_KEY=$(openssl rand \-hex 16\)  
-export API_KEY  
+La imagen que se utiliza dentro de las instancias EC2 en Terraform se levanta con el siguiente script de inicio:
+
+```bash
+# Generar API key de autenticación con el API de Vercel
+API_KEY=$(openssl rand -hex 16)
+export API_KEY
 echo "Generated API_KEY: $API_KEY"
 
-\# Cuerpo del request para la API de Vercel Edge Config  
-REQUEST_BODY=$(cat \<\<EOF  
-{  
-  "items": \[  
-    {  
-      "operation": "upsert",  
-      "key": "${APP_ID}",  
- "value": "${API_KEY}"  
- }  
- \]  
-}  
-EOF  
+# Cuerpo del request para la API de Vercel Edge Config
+REQUEST_BODY=$(cat <<EOF
+{
+  "items": [
+    {
+      "operation": "upsert",
+      "key": "${APP_ID}",
+ "value": "${API_KEY}"
+ }
+ ]
+}
+EOF
 )
 
-\# URL para la API de Vercel Edge Config  
-URL="https://api.vercel.com/v1/edge-config/${VERCEL\_EDGE\_CONFIG\_ID}/items"
+# URL para la API de Vercel Edge Config
+URL="https://api.vercel.com/v1/edge-config/${VERCEL_EDGE_CONFIG_ID}/items"
 
-echo "Updating Edge Config with API key for APP_ID: ${APP\_ID}"  
-\# Realizar el request PATCH a la API de Vercel Edge Config para actualizar el API key  
-curl \--retry 10 \-f \--retry-all-errors \--retry-delay  5 \-s \-o /dev/null \\  
-     \-X PATCH "$URL" \\  
- \-H "Authorization: Bearer $VERCEL\_TOKEN" \\  
-     \-H "Content-Type: application/json" \\  
-     \-d "$REQUEST_BODY"
+echo "Updating Edge Config with API key for APP_ID: ${APP_ID}"
+# Realizar el request PATCH a la API de Vercel Edge Config para actualizar el API key
+curl --retry 10 -f --retry-all-errors --retry-delay  5 -s -o /dev/null \
+     -X PATCH "$URL" \
+ -H "Authorization: Bearer $VERCEL_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d "$REQUEST_BODY"
 
 sleep 10
 
-PUBLIC_IP=$(curl \-s http://169.254.169.254/latest/meta-data/public-ipv4)  
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 export PUBLIC_IP
 
 echo "Public IP of the instance: $PUBLIC_IP"
 
-echo "Registering zonal cache with REST API at ${REST\_API}"  
-curl \--retry 10 \-kfsS \--retry-all-errors \--retry-delay 5 \\  
-     \-X POST "https://${REST_API}/cache/register" \\  
- \-H "x-api-key: ${API\_KEY}" \\  
-     \-H "x-app-id: ${APP\_ID}" \\  
-     \-H "Content-Type: application/json" \\  
-     \-d "{\\"country\\":\\"${COUNTRY}\\", \\"ip\\":\\"${PUBLIC_IP}\\"}"
+echo "Registering zonal cache with REST API at ${REST_API}"
+curl --retry 10 -kfsS --retry-all-errors --retry-delay 5
+     -X POST "https://${REST_API}/cache/register" \
+ -H "x-api-key: ${API_KEY}" \
+     -H "x-app-id: ${APP_ID}" \
+     -H "Content-Type: application/json" \
+     -d "{"country":"${COUNTRY}", "ip":"${PUBLIC_IP}"}"
 
 sleep 5
 
-echo "Executing zonal cache with APP_ID: ${APP_ID}, REST_API: ${REST_API}, COUNTRY: ${COUNTRY}"  
-\# Se levanta el zonal cache  
-exec ./zonal\_cache  
-```  
+echo "Executing zonal cache with APP_ID: ${APP_ID}, REST_API: ${REST_API}, COUNTRY: ${COUNTRY}"
+# Se levanta el zonal cache
+exec ./zonal_cache
+```
+
 Este script de inicio se encarga de configurar la autenticación de la caché zonal y su configuración en Firestore, para que así el DNS API pueda redirigir las peticiones DNS con base en el IP de origen. Realiza las siguientes operaciones:
 
 1. Genera el API Key que usará para autenticar con el Rest API.
@@ -510,51 +389,54 @@ Este script de inicio se encarga de configurar la autenticación de la caché zo
 
 ## 6.3. Manejo del almacenamiento
 
-El objetivo de una caché es evitar tener que enviar una petición en repetidas ocasiones si se realiza múltiples veces. Para lograr esto, creamos un objeto de una caché. Este tiene la siguiente estructura:  
+El objetivo de una caché es evitar tener que enviar una petición en repetidas ocasiones si se realiza múltiples veces. Para lograr esto, creamos un objeto de una caché. Este tiene la siguiente estructura:
 
-```json  
-{  
- “cache”: {  
- “destino”: {  
- “requests”: {  
- “request” :{  
- “received”: fecha y hora recibida,  
- “most_recent_use”: fecha y hora de la última vez que se usó,  
- “times_used”: cantidad de usos,  
- “time_to_live”: fecha y hora a la que expira el registro,  
- “filename”: nombre del archivo con su información,  
+```json
+{
+ “cache”: {
+ “destino”: {
+ “requests”: {
+ “request” :{
+ “received”: fecha y hora recibida,
+ “most_recent_use”: fecha y hora de la última vez que se usó,
+ “times_used”: cantidad de usos,
+ “time_to_live”: fecha y hora a la que expira el registro,
+ “filename”: nombre del archivo con su información,
  “size”: tamaño del archivo.
 
     		}
 
-},  
-“size”: tamaño de la cache que tiene el dominio.  
-}  
-}  
-}  
-```  
-Un ejemplo de esta estructura es:  
-```json  
-{  
- “cache”: {  
- “pokemon.mooo.com”: {  
- “requests”: {  
- “[GET-pokemon.mooo.com/getPokemon/001](http://GET-pokemon.moo.com/getPokemon/001)” :{  
- “received”: “Tue Jun 3 02:37:49”,  
- “most_recent_use”: “Tue Jun 3 05:40:20”,  
- “times_used”: 3,  
- “time_to_live”: “Tue Jun 3 06:00:00”,  
- “filename”: bulbasour.ksh,  
+},
+“size”: tamaño de la cache que tiene el dominio.
+}
+}
+}
+```
+
+Un ejemplo de esta estructura es:
+
+```json
+{
+ “cache”: {
+ “pokemon.mooo.com”: {
+ “requests”: {
+ “[GET-pokemon.mooo.com/getPokemon/001](http://GET-pokemon.moo.com/getPokemon/001)” :{
+ “received”: “Tue Jun 3 02:37:49”,
+ “most_recent_use”: “Tue Jun 3 05:40:20”,
+ “times_used”: 3,
+ “time_to_live”: “Tue Jun 3 06:00:00”,
+ “filename”: bulbasour.ksh,
  “size”: 500
 
     		}
 
-},  
-“size”: 500  
-}  
-}  
-}  
-```  
+},
+“size”: 500
+}
+}
+}
+```
+
 Como C++ no tiene soporte nativo para objetos JSON, por lo que usamos la biblioteca [RapidJSON](https://rapidjson.org/). Esta biblioteca simplificó mucho el desarrollo al tener una forma fácil de obtener los objetos con base en la llave. El siguiente [diagrama](https://www.mermaidchart.com/app/projects/5849e424-fa63-48bc-a804-13f2ca3b7dd7/diagrams/96b9d9ba-b12c-41df-9c4b-c477af41341f/version/v0.1/edit) explica el proceso de administrar la caché.
 
 ![](images/zonal_cache_flow.png)
@@ -563,97 +445,98 @@ Como C++ no tiene soporte nativo para objetos JSON, por lo que usamos la bibliot
 
 Cuando se quiere agregar un request a la caché, pero no hay espacio suficiente para este, es necesario eliminar uno que ya existe. Para este fin, hay cinco políticas de reemplazo:
 
-* Last Recently Used (LRU): En esta política, se busca cuál es el registro que no se ha usado en la mayor cantidad de tiempo. Para esto, se revisa el campo de `most\_recent\_use’ y buscar cuál tiene el menor timestamp.  
-* Last Frequently Used (LFU): En esta política, se busca cuál es el registro que se usa con menos frecuencia.  Para esto, se revisa el campo de `times\_used` y se elimina el que tenga la menor cifra.  
-* First In, First Out (FIFO): En esta política, se elimina el registro más antiguo, el primero en entrar a la caché. Esto se obtiene por medio del campo `received`.  
-* Most Recently Used: En esta política, se elimina el registro que se ha usado más recientemente. Este se obtiene con el campo de `most\_recent\_use`, igual que con LRU.  
-* Random: Esta política elimina un registro aleatoriamente.
+- Last Recently Used (LRU): En esta política, se busca cuál es el registro que no se ha usado en la mayor cantidad de tiempo. Para esto, se revisa el campo de `most_recent_use’ y buscar cuál tiene el menor timestamp.
+- Last Frequently Used (LFU): En esta política, se busca cuál es el registro que se usa con menos frecuencia. Para esto, se revisa el campo de `times_used` y se elimina el que tenga la menor cifra.
+- First In, First Out (FIFO): En esta política, se elimina el registro más antiguo, el primero en entrar a la caché. Esto se obtiene por medio del campo `received`.
+- Most Recently Used: En esta política, se elimina el registro que se ha usado más recientemente. Este se obtiene con el campo de `most_recent_use`, igual que con LRU.
+- Random: Esta política elimina un registro aleatoriamente.
 
 ## 6.5. Expiración de la caché
 
-Cada registro en la caché tiene un time to live (TTL), o tiempo para vivir. Este se calcula al sumar el TTL configurado para el registro al tiempo en el que se recibió el request. Para imponer esta restricción, hay un hilo que periódicamente revisa los registros de la caché y si el timestamp del TTL es menor al tiempo actual, ese registro se elimina. En la implementación, se obtiene un lock compartido para leer la caché. Se lee el campo de `time\_to\_live` de cada registro y se compara con el tiempo actual. Si es menor, se obtiene un lock de escritora único para poder modificar el objeto compartido de la caché de una manera segura. Luego, se libera ese lock y se vuelve a adquirir un lock compartido de lectura. Si luego de eliminar el registro, el objeto del destino se queda sin registros, se elimina ese objeto también. Se vuelve a adquirir un lock único de escritura y se realiza la modificación.
+Cada registro en la caché tiene un time to live (TTL), o tiempo para vivir. Este se calcula al sumar el TTL configurado para el registro al tiempo en el que se recibió el request. Para imponer esta restricción, hay un hilo que periódicamente revisa los registros de la caché y si el timestamp del TTL es menor al tiempo actual, ese registro se elimina. En la implementación, se obtiene un lock compartido para leer la caché. Se lee el campo de `time_to_live` de cada registro y se compara con el tiempo actual. Si es menor, se obtiene un lock de escritora único para poder modificar el objeto compartido de la caché de una manera segura. Luego, se libera ese lock y se vuelve a adquirir un lock compartido de lectura. Si luego de eliminar el registro, el objeto del destino se queda sin registros, se elimina ese objeto también. Se vuelve a adquirir un lock único de escritura y se realiza la modificación.
 
 ## 6.6. Subdominios
 
 La caché tiene un hilo que ejecuta la función `fetch_subdomains`, la cual hace un fetch al endpoint de `/subdomains/all` del Rest API para extraer la información de todos los subdominios. Una vez actualizada la información, se queda esperando lo que establezca la variable de entorno de `$FETCH_INTERVAL`, la cual establece el tiempo de espera en minutos. Guarda la información en un objeto Document llamado `subdomains`. Este objeto es una estructura de datos para representar objetos JSON de la biblioteca RapidJSON. Adicionalmente, el objeto de subdominios y la caché se protegen con un objeto [shared_mutex](https://en.cppreference.com/w/cpp/thread/shared_mutex.html) para prevenir condiciones de carrera. Este permite varios lectores a la vez y solo 1 escritor.
 
-En este objeto de subdomains, los subdominios tienen la siguiente estructura:  
-```json  
-{  
- "amazon.chickenkiller.com": {  
- "cacheSize": 10000000,  
- "fileTypes": \[  
- "text/html",  
- "text/css",  
- "application/js",  
- "application/json",  
- "image/png",  
- "image/jpeg",  
- "image/svg+xml",  
- "application/xml",  
- "text/plain",  
- "application/pdf"  
- \],  
- "ttl": 300000,  
- "replacementPolicy": "FIFO",  
- "authMethod": "none",  
- "https": true,  
- "destination": "www.amazon.com"  
- },  
- "apache.mooo.com": {  
- "cacheSize": 1000000,  
- "fileTypes": \[  
- "text/html",  
- "text/css",  
- "application/js"  
- \],  
- "ttl": 300000,  
- "replacementPolicy": "LRU",  
- "authMethod": "user-password",  
- "https": false,  
- "destination": "10.0.2.118"  
- }  
-}  
-```  
-Una vez que se procesan, se guardan en un objeto de la estructura subdomain\_info, la cual tiene los siguientes campos:  
-```c++  
-struct *subdomain\_info* {  
-    *string* auth\_method;  
-    *string* destination;  
-    bool https;  
-    vector\<*string*\> file\_types;  
-    *uint64\_t* cache\_size;  
-    int ttl;  
-    *string* replacement\_policy;  
-    *string* wildcard;  
-}  
+En este objeto de subdomains, los subdominios tienen la siguiente estructura:
+
+```json
+{
+  "amazon.chickenkiller.com": {
+    "cacheSize": 10000000,
+    "fileTypes": [
+      "text/html",
+      "text/css",
+      "application/js",
+      "application/json",
+      "image/png",
+      "image/jpeg",
+      "image/svg+xml",
+      "application/xml",
+      "text/plain",
+      "application/pdf"
+    ],
+    "ttl": 300000,
+    "replacementPolicy": "FIFO",
+    "authMethod": "none",
+    "https": true,
+    "destination": "www.amazon.com"
+  },
+  "apache.mooo.com": {
+    "cacheSize": 1000000,
+    "fileTypes": ["text/html", "text/css", "application/js"],
+    "ttl": 300000,
+    "replacementPolicy": "LRU",
+    "authMethod": "user-password",
+    "https": false,
+    "destination": "10.0.2.118"
+  }
+}
+```
+
+Una vez que se procesan, se guardan en un objeto de la estructura subdomain_info, la cual tiene los siguientes campos:
+
+```c++
+struct *subdomain_info* {
+    *string* auth_method;
+    *string* destination;
+    bool https;
+    vector<*string*> file_types;
+    *uint64_t* cache_size;
+    int ttl;
+    *string* replacement_policy;
+    *string* wildcard;
+}
 ```
 
 ## 6.7. Wildcards
 
 Los wildcards se insertan en su propia colección en Firestore. Así, en la función de fetch_subdomains en la que se actualizan los subdominios, se actualizan los wildcards. Se hace una petición al endpoint de “/subdomain/wildcards” del Rest API para leer la información. Se guarda en el objeto `wildcards` en el zonal cache. Igualmente, se usa un shared mutex para proteger el acceso.  
-La función que se usa para validar si un subdominio está cubierto por un wildcard es la siguiente:  
-```c++  
-string check\_wildcard(const string \&subdomain) {  
-    size\_t length \= 0;  
-    string response;  
-    // Iterar sobre los wildcards  
-    for (auto wildcard\_itr \= wildcards.MemberBegin(); wildcard\_itr \!= wildcards.MemberEnd(); \++wildcard\_itr) {  
-        const string wildcard\_str \= wildcard\_itr-\>name.GetString();  
-        // Verificar si el subdominio termina con el wildcard  
-        if (subdomain.ends\_with("." \+ wildcard\_str)) {  
-            // Si el wildcard es más largo que el actual, actualizar la longitud  
-            if (wildcard\_str.length() \> length) {  
-                length \= wildcard\_str.length();  
-                response \= wildcard\_str;  
-            }  
-            // Retornar el wildcard encontrado  
-            return wildcard\_str;  
-        }  
-    }  
-    return "";  
-}  
-```  
+La función que se usa para validar si un subdominio está cubierto por un wildcard es la siguiente:
+
+```c++
+string check_wildcard(const string &subdomain) {
+    size_t length = 0;
+    string response;
+    // Iterar sobre los wildcards
+    for (auto wildcard_itr = wildcards.MemberBegin(); wildcard_itr != wildcards.MemberEnd(); ++wildcard_itr) {
+        const string wildcard_str = wildcard_itr->name.GetString();
+        // Verificar si el subdominio termina con el wildcard
+        if (subdomain.ends_with("." + wildcard_str)) {
+            // Si el wildcard es más largo que el actual, actualizar la longitud
+            if (wildcard_str.length() > length) {
+                length = wildcard_str.length();
+                response = wildcard_str;
+            }
+            // Retornar el wildcard encontrado
+            return wildcard_str;
+        }
+    }
+    return "";
+}
+```
+
 Esta función lo que hace es iterar por los wildcards registrados y terminar si el dominio que se está revisando termina con el wildcard. En el caso en que haya varias coincidencias, se queda con el wildcard que sea más largo. Después de haber obtenido esto, se puede extraer la información del objeto del objeto `wildcards` y crear un objeto `subdomain_info`, con el wildcard encontrado guardado en el campo de `wildcard`. Esto se realiza porque la autenticación se maneja levemente diferente cuando es un wildcard.
 
 ## 6.8. Autenticación
@@ -669,21 +552,22 @@ Si se encuentra que el subdominio no tiene un método de autenticación configur
 
 A continuación se muestra el flujo de autenticación con usuario y password:  
 ![](images/image21.png)  
-Los pasos son los siguientes:  
-1\. Cache revisa si recibe el Cookie de Token y no lo encuentra.  
-2\. Redirige al Browser por medio de una respuesta HTTP 302 a la página del UI en Vercel en el path "/login", con los siguientes query parameters: subdomain \= url_encode(scheme \+ host \+ request.uri), authMethod \= authMethod. Si tiene wildcard, el wildcard también se agrega como query parameter.  
-3\. El browser envía al Vercel UI el usuario y contraseña.  
-4\. El Vercel UI envía una solicitud de autenticación al Rest API.  
-5\. El Rest API autentica y devuelve un URL con la siguiente estructura: host_original/\_auth/callback?token={JWT de autenticación}\&next={subdominio+uri_original}\&exp={segundos de expiración de la sesión}.  
-6\. El Vercel UI recibe el URL y genera una redirección al URL.  
-7\. El browser regresa el URL con el subdominio original y envía un HTTP request con el URI /\_auth/callback.  
-8\. El zonal cache verifica que se haya llamado a la ruta del callback y extrae el token, el subdominio y la expiración. Devuelve una respuesta HTTP 302 con el header de Set-Cookie: token={token} y redirige al subdominio con el URI original.  
-9\. El Browser va al subdominio con el URI original.  
-10\. El zonal cache encuentra el cookie token. Envía el cookie al Rest API.  
-11\. El Rest API valida el token devuelve una respuesta de si el token es una sesión válida.  
-12\. El zonal cache recibe la respuesta afirmativa y autentica la solicitud.
+Los pasos son los siguientes:
 
-Cuando ya se estableció el cookie de Token, la autenticación solo se realiza a partir del paso 10\.
+1. Cache revisa si recibe el Cookie de Token y no lo encuentra.
+2. Redirige al Browser por medio de una respuesta HTTP 302 a la página del UI en Vercel en el path "/login", con los siguientes query parameters: subdomain = url_encode(scheme + host + request.uri), authMethod = authMethod. Si tiene wildcard, el wildcard también se agrega como query parameter.
+3. El browser envía al Vercel UI el usuario y contraseña.
+4. El Vercel UI envía una solicitud de autenticación al Rest API.
+5. El Rest API autentica y devuelve un URL con la siguiente estructura: host_original/\_auth/callback?token={JWT de autenticación}&next={subdominio+uri_original}&exp={segundos de expiración de la sesión}.
+6. El Vercel UI recibe el URL y genera una redirección al URL.
+7. El browser regresa el URL con el subdominio original y envía un HTTP request con el URI /\_auth/callback.
+8. El zonal cache verifica que se haya llamado a la ruta del callback y extrae el token, el subdominio y la expiración. Devuelve una respuesta HTTP 302 con el header de Set-Cookie: token={token} y redirige al subdominio con el URI original.
+9. El Browser va al subdominio con el URI original.
+10. El zonal cache encuentra el cookie token. Envía el cookie al Rest API.
+11. El Rest API valida el token devuelve una respuesta de si el token es una sesión válida.
+12. El zonal cache recibe la respuesta afirmativa y autentica la solicitud.
+
+Cuando ya se estableció el cookie de Token, la autenticación solo se realiza a partir del paso 10.
 
 ### 6.8.3. API keys
 
@@ -693,40 +577,42 @@ El siguiente diagrama muestra cómo se autentican los API keys en el zonal cache
 
 ## 6.9. SSL Termination
 
-Los zonal cache soportan conexión por HTTP y HTTPS. Así, tienen dos sockets abiertos: el puerto 80 y el puerto 443\. Las conexiones por el puerto 80 se asumen que son HTTP, por lo que se usan las primitivas de socket normales, de `recv` y `send`. Para las conexiones por el puerto 443, se asumen que son HTTPS. Se utiliza la biblioteca de `OpenSSL` para el manejo del handshake TLS y los certificados. Para los certificados, se usa un self signed certificate generado por el siguiente comando ([Referencia](https://www.ibm.com/docs/en/api-connect/10.0.x_cd?topic=profile-using-openssl-generate-format-certificates)) :  
-```  
-openssl req \\  
-  \-newkey rsa:2048 \\  
-  \-nodes \\  
-  \-keyout key.pem \\  
-  \-x509 \\  
-  \-days 365 \\  
-  \-out cert.pem \\  
-  \-subj "/C=US/ST=Florida/L=Miami/O=Twins/OU=Software/CN=redesproject"  
-```  
+Los zonal cache soportan conexión por HTTP y HTTPS. Así, tienen dos sockets abiertos: el puerto 80 y el puerto 443. Las conexiones por el puerto 80 se asumen que son HTTP, por lo que se usan las primitivas de socket normales, de `recv` y `send`. Para las conexiones por el puerto 443, se asumen que son HTTPS. Se utiliza la biblioteca de `OpenSSL` para el manejo del handshake TLS y los certificados. Para los certificados, se usa un self signed certificate generado por el siguiente comando ([Referencia](https://www.ibm.com/docs/en/api-connect/10.0.x_cd?topic=profile-using-openssl-generate-format-certificates)) :
+
+```
+openssl req
+  -newkey rsa:2048
+  -nodes
+  -keyout key.pem
+  -x509
+  -days 365
+  -out cert.pem
+  -subj "/C=US/ST=Florida/L=Miami/O=Twins/OU=Software/CN=redesproject"
+```
+
 Esto genera un self signed certificate. Como las cachés zonales no tienen un dominio fijo ya que el IP asignado depende de lo que les asigne AWS, no se puede asignar un certificado respaldado por un Certificate Authority autorizado. Por lo tanto, el acceso por HTTPS va a dar los errores de certificados inválidos, pero cuando se continúa con la opción de acceder al sitio, sí se puede acceder exitosamente.
 
-# 7\. Rest API Python
+# 7. Rest API Python
 
 Este componente es un programa simple escrito en Python con la biblioteca Flask. Es un REST API que simplemente funciona como un diccionario de Pokémones. Tiene endpoints para realizar requests de GET, POST, PUT y DELETE. Ejemplos de requests son:
 
 ![](images/image11.png)  
 ![](images/image3.png)
 
-# 8\. Apache Server
+# 8. Apache Server
 
-* `index.html`: Tiene la estructura de la calculadora.  
-* `style.css`: Tiene la customización de la página para hacerla más atractiva visualmente.  
+- `index.html`: Tiene la estructura de la calculadora.
+- `style.css`: Tiene la customización de la página para hacerla más atractiva visualmente.
+- `[calculator.js](http://calculator.js)`: Tiene el código de Javascript que corre la calculadora.
+
+* `index.html`: Tiene la estructura de la calculadora.
+* `style.css`: Tiene la customización de la página para hacerla más atractiva visualmente.
 * `[calculator.js](http://calculator.js)`: Tiene el código de Javascript que corre la calculadora.
-
-- \`index.html\`: Tiene la estructura de la calculadora.
-- \`style.css\`: Tiene la customización de la página para hacerla más atractiva visualmente.
-- \`[calculator.js](http://calculator.js)\`: Tiene el código de Javascript que corre la calculadora.
 
 Esta página se ve así:  
 ![](images/image2.png)
 
-# 9\. Node API
+# 9. Node API
 
 Este es un REST server hecho con Node.js y Express que expone endpoints usados por la UI y por las caches zonales. Funciona como la capa de aplicación que gestiona usuarios, dominios y subdominios en Firebase/Firestore. Ofrece rutas para los métodos GET, POST, PUT y DELETE, y se asegura la seguridad con JWT y middlewares.
 
@@ -745,45 +631,46 @@ Esta función crea una sesión de usuario almacenando en Firestore un documento 
 
 Luego genera un JWT que incluye **{ user, domain, sessionId, type: "user" }** y expira según el mismo valor **expiration**. Si ocurre algún error al parsear la duración o al crear el documento, devuelve una cadena vacía.
 
-```javascript  
-*const* createSessionUser \= *async* (  
-  user: string,  
-  domain: string,  
-  expiration: ms.StringValue  
-) \=\> {  
- try {  
- _const_ expirationMs \= ms(expiration);  
- if (isNaN(expirationMs)) {  
- _return_ "";  
+```javascript
+*const* createSessionUser = *async* (
+  user: string,
+  domain: string,
+  expiration: ms.StringValue
+) => {
+ try {
+ _const_ expirationMs = ms(expiration);
+ if (isNaN(expirationMs)) {
+ _return_ "";
  }
 
-    *const* now \= new Date(Date.now());
-    *const* expirationDate \= new Date(now.getTime() \+ expirationMs);
-    *const* sessionData \= {
+    *const* now = new Date(Date.now());
+    *const* expirationDate = new Date(now.getTime() + expirationMs);
+    *const* sessionData = {
       user,
       domain,
       createdAt: now.toISOString(),
       expiresAt: expirationDate.toISOString(),
     };
-    *const* sessionsRef \= *await* firestore.collection("sessions").add(sessionData);
-    *const* sessionId \= sessionsRef.id;
-    if (\!sessionId) {
+    *const* sessionsRef = *await* firestore.collection("sessions").add(sessionData);
+    *const* sessionId = sessionsRef.id;
+    if (!sessionId) {
       *return* "";
     }
-    *const* token \= jwt.sign(
+    *const* token = jwt.sign(
       { user, domain, sessionId, type: "user" },
-      process.env.JWT\_SECRET || "defaultsecret",
+      process.env.JWT_SECRET || "defaultsecret",
       { expiresIn: expiration }
     );
 
     *return* token;
 
-} catch (error) {  
- console.error("Error creating session:", error);  
- _return_ "";  
- }  
-};  
-```  
+} catch (error) {
+ console.error("Error creating session:", error);
+ _return_ "";
+ }
+};
+```
+
 **createSessionApiKey**
 
 Esta función crea una sesión basada en API Key almacenando en Firestore un documento con:
@@ -801,30 +688,30 @@ Esta función registra un nuevo usuario verificando que no exista un documento c
 
 ```
 
-export _const_ registerUser \= _async_ (  
- req: Request,  
- res: Response  
-): Promise\<void\> \=\> {  
- try {  
- _const_ { username, password } \= req.body;  
- _const_ docRef \= firestore.collection("users").doc(username);  
- _const_ doc \= _await_ docRef.get();  
- if (doc.exists) {  
- res.status(400).json({ message: "El usuario ya existe." });  
- _return_;  
+export _const_ registerUser = _async_ (
+ req: Request,
+ res: Response
+): Promise<void> => {
+ try {
+ _const_ { username, password } = req.body;
+ _const_ docRef = firestore.collection("users").doc(username);
+ _const_ doc = _await_ docRef.get();
+ if (doc.exists) {
+ res.status(400).json({ message: "El usuario ya existe." });
+ _return_;
  }
 
-    *const* salt \= bcrypt.genSaltSync(10);
-    *const* hashedPassword \= bcrypt.hashSync(password, salt);
+    *const* salt = bcrypt.genSaltSync(10);
+    *const* hashedPassword = bcrypt.hashSync(password, salt);
 
     *await* docRef.set({
       username,
       password: hashedPassword,
     });
 
-    *const* expiration \= "1h";
-    *const* token \= *await* createSessionUser(username, "domain\_ui", expiration);
-    if (\!token) {
+    *const* expiration = "1h";
+    *const* token = *await* createSessionUser(username, "domain_ui", expiration);
+    if (!token) {
       res.status(500).json({ message: "Error al crear la sesión" });
       *return*;
     }
@@ -835,10 +722,10 @@ export _const_ registerUser \= _async_ (
     });
     res.status(201).json({ message: "Usuario registrado exitosamente", token });
 
-} catch (error) {  
- console.error("Error al registrar el usuario:", error);  
- res.status(500).json({ message: "Internal server error" });  
- }  
+} catch (error) {
+ console.error("Error al registrar el usuario:", error);
+ res.status(500).json({ message: "Internal server error" });
+ }
 };
 
 ```
@@ -849,30 +736,30 @@ Esta función recibe **username** y **password** en el cuerpo, busca el document
 
 ```
 
-export _const_ loginUser \= _async_ (req: Request, res: Response): Promise\<void\> \=\> {  
- try {  
- _const_ { username, password } \= req.body;  
- _const_ docRef \= firestore.collection("users").doc(username);  
- _const_ doc \= _await_ docRef.get();  
- if (\!doc.exists) {  
- res.status(401).json({ message: "Unauthorized" });  
- _return_;  
+export _const_ loginUser = _async_ (req: Request, res: Response): Promise<void> => {
+ try {
+ _const_ { username, password } = req.body;
+ _const_ docRef = firestore.collection("users").doc(username);
+ _const_ doc = _await_ docRef.get();
+ if (!doc.exists) {
+ res.status(401).json({ message: "Unauthorized" });
+ _return_;
  }
 
-    *const* userData \= doc.data();
-    if (\!userData) {
+    *const* userData = doc.data();
+    if (!userData) {
       res.status(500).json({ message: "Internal server error" });
       *return*;
     }
 
-    *const* isPasswordValid \= bcrypt.compareSync(password, userData.password);
-    if (\!isPasswordValid) {
+    *const* isPasswordValid = bcrypt.compareSync(password, userData.password);
+    if (!isPasswordValid) {
       res.status(401).json({ message: "Unauthorized" });
       *return*;
     }
-    *const* expiration \= "1h";
-    *const* token \= *await* createSessionUser(username, "domain\_ui", expiration);
-    if (\!token) {
+    *const* expiration = "1h";
+    *const* token = *await* createSessionUser(username, "domain_ui", expiration);
+    if (!token) {
       res.status(500).json({ message: "Error al crear sesión" });
       *return*;
     }
@@ -883,11 +770,11 @@ export _const_ loginUser \= _async_ (req: Request, res: Response): Promise\<void
     });
     res.status(200).json({ token });
 
-} catch (error) {  
- console.error("Error logging in user:", error);  
- res.status(500).json({ message: "Internal server error" });  
- }  
-};  
+} catch (error) {
+ console.error("Error logging in user:", error);
+ res.status(500).json({ message: "Internal server error" });
+ }
+};
 ```
 
 **loginSubdomainUser**
@@ -896,41 +783,41 @@ Verifica que **subdomain** sea una URL válida y, según si es wildcard o no, bu
 
 ```
 
-export _const_ loginSubdomainUser \= _async_ (  
- req: Request,  
- res: Response  
-): Promise\<void\> \=\> {  
- try {  
- _const_ { username, password, subdomain, wildcard } \= req.body;  
- console.log(username, password, subdomain);  
- _let_ subdomainURL: URL;  
- try {  
- subdomainURL \= new URL(subdomain);  
- } catch (error) {  
- console.error("Invalid subdomain URL:", error);  
- res.status(400).json({ message: "URL del subdominio inválido" });  
- _return_;  
- }  
- _let_ docRef;  
- if (\!wildcard) {  
- docRef \= firestore.collection("subdomains").doc(subdomainURL.hostname);  
- } else {  
- docRef \= firestore.collection("wildcards").doc(wildcard);  
+export _const_ loginSubdomainUser = _async_ (
+ req: Request,
+ res: Response
+): Promise<void> => {
+ try {
+ _const_ { username, password, subdomain, wildcard } = req.body;
+ console.log(username, password, subdomain);
+ _let_ subdomainURL: URL;
+ try {
+ subdomainURL = new URL(subdomain);
+ } catch (error) {
+ console.error("Invalid subdomain URL:", error);
+ res.status(400).json({ message: "URL del subdominio inválido" });
+ _return_;
+ }
+ _let_ docRef;
+ if (!wildcard) {
+ docRef = firestore.collection("subdomains").doc(subdomainURL.hostname);
+ } else {
+ docRef = firestore.collection("wildcards").doc(wildcard);
  }
 
-    *const* doc \= *await* docRef.get();
-    if (\!doc.exists) {
+    *const* doc = *await* docRef.get();
+    if (!doc.exists) {
       res.status(401).json({ message: "Unauthorized. No domain." });
       *return*;
     }
 
-    *const* subdomainData \= doc.data();
-    if (\!subdomainData) {
+    *const* subdomainData = doc.data();
+    if (!subdomainData) {
       res.status(500).json({ message: "Internal server error" });
       *return*;
     }
 
-    if (subdomainData.authMethod \!= "user-password") {
+    if (subdomainData.authMethod != "user-password") {
       res.status(401).json({
         message:
           "Unauthorized, subdominio requiere autenticación con usuario y contraseña",
@@ -939,34 +826,34 @@ export _const_ loginSubdomainUser \= _async_ (
     }
 
     console.log("Subdomain data:", subdomainData);
-    *const* userPassword \= subdomainData.users?.\[username\];
-    if (\!userPassword) {
+    *const* userPassword = subdomainData.users?.[username];
+    if (!userPassword) {
       res.status(401).json({ message: "Unauthorized" });
       *return*;
     }
-    *const* isPasswordValid \= bcrypt.compareSync(password, userPassword);
-    if (\!isPasswordValid) {
+    *const* isPasswordValid = bcrypt.compareSync(password, userPassword);
+    if (!isPasswordValid) {
       res.status(401).json({ message: "Unauthorized" });
       *return*;
     }
 
-    *const* expiration \= "1h";
-    *const* token \= *await* createSessionUser(username, subdomain, expiration);
-    if (\!token) {
+    *const* expiration = "1h";
+    *const* token = *await* createSessionUser(username, subdomain, expiration);
+    if (!token) {
       res.status(500).json({ message: "Error al crear sesión" });
       *return*;
     }
-    *const* redirectURL \= new URL("/\_auth/callback", subdomainURL.origin);
+    *const* redirectURL = new URL("/_auth/callback", subdomainURL.origin);
     redirectURL.searchParams.set("token", token);
     redirectURL.searchParams.set("next", subdomain);
     redirectURL.searchParams.set("exp", (ms(expiration) / 1000).toString());
     res.status(200).json({ url: redirectURL.toString() });
 
-} catch (error) {  
- console.error("Error logging in user:", error);  
- res.status(500).json({ message: "Internal server error" });  
- }  
-};  
+} catch (error) {
+ console.error("Error logging in user:", error);
+ res.status(500).json({ message: "Internal server error" });
+ }
+};
 ```
 
 **loginSubdomainApiKey**
@@ -977,41 +864,42 @@ Valida que **subdomain** sea una URL válida y recupera el documento correspondi
 
 Esta función busca el JWT en la cookie **token**, decodifica para obtener **sessionId** y elimina el documento de sesión correspondiente en Firestore (**sessions/{sessionId}**). Luego borra la cookie y responde confirmando que la sesión fue removida.
 
-``` 
-export *const* logoutUser \= *async* (  
-  req: Request,  
-  res: Response  
-): Promise\<void\> \=\> {  
- _const_ token \= req.cookies.token;  
- if (\!token) {  
- console.error("No token found");  
- res.status(401).json({ message: "Unauthorized" });  
- _return_;  
- }  
- _const_ decoded: any \= jwtDecode(token);  
- _const_ { sessionId } \= decoded;  
- _const_ sessionRef \= firestore.collection("sessions").doc(sessionId);  
+```
+export *const* logoutUser = *async* (
+  req: Request,
+  res: Response
+): Promise<void> => {
+ _const_ token = req.cookies.token;
+ if (!token) {
+ console.error("No token found");
+ res.status(401).json({ message: "Unauthorized" });
+ _return_;
+ }
+ _const_ decoded: any = jwtDecode(token);
+ _const_ { sessionId } = decoded;
+ _const_ sessionRef = firestore.collection("sessions").doc(sessionId);
  _await_ sessionRef.delete();
 
-res.clearCookie("token", {  
- sameSite: "none",  
- secure: true,  
- });  
- res.status(200).json({ message: "Session removed" });  
-};  
-``` 
+res.clearCookie("token", {
+ sameSite: "none",
+ secure: true,
+ });
+ res.status(200).json({ message: "Session removed" });
+};
+```
+
 **hashApiKey**
 
 Esta función genera un hash HMAC-SHA256 de la **apiKey** usando un secret (**API_KEY_SECRET**) y devuelve el resultado en hexadecimal para almacenar de forma segura las claves.
 
 ```
 
-export _const_ hashApiKey \= (apiKey: string): string \=\> {  
- _return_ crypto  
- .createHmac("sha256", process.env.API_KEY_SECRET || "default")  
- .update(apiKey)  
- .digest("hex");  
-};  
+export _const_ hashApiKey = (apiKey: string): string => {
+ _return_ crypto
+ .createHmac("sha256", process.env.API_KEY_SECRET || "default")
+ .update(apiKey)
+ .digest("hex");
+};
 ```
 
 **validateSubdomainApiKey**
@@ -1026,38 +914,38 @@ Si todo es correcto, responde con “OK”; en caso contrario, retorna “Forbid
 
 ```
 
-export _const_ validateSubdomainApiKey \= _async_ (req: Request, res: Response) \=\> {  
- try {  
- _const_ { apiKey, subdomain, wildcard } \= req.body;
+export _const_ validateSubdomainApiKey = _async_ (req: Request, res: Response) => {
+ try {
+ _const_ { apiKey, subdomain, wildcard } = req.body;
 
     *let* docRef;
-    if (\!wildcard) {
-      docRef \= firestore.collection("subdomains").doc(subdomain);
+    if (!wildcard) {
+      docRef = firestore.collection("subdomains").doc(subdomain);
     } else {
-      docRef \= firestore.collection("wildcards").doc(wildcard);
+      docRef = firestore.collection("wildcards").doc(wildcard);
     }
-    *const* doc \= *await* docRef.get();
-    if (\!doc.exists) {
+    *const* doc = *await* docRef.get();
+    if (!doc.exists) {
       res.status(401).json({ message: "Unauthorized. No domain." });
       *return*;
     }
 
-    *const* subdomainData \= doc.data();
-    if (\!subdomainData) {
+    *const* subdomainData = doc.data();
+    if (!subdomainData) {
       res.status(500).json({ message: "Internal server error" });
       *return*;
     }
 
-    if (subdomainData.authMethod \!= "api-keys") {
+    if (subdomainData.authMethod != "api-keys") {
       res.status(403).json({
         message: "Forbidden, subdominio requiere autenticación con API keys",
       });
       *return*;
     }
 
-    *const* hashedKey \= hashApiKey(apiKey);
-    *const* isApiKeyValid \= subdomainData.apiKeys?.\[hashedKey\];
-    if (\!isApiKeyValid) {
+    *const* hashedKey = hashApiKey(apiKey);
+    *const* isApiKeyValid = subdomainData.apiKeys?.[hashedKey];
+    if (!isApiKeyValid) {
       res.status(403).json({ message: "Forbidden" });
       *return*;
     }
@@ -1065,12 +953,12 @@ export _const_ validateSubdomainApiKey \= _async_ (req: Request, res: Response) 
     res.status(200).send("OK");
     *return*;
 
-} catch (error) {  
- console.error("Error creating session:", error);  
- res.status(401).send("Forbidden");  
- _return_;  
- }  
-};  
+} catch (error) {
+ console.error("Error creating session:", error);
+ res.status(401).send("Forbidden");
+ _return_;
+ }
+};
 ```
 
 **changePassword**
@@ -1079,23 +967,23 @@ Esta función recibe **username** y **newPassword**, busca el documento del usua
 
 ```
 
-export _const_ changePassword \= _async_ (  
- req: Request,  
- res: Response  
-): Promise\<void\> \=\> {  
- try {  
- _const_ { username, newPassword } \= req.body;
+export _const_ changePassword = _async_ (
+ req: Request,
+ res: Response
+): Promise<void> => {
+ try {
+ _const_ { username, newPassword } = req.body;
 
-    *const* docRef \= firestore.collection("users").doc(username);
-    *const* doc \= *await* docRef.get();
+    *const* docRef = firestore.collection("users").doc(username);
+    *const* doc = *await* docRef.get();
 
-    if (\!doc.exists) {
+    if (!doc.exists) {
       res.status(404).json({ message: "Usuario no encontrado" });
       *return*;
     }
 
-    *const* salt \= bcrypt.genSaltSync(10);
-    *const* hashedNewPassword \= bcrypt.hashSync(newPassword, salt);
+    *const* salt = bcrypt.genSaltSync(10);
+    *const* hashedNewPassword = bcrypt.hashSync(newPassword, salt);
 
     *await* docRef.update({
       password: hashedNewPassword,
@@ -1103,11 +991,11 @@ export _const_ changePassword \= _async_ (
 
     res.status(200).json({ message: "Contraseña actualizada exitosamente" });
 
-} catch (error) {  
- console.error("Error al cambiar la contraseña:", error);  
- res.status(500).json({ message: "Error interno del servidor" });  
- }  
-};  
+} catch (error) {
+ console.error("Error al cambiar la contraseña:", error);
+ res.status(500).json({ message: "Error interno del servidor" });
+ }
+};
 ```
 
 ### domain.controller.ts
@@ -1129,7 +1017,7 @@ Esta función comprueba que el usuario esté autenticado y que se reciba el par�
 Esta función verifica los dominios pendientes de validación para el usuario autenticado. Lee todos los documentos en **users/{uid}/domains** donde **validated** es **false**. Para cada dominio:
 
 - Obtiene **subdomain** y **token** desde **data.validation**.
-- Construye **fullDomain \= subdomain \+ "." \+ domain** y realiza una consulta DNS TXT para ese nombre.
+- Construye **fullDomain = subdomain + "." + domain** y realiza una consulta DNS TXT para ese nombre.
 - Si no hay registros TXT, marca **{ verified: false, error: "No se encontró el registro TXT" }**.
 - Si el primer registro TXT no coincide con token, marca **{ verified: false, error: "Token no coincide" }**.
 - Si coincide, actualiza en Firestore el campo **validated: true** y marca **{ verified: true, message: "Dominio verificado correctamente" }**.
@@ -1150,7 +1038,7 @@ Primero verifica que el usuario tenga sesión activa. Luego extrae del cuerpo es
 
 - **domain:** debe ser un string no vacío y FQDN válido.
 - **destination:** debe ser un dominio o IP válidos.
-- **subdomain:** puede ser cadena vacía, FQDN parcial o wildcard (\*/\*.\<nombre\>).
+- **subdomain:** puede ser cadena vacía, FQDN parcial o wildcard (_/_.<nombre>).
 - **cacheSize:** número (MB convertidos a bytes).
 - **ttl:** número de milisegundos positivo.
 - **https:** booleano.
@@ -1169,7 +1057,7 @@ Firestore:
 
 Realtime Database:
 
-- domains/{flipped_domain}/\_enabled \= true.
+- domains/{flipped_domain}/\_enabled = true.
 - Finalmente retorna un mensaje de éxito y, si se generaron API keys, las incluye en la respuesta.
 
 **updateSubdomain**
@@ -1178,7 +1066,7 @@ Este método comprueba que el usuario esté autenticado y extrae del cuerpo los 
 
 - **domain:** string no vacío y FQDN válido.
 - **destination:** FQDN o IP válidos.
-- **subdomain:** cadena vacía, FQDN parcial o wildcard (\*/\*.\<nombre\>).
+- **subdomain:** cadena vacía, FQDN parcial o wildcard (_/_.<nombre>).
 - **cacheSize:** número válido.
 - ttl: número de milisegundos positivo.
 - **https:** booleano.
@@ -1204,28 +1092,28 @@ Primero verifica que el usuario esté autenticado. Luego extrae de los parámetr
    2. "subdomains" en caso contrario.
 2. Construye el ID del documento en Firestore ({cleanedSub}.{domain} o simplemente domain para subdominio vacío).
 3. Identifica también la referencia en la subcolección del usuario:
-   1. users/{uid}/domains/{domain}/subdomains/{subdomainId}, usando "\_root\_" si es subdominio raíz.
+   1. users/{uid}/domains/{domain}/subdomains/{subdomainId}, usando "_root_" si es subdominio raíz.
 4. En un batch de Firestore:
    1. Elimina primaryColl/{docId}.
    2. Elimina users/{uid}/domains/{domain}/subdomains/{subdomainId}.
 5. En Realtime Database, borra la clave invertida domains/{flippedDomain}/\_enabled.
 
-Finalmente responde con un mensaje de éxito o, en caso de error, con un 500\.
+Finalmente responde con un mensaje de éxito o, en caso de error, con un 500.
 
 **getSubdomainsByDomain**
 
-Primero verifica que el usuario tenga sesión activa. Luego extrae domain de la query y valida que exista. A continuación recupera todos los documentos de subdomains y wildcards en Firestore, y filtra aquellos cuyo ID sea igual al dominio o termine en .\<domain\>. Para cada wildcard, construye la clave con prefijo \*. antes de agregarlo al resultado. Finalmente devuelve un objeto donde cada clave es el nombre completo del subdominio o wildcard y el valor es su configuración.
+Primero verifica que el usuario tenga sesión activa. Luego extrae domain de la query y valida que exista. A continuación recupera todos los documentos de subdomains y wildcards en Firestore, y filtra aquellos cuyo ID sea igual al dominio o termine en .<domain>. Para cada wildcard, construye la clave con prefijo \*. antes de agregarlo al resultado. Finalmente devuelve un objeto donde cada clave es el nombre completo del subdominio o wildcard y el valor es su configuración.
 
 **getSubdomainByName**
 
 Verifica que exista sesión de usuario y extrae domain y subdomainName de los parámetros. Luego:
 
-- subdomainName: si es \_root\_, corresponde al dominio base; si contiene \*, se trata de un wildcard.
+- subdomainName: si es _root_, corresponde al dominio base; si contiene \*, se trata de un wildcard.
 - cleaned: quita prefijo \*. si es wildcard, o deja el nombre tal cual.
 - collectionName: elige "wildcards" si es wildcard, o "subdomains" en caso contrario.
 - fullSubdomainId:
   - Si subdomainName es "\*" o root, usa domain.
-  - Si no, concatena cleaned \+ "." \+ domain.
+  - Si no, concatena cleaned + "." + domain.
 
 Consulta en Firestore collectionName/fullSubdomainId. Si no existe, retorna error, si existe, devuelve un objeto con id (con \*. prefijado para wildcards) y el resto de datos del documento.
 
@@ -1235,36 +1123,36 @@ A continuación se muestran los endpoints disponibles en el servidor Express. Ca
 
 ### [auth.routes.ts](http://auth.routes.ts)
 
-```  
-router.post("/register", registerUser);  
-router.post("/login", loginUser);  
-router.post("/login/subdomain/user", loginSubdomainUser);  
-router.post("/login/subdomain/apikey", loginSubdomainApiKey);  
-router.get("/logout", logoutUser);  
-router.get("/validate", authenticateJWT, validateSubdomainSession);  
-router.post("/validate/apikey", validateSubdomainApiKey);  
-router.post("/change-password", changePassword);  
+```
+router.post("/register", registerUser);
+router.post("/login", loginUser);
+router.post("/login/subdomain/user", loginSubdomainUser);
+router.post("/login/subdomain/apikey", loginSubdomainApiKey);
+router.get("/logout", logoutUser);
+router.get("/validate", authenticateJWT, validateSubdomainSession);
+router.post("/validate/apikey", validateSubdomainApiKey);
+router.post("/change-password", changePassword);
 ```
 
 ### [domain.routes.ts](http://domain.routes.ts)
 
-```  
-router.post("/register", registerDomain);  
-router.get("/all", getUserDomains);  
-router.delete("/:domain", deleteDomain);  
-router.get("/verify/", verifyDomainOwnership);  
+```
+router.post("/register", registerDomain);
+router.get("/all", getUserDomains);
+router.delete("/:domain", deleteDomain);
+router.get("/verify/", verifyDomainOwnership);
 ```
 
 ### [subdomain.routes.ts](http://subdomain.routes.ts)
 
-```  
-router.get("/all", getAllSubdomains);  
-router.get("/wildcards", getWildcardSubdomains);  
-router.post("/register", authenticateJWT, registerSubdomain);  
-router.get("/subdomains", authenticateJWT, getSubdomainsByDomain);  
-router.delete("/:domain/:subdomain", authenticateJWT, deleteSubdomain);  
-router.put("/:domain/:subdomain", authenticateJWT, updateSubdomain);  
-router.get("/:domain/:subdomainName", authenticateJWT, getSubdomainByName);  
+```
+router.get("/all", getAllSubdomains);
+router.get("/wildcards", getWildcardSubdomains);
+router.post("/register", authenticateJWT, registerSubdomain);
+router.get("/subdomains", authenticateJWT, getSubdomainsByDomain);
+router.delete("/:domain/:subdomain", authenticateJWT, deleteSubdomain);
+router.put("/:domain/:subdomain", authenticateJWT, updateSubdomain);
+router.get("/:domain/:subdomainName", authenticateJWT, getSubdomainByName);
 ```
 
 ## 9.3. Autenticación con el API
@@ -1277,41 +1165,41 @@ Dicho proceso de autenticación sucede en el archivo llamado ‘auth.middleware�
 
 El otro middleware se llama authenticate JWT el cual maneja la autenticación de usuarios utilizando JWT (JSON Web Tokens). Esto verifica tokens JWT en las cookies y valida sesiones contra Firestore. Además soporta dos tipos de autenticación donde está la de usuario y API. Además de esto se encarga de verificar la expiración de las sesiones, comprueba dominios y valida consistencia de datos entre token y base de datos. El flujo se resumen en lo siguiente: Las peticiones pasan por authenticateServer donde depende de la autenticación se procesa diferente, se valida que todas las validaciones sean exitosas y si es así la petición continua, de lo contrario se retorna error.
 
-# 10\. DNS Interceptor
+# 10. DNS Interceptor
 
-El interceptor DNS es el punto de contacto principal del sistema desde el punto de vista de la funcionalidad. Es una aplicación escrita en C que, por medio de un socket, recibe datagramas del protocolo UDP por el puerto 53\. Un cliente DNS envía solicitudes a este puerto y el interceptor responde con respuestas DNS, las cuales contienen la dirección IP extraída de la base de datos a través del REST API o más bien fueron resueltas por el cliente UDP del DNS API.  
+El interceptor DNS es el punto de contacto principal del sistema desde el punto de vista de la funcionalidad. Es una aplicación escrita en C que, por medio de un socket, recibe datagramas del protocolo UDP por el puerto 53. Un cliente DNS envía solicitudes a este puerto y el interceptor responde con respuestas DNS, las cuales contienen la dirección IP extraída de la base de datos a través del REST API o más bien fueron resueltas por el cliente UDP del DNS API.  
 Para interactuar con el programa, se pueden utilizar herramientas como `dig` y `nslookup`.  
-	Suponga que el público de la instancia en AWS que corre el interceptor es 44.204.113.56. Para hacer consultas al servidor con `dig` desde una terminal Linux, se haría lo siguiente:
+ Suponga que el público de la instancia en AWS que corre el interceptor es 44.204.113.56. Para hacer consultas al servidor con `dig` desde una terminal Linux, se haría lo siguiente:
 
-* `dig @\<DNS instance IP\> \<domain\>`  
-* `dig @44.204.113.56 [www.google.com](http://www.google.com)`
+- `dig @<DNS instance IP> <domain>`
+- `dig @44.204.113.56 [www.google.com](http://www.google.com)`
 
 Con nslookup, se realizaría lo siguiente:
 
-* `nslookup \<domain\> \<DNS instance IP\>`  
-* `nslookup [www.google.com](http://www.google.com) 44.204.113.56`
+- `nslookup <domain> <DNS instance IP>`
+- `nslookup [www.google.com](http://www.google.com) 44.204.113.56`
 
 ## 10.1. Implementación
 
 En esta sección, se describe la implementación del DNS Interceptor.  
 En primer lugar, las bibliotecas que se utilizaron para la programación del interceptor son las siguientes:
 
-- \[libcurl\](https://curl.se/libcurl/): Esta biblioteca se utiliza para enviar las solicitudes HTTPS al DNS API.
-- \[libb64\](https://github.com/libb64/libb64): Esta biblioteca se utiliza para codificar y decodificar las solicitudes DNS a base 64\.
-- \[pthreads\](http://man7.org/linux/man-pages/man7/pthreads.7.html): Es una biblioteca para trabajar con hilos en C.
+- [libcurl](https://curl.se/libcurl/): Esta biblioteca se utiliza para enviar las solicitudes HTTPS al DNS API.
+- [libb64](https://github.com/libb64/libb64): Esta biblioteca se utiliza para codificar y decodificar las solicitudes DNS a base 64.
+- [pthreads](http://man7.org/linux/man-pages/man7/pthreads.7.html): Es una biblioteca para trabajar con hilos en C.
 
 Adicionalmente, se incluyen headers para poder trabajar con sockets y con los datos en formato de red:
 
-- \<sys/socket.h\>
-- \<arpa/inet.h\>
-- \<netinet/in.h\>
+- <sys/socket.h>
+- <arpa/inet.h>
+- <netinet/in.h>
 
 A continuación, se adjunta un diagrama de flujo que representa cómo funciona el DNS interceptor.  
 ![](images/image29.png)  
  El DNS interceptor procesa las solicitudes con base en la documentación de los RFCs. Más específicamente, toma como referencia los siguientes:
 
-- \[RFC-1035\](https://datatracker.ietf.org/doc/html/rfc1035)
-- \[RFC-2535\](https://datatracker.ietf.org/doc/html/rfc2535)
+- [RFC-1035](https://datatracker.ietf.org/doc/html/rfc1035)
+- [RFC-2535](https://datatracker.ietf.org/doc/html/rfc2535)
 
 Con base en estos documentos, se realizó el parsing del header y del dominio que viene dentro de la solicitud. Para la respuesta, se construyó el header a partir de lo que vino originalmente el request. Además, se aprovecha el hecho de que el “resource record” va a tener el mismo nombre de dominio que la pregunta para usar el mecanismo de compresión que establece la sección 4.1.4 del RFC-1035. Esta establece que si un nombre de dominio se repite, se puede usar un puntero hacia la primera aparición del mismo y así evitar incluirlo dos veces en el paquete.
 
@@ -1355,7 +1243,7 @@ Verifica si un dominio es un wildcard al buscar si hay un wildcard que tenga el 
 
 Obtiene el IP de un zonal cache con base en el país que se manda.
 
-# 11\. Pruebas
+# 11. Pruebas
 
 ## 11.1. Zonal Cache
 
@@ -1394,13 +1282,13 @@ Como podemos ver, se eliminó el registro 002 porque era el que se usó más rec
 #### Random
 
 ![](images/Random1.png)
-En este ejemplo, se tienen seis registros: 001, 002, 003, 004, 006 y 007\.  
+En este ejemplo, se tienen seis registros: 001, 002, 003, 004, 006 y 007.  
 ![](images/Random2.png)
-Aquí, se escogió aleatoriamente el registro 006\.  
+Aquí, se escogió aleatoriamente el registro 006.  
 Esta otra prueba es otro caso similar. Hay 6 registros del 1 al 6:  
 ![](images/Random3.png)
 ![](images/Random4.png)
-Aquí, se eliminó aleatoriamente el registro 3\.
+Aquí, se eliminó aleatoriamente el registro 3.
 
 ### Unit tests
 
@@ -1494,7 +1382,7 @@ registerCache
 Evidencia:  
 ![](images/image6.png)
 
-# 12\. Recomendaciones
+# 12. Recomendaciones
 
 Las siguientes son nuestras recomendaciones si tuviéramos que volver a realizar el proyecto:
 
@@ -1509,7 +1397,7 @@ Las siguientes son nuestras recomendaciones si tuviéramos que volver a realizar
 9. Si se van a usar Cookies para el manejo de sesiones, es importantísimo iniciar el desarrollo con el objetivo de que el servidor de la interfaz gráfica y el Rest API o backend usen el mismo dominio para que sea válido enviar cookies entre los servidores. Por razones de seguridad, no se pueden asignar cookies entre dominios. Nosotros no sabíamos esto cuando empezamos a desarrollar y montamos el API y la interfaz en proyectos de Vercel separados, por lo que tienen dominios distintos. Esto implica que el Cookie no era aceptado por el browser o se asociaba con el dominio del API, no de la interfaz. Para solucionar esto, tuvimos que cambiar la configuración del deployment de Vercel por medio del archivo de `vercel.json`, para que, por medio de las opciones de `rewrites`, las rutas se mostraran al cliente como si estuvieran en el dominio de la interfaz, pero por detrás se envían al otro dominio del Rest API.
 10. A pesar de que lo siguiente parezca trivial, se recomienda utilizar colores para agrupar los logs de la aplicación de acuerdo con su función o propósito. Para la caché zonal, se usaron colores en los mensajes en la consola para que sea más fácil entender a qué se referían. Por ejemplo, el color azul se refería a los subdominios, el rosado a los wildcards, el rojo al hilo de garbage collection, el amarillo a inserciones en la caché, etc. Esto volvió mucho más fácil interpretar qué estaba haciendo el programa y resultó más fácil hacer debugging de posibles errores, ya que los mensajes eran más fáciles de identificar. Esto es especialmente útil en un entorno multihilo y orientado a eventos en el que el orden de ejecución no es necesariamente determinístico. A veces, ver un montón de logs puede ser abrumador y hace la depuración del sistema mucho más difícil.
 
-# 13\. Conclusiones
+# 13. Conclusiones
 
 Las conclusiones de este proyecto son las siguientes:
 
@@ -1522,8 +1410,9 @@ Las conclusiones de este proyecto son las siguientes:
 7. Este proyecto resalta la importancia de buscar formas de reducir las consultas a la base de datos para mejorar el tiempo de respuesta. Perfectamente, por cada solicitud que llega al zonal caché, se podría hacer una solicitud a Firestore para extraer la información del dominio. No obstante, esto aumentaría considerablemente el tiempo de respuesta de la aplicación al sumar la latencia del request a Firestore para absolutamente todo. Esto podría desembocar en timeouts y en situaciones similares. Por lo tanto, mecanismos de caching resultaron muy efectivos para evitar estos requests. Se extrae toda la información de la base de datos y se mantiene en memoria. Así se tiene el acceso directo. No obstante, esta solución tiene el problema de que la información podría quedar desactualizada por un periodo de tiempo hasta el siguiente refrescamiento. Asimismo, no es muy escalable ya que si la información crece mucho, podría generar que se agote la memoria.
 8. Para este proyecto se implementó la herramienta de Vercel que consiste en hacer un deploy para que se pueda acceder al sistema mediante una URL pública. Otra ventaja que tiene Vercel es el hecho del despliegue automático del app cada vez que se hace un push a GitHub. Es una herramienta que ayudó mucho al permitir siempre estar actualizada y proporcionando una URL pública para su acceso. No obstante, tiene algunas limitaciones. Por ejemplo, las funciones de API se manejan como [serverless functions](https://vercel.com/guides/using-express-with-vercel), lo cual implica que no se puede tener un caché en memoria o un event listener que se quede escuchando por cambios, lo cual es muy típico cuando se maneja con Firebase.
 9. Este proyecto resalta la versatilidad del protocolo HTTP. Usamos este protocolo para cosas muy variadas, como para extraer información, generar redirecciones en el browser, incluir headers de autenticación, descargar archivos, etc. Esto resalta la interoperabilidad del protocolo, ya que lo usamos en 3 lenguajes distintos y a distintos niveles. En JavaScript y Python, usamos abstracciones brindadas por bibliotecas, pero en C++ sí tuvimos que manipular la estructura a bajo nivel, en bytes, del protocolo. Esto fue facilitado por las bibliotecas de `libcurl` y `openssl`. No obstante, esto también resaltó posibles ineficiencias del protocolo ya que casi todo se maneja por texto. Esto implica hacer muchas manipulaciones de strings y parsing, lo cual podría llevar a muchas asignaciones dinámicas de memoria. Esto significa que el protocolo HTTP tal vez es muy natural e interpretable como nosotros como humanos, pero no es lo más eficiente para una computadora.
+10. La caché zonal puede mejorar el rendimiento de los servidores al encargarse de realizar todo el TLS handshake del protocolo HTTPS. Estas intervenciones son lentas y pueden generar una carga significativa en un servidor. La caché zonal realiza este proceso de antemano para ahorrárselo al servidor. Esto permite que el servidor se enfoque en cumplir el trabajo de servir contenido o algo similar. Adicionalmente, como la caché zonal funciona como proxy, es una medida más de seguridad para los servidores que están detrás. De esta manera, puede funcionar como un Firewall de Capa Aplicación, ya que hace bloqueo de solicitudes con base en el protocolo HTTP.
 
-# 14\. Referencias
+# 14. Referencias
 
 Referencias UI
 
@@ -1542,9 +1431,9 @@ Referencias RestAPI
   - https://github.com/auth0/node-jsonwebtoken
   - https://www.npmjs.com/package/bcryptjs
   - https://apidog.com/blog/node-js-express-authentication/
-  - [https://www.npmjs.com/package/jwt-decode\#getting-started](https://www.npmjs.com/package/jwt-decode#getting-started)
+  - [https://www.npmjs.com/package/jwt-decode#getting-started](https://www.npmjs.com/package/jwt-decode#getting-started)
   - hashApiKey: función que se usa para encriptar la API key antes de guardarla en la base de datos:  
-    [https://nodejs.org/api/crypto.html\#class-hmac](https://nodejs.org/api/crypto.html#class-hmac)
+    [https://nodejs.org/api/crypto.html#class-hmac](https://nodejs.org/api/crypto.html#class-hmac)
 
 - Auth.middleware
   - [https://apidog.com/blog/node-js-express-authentication/](https://apidog.com/blog/node-js-express-authentication/)
@@ -1559,18 +1448,18 @@ Referencias ZonalCache
     https://stackoverflow.com/questions/38679346/get-public-ip-address-on-current-ec2-instance  
     http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
   - Para enviar el request PATCH a la API de Vercel Edge Config:  
-    https://gist.github.com/mohanpedala/1e2ff5661761d3abd0385e8223e16425?permalink\_comment\_id=3935570  
+    https://gist.github.com/mohanpedala/1e2ff5661761d3abd0385e8223e16425?permalink_comment_id=3935570  
     https://unix.stackexchange.com/questions/644343/bash-while-loop-stop-after-a-successful-curl-request  
     [https://vercel.com/docs/edge-config/vercel-api](https://vercel.com/docs/edge-config/vercel-api)
 - Zonal_cache.cpp
   - Referencias para threads:  
     https://cplusplus.com/reference/thread/thread/
   - Referencias para concurrencia con lock de lectura compartida:  
-    https://en.cppreference.com/w/cpp/thread/shared\_mutex
+    https://en.cppreference.com/w/cpp/thread/shared_mutex
   - Referencias para sockets:  
     https://dev.to/jeffreythecoder/how-i-built-a-simple-http-server-from-scratch-using-c-739
   - Referencias para env variables:  
-    https://www.gnu.org/software/libc/manual/html\_node/Environment-Access.html\#:\~:text=The%20value%20of%20an%20environment,accidentally%20use%20untrusted%20environment%20variables.
+    https://www.gnu.org/software/libc/manual/html_node/Environment-Access.html#:~:text=The%20value%20of%20an%20environment,accidentally%20use%20untrusted%20environment%20variables.
 - Http_client.cpp
   - Función para convertir una cadena a minúsculas  
     https://www.geeksforgeeks.org/conversion-whole-string-uppercase-lowercase-using-stl-c/
@@ -1597,7 +1486,7 @@ Referencias DNS Interceptor
   - Almacenar la respuesta de la request HTTPS en memoria.
   - [https://curl.se/libcurl/c/getinmemory.html](https://curl.se/libcurl/c/getinmemory.html)
 - Test_interceptor
-  - https://libcheck.github.io/check/doc/check\_html/check\_3.html
+  - https://libcheck.github.io/check/doc/check_html/check_3.html
   - [https://developertesting.rocks/tools/check/](https://developertesting.rocks/tools/check/)
 - Interceptor.c
   - Referencias para threads  
@@ -1609,7 +1498,7 @@ Referencias DNS Interceptor
     https://github.com/libb64/libb64/blob/master/examples/c-example1.c
   - Formato de la URL
   - [http://dns_api:dns_api_port/api/dns_resolver](http://dns_api:dns_api_port/api/dns_resolver)
-  - [http://dns_api:dns_api_port/api/exists?domain=domain\&ip=ip_address](http://dns_api:dns_api_port/api/exists?domain=domain&ip=ip_address)
+  - [http://dns_api:dns_api_port/api/exists?domain=domain&ip=ip_address](http://dns_api:dns_api_port/api/exists?domain=domain&ip=ip_address)
   - Almacenar la respuesta de la request HTTPS en memoria
   - [https://curl.se/libcurl/c/getinmemory.html](https://curl.se/libcurl/c/getinmemory.html)
   - Enviar la solicitud HTTPS al DNS API
@@ -1619,4 +1508,4 @@ Referencias DNS Interceptor
   - // https://www.geeksforgeeks.org/udp-client-server-using-connect-c-implementation/
   - // [https://www.youtube.com/watch?v=5PPfy-nUWIM](https://www.youtube.com/watch?v=5PPfy-nUWIM)
   - Para env variables:
-  - https://www.gnu.org/software/libc/manual/html\_node/Environment-Access.html\#:\~:text=The%20value%20of%20an%20environment,accidentally%20use%20untrusted%20environment%20variables.
+  - https://www.gnu.org/software/libc/manual/html_node/Environment-Access.html#:~:text=The%20value%20of%20an%20environment,accidentally%20use%20untrusted%20environment%20variables.
