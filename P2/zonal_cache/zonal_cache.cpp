@@ -165,12 +165,13 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
             for (auto host_itr = cache.MemberBegin(); host_itr != cache.MemberEnd(); ) {
                 Value& host_object = host_itr->value;
                 const string host = host_itr->name.GetString();
+                auto host_size = host_object["size"].GetUint64();
                 Value& requests_object = host_object["requests"];
                 // Iterar por las URIs cacheadas para el host
                 for (auto uri_itr = requests_object.MemberBegin(); uri_itr != requests_object.MemberEnd(); ) {
                     Value& uri_obj = uri_itr->value;
                 
-                    cout << "\033[1;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m\n";
+                    cout << "\033[1;31mChecking cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
                     
                     // Revisar si el TTL ya expiró
                     if (uri_obj.HasMember("time_to_live") && uri_obj["time_to_live"].IsString()) {
@@ -185,8 +186,11 @@ void cleanup_expired_cache(Document& cache, shared_mutex& cache_mutex) {
                             uri_obj["most_recent_use"].SetNull();
                             uri_obj["received"].SetNull();
                             uri_obj["time_to_live"].SetNull();
-                            uri_itr = requests_object.RemoveMember(uri_itr);
+                            host_size -= uri_obj["size"].GetUint64();
+                            host_object["size"].SetUint64(host_size);
                             cout << "\033[1;31mRemoved expired cache entry: " << host_itr->name.GetString() << " -> " << uri_itr->name.GetString() << "\033[0m" << endl;
+                            uri_itr = requests_object.RemoveMember(uri_itr);
+                            
                             // Liberar los bloqueos.
                             write_lock.unlock();
                             read_lock.lock();
@@ -691,7 +695,6 @@ void add_to_cache_by_host(const string& host, const subdomain_info &info, const 
         string key_to_delete = replacementPolicies(requests_object, cache_mutex, replacement_policy);
 
         if (!key_to_delete.empty()) {
-            cout << "\033[1;33mLeast recently used URI: " << key_to_delete << "\033[0m" << endl;
             host_size -= requests_object[key_to_delete.c_str()]["size"].GetUint64();
             Value& uri_obj = requests_object[key_to_delete.c_str()];
             uri_obj["filename"].SetNull();
@@ -701,6 +704,7 @@ void add_to_cache_by_host(const string& host, const subdomain_info &info, const 
             requests_object.RemoveMember(key_to_delete.c_str());
         } else {
             cout << "\033[1;33mCould not remove key to add space. " << host << "\033[0m" << endl;
+            host_object["size"].SetUint64(host_size);
             return;
         }    
     }
@@ -762,6 +766,7 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
         Value& requests_object = host_object["requests"];
         if (requests_object.HasMember(cache_key.c_str())) {
             cout << "\033[1;33mURI object found in cache.\033[0m" << endl;
+                    
             Value& entry = requests_object[cache_key.c_str()];
             
             // Revisar la cache para ver si el request está en el cache.
@@ -802,6 +807,12 @@ bool get_response(const int &client_socket, HttpRequest request, const subdomain
                     entry.AddMember("times_used", 1, allocator);
                 }
                 send_http_response(client_socket, content.data(), size, is_ssl, ssl);
+                StringBuffer buffer;
+                Writer<StringBuffer> writer(buffer);
+                cache.Accept(writer);
+
+                cout << "\033[1;33mCache Object: " << buffer.GetString() << "\033[0m" << endl;
+
                 return true;
             } else {
                 cerr << "Failed to read cache file: " << filepath << "\033[0m" << endl;
