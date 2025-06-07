@@ -8,7 +8,6 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, name, type }) {
   const handleConfirm = async () => {
     await onConfirm();
     onClose();
-    // Añadir refresh después de cerrar el modal
     window.location.reload();
   };
 

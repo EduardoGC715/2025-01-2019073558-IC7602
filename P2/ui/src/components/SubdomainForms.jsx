@@ -177,7 +177,7 @@ export default function SubdomainForm() {
   const handleSubmit = async e => {
     e.preventDefault();
 
-    // 1. Cache Size: must be a positive decimal number (MB)
+    // Tamaño de cache: debe ser un número positivo 
     if (!/^\d+(\.\d+)?$/.test(form.cacheSize)) {
       return toast.error('Cache Size debe ser un número positivo (MB).');
     }
@@ -187,28 +187,25 @@ export default function SubdomainForm() {
     }
     const cacheBytes = mb * 1000000;
 
-    // 2. TTL: parseable, > 0
+    // TTL debe ser parseable por ms
     const ttlMs = ms(form.ttl);
     if (typeof ttlMs !== 'number' || ttlMs <= 0) {
       return toast.error('TTL inválido; use un formato como "5m", "1h".');
     }
 
-    // 3. File types: at least one
     if (!form.fileTypes.length) {
       return toast.error('Seleccione al menos un tipo de archivo para cachear.');
     }
 
-    // 4. Replacement policy
+    // Politica de reemplazo
     if (!form.replacementPolicy) {
       return toast.error('Seleccione una política de reemplazo.');
     }
 
-    // 5. Auth method
     if (!form.authMethod) {
       return toast.error('Seleccione un método de autenticación.');
     }
 
-    // 6. API-Keys
     if (form.authMethod === 'api-keys') {
       const names = form.apiKeys.map(k => k.name.trim());
       if (names.some(n => !n)) {
@@ -220,7 +217,6 @@ export default function SubdomainForm() {
       }
     }
 
-    // 7. User/Password
     if (form.authMethod === 'user-password') {
       const users = form.users.map(u => u.username.trim());
       const pwds = form.users.map(u => u.password);
