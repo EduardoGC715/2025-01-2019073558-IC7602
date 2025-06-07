@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trash2, RefreshCw } from "lucide-react"; // Removed Edit2
+import { Trash2, RefreshCw } from "lucide-react"; 
 import { dnsApi } from "../services/api";
 import {
   getUserDomains,

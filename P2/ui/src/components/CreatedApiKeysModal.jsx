@@ -1,7 +1,7 @@
 // src/components/CreatedApiKeysModal.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Copy } from 'lucide-react'; // o cualquier icono de copiar que prefieras
+import { Copy } from 'lucide-react'; 
 import { toast } from 'react-toastify';
 
 function CreatedApiKeysModal({ isOpen, createdKeys, domain, onClose }) {
