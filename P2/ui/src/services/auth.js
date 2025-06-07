@@ -6,7 +6,6 @@ export const registerUser = async (userData) => {
       withCredentials: true,
     });
     if (response.status === 200 || response.status == 201) {
-      // setAuthToken(response.data.token);
       return {
         success: true,
         message: "Usuario registrado exitosamente",
@@ -30,7 +29,6 @@ export const loginUser = async (userData) => {
       withCredentials: true,
     });
     if (response.status === 200) {
-      // setAuthToken(response.data.token);
       return {
         success: true,
         message: "Usuario logueado exitosamente",
@@ -64,9 +62,7 @@ export const loginSubdomain = async (userData, authMethod) => {
     }
     console.log("Response from loginSubdomain", response);
     if (response.status === 200 && response.data.url) {
-      // setAuthToken(response.data.token);
       window.location.href = response.data.url;
-      // Esto redirige al usuario a la URL proporcionada por el backend
       return {
         success: true,
         message: "Usuario logueado exitosamente",
@@ -90,8 +86,6 @@ export const logoutUser = async () => {
   try {
     const response = await api.get("/auth/logout");
     if (response.status === 200) {
-      console.log("HERE1");
-      // setAuthToken(null);
       return {
         success: true,
         message: "Sesión cerrada exitosamente",
